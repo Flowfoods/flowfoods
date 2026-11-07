@@ -15,7 +15,6 @@ import { entradaDoCaminho, caixaDaTela, itemFechado } from '@/lib/erp/ajuda-rota
 import { abasDaArea, acoesDaNavegacao, itemAtivo, montarTrilha, telasDaNavegacao } from '@/lib/erp/modulos';
 import { comParceiroAtual, slugNoCaminho } from '@/lib/rodolfo/modulos';
 import { raizDoRetorno } from '@/lib/erp/voltar-navegacao';
-import { Abas } from '../ui/abas';
 import { Dialogo } from '../ui/Dialogo';
 import { ContextoDaAjuda } from '../ui/link-de-ajuda';
 import { ContextoDaCaixa } from '../ui/caixa-da-tela';
@@ -367,12 +366,6 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
             <Suspense fallback={null}>
               <VoltarDaNavegacao nav={nav} chaveDoContexto={props.chaveDoContexto} visao={props.visao.modo === 'parceiro' ? props.visao.valor : undefined} />
             </Suspense>
-            {abas && (
-              <Abas
-                rotulo={`Seções de ${abas.area}`}
-                abas={abas.abas.map((a) => ({ href: a.href, rotulo: a.rotulo, ativa: a.href === ativo?.item.href }))}
-              />
-            )}
             {/* A caixa "Como funciona" vai para baixo do título (PageHeader): o título vem primeiro. */}
             <ContextoDaCaixa.Provider value={caixa}>{children}</ContextoDaCaixa.Provider>
           </main>

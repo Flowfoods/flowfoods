@@ -306,7 +306,9 @@ function PorLoja({ d, base }: { d: DreDoPeriodo; base: string }) {
                   <Link href={aqui(l.loja.id)} className={`${LINK_DE_TEXTO} ff-toque min-w-0 truncate font-medium`}>
                     {l.loja.nome}
                   </Link>
-                  <span className="shrink-0 text-[15px] font-semibold tabular-nums">{l.receitaBrutaCentavos === 0 ? '—' : formatarDinheiro(l.resultadoCentavos)}</span>
+                  <span className={`shrink-0 text-[15px] font-semibold tabular-nums ${l.resultadoCentavos < 0 ? 'text-erro' : ''}`}>
+                    {l.receitaBrutaCentavos === 0 && l.resultadoCentavos === 0 ? '—' : formatarDinheiro(l.resultadoCentavos)}
+                  </span>
                 </div>
                 <p className="mt-1 text-[12px] leading-snug tabular-nums text-suave">
                   Receita {l.receitaBrutaCentavos === 0 ? 'sem faturamento' : formatarDinheiro(l.receitaBrutaCentavos)}
