@@ -1,5 +1,6 @@
 /** Contrato puro do painel. Strings decimais não passam por Number. */
 import type { PagamentosDoPainelAnalytics } from './painel-pagamentos';
+import type { ComplementaresDoPainelAnalytics } from './painel-complementares';
 export type InteiroDecimalAnalytics = string;
 export type MotivoSemDadoAnalytics = 'cobertura-parcial' | 'sem-fontes' | 'valor-nao-informado' | 'sem-pedidos' | 'status-nao-classificado' | 'contrato-indisponivel';
 export type MedidaAnalytics<T> = { estado: 'disponivel'; valor: T } | { estado: 'sem-dado'; motivo: MotivoSemDadoAnalytics };
@@ -55,6 +56,7 @@ export interface PainelAnalytics {
   fontes: FonteDoPainelAnalytics[];
   cobertura: CoberturaDoPainelAnalytics;
   pagamentos: PagamentosDoPainelAnalytics;
+  complementares: ComplementaresDoPainelAnalytics;
   resumo: ResumoDoPainelAnalytics;
   serie: Array<{ dia: string; completo: boolean; indicadores: IndicadoresAnalytics }>;
 }

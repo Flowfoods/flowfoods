@@ -6,11 +6,12 @@ describe('INT-1.6 · calendário e materialização limitada', () => {
   it('a fronteira das 9h30 BRT não antecipa D1; depois são16 dias e um histórico por perfil', () => {
     expect(planejarAnalytics(Date.parse('2026-11-07T12:29:59Z'), loja).map(j => j.tipo)).toEqual(['ACESSO']);
     const todas = planejarAnalytics(Date.parse('2026-11-07T12:30:00Z'), loja);
-    expect(todas).toHaveLength(35);
+    expect(todas).toHaveLength(52);
     expect(todas.filter(x => x.tipo === 'ACESSO')).toHaveLength(1);
     const j = todas.filter(x => x.perfil === 'diario');
     expect(j).toHaveLength(17);
     expect(todas.filter(x => x.perfil === 'pagamentos').map(x => ({ ...x, perfil: 'diario' }))).toEqual(j);
+    expect(todas.filter(x => x.perfil === 'complementares').map(x => ({ ...x, perfil: 'diario' }))).toEqual(j);
     expect(j.filter(x => x.tipo === 'D1').map(x => x.dia)).toEqual(['2026-11-06']);
     expect(j.filter(x => x.tipo === 'REVISAO').map(x => x.dia)).toEqual([
       '2026-11-05', '2026-11-04', '2026-11-03', '2026-11-02', '2026-11-01', '2026-10-31', '2026-10-30', '2026-10-29',
@@ -31,7 +32,7 @@ describe('INT-1.6 · calendário e materialização limitada', () => {
   it('limita a materialização pendente e respeita13 meses sem criar limpeza', () => {
     for (const extra of [{ historicosPendentes: 20 }, { primeiroDiaPlanejado: '2025-10-07' }]) {
       const j = planejarAnalytics(Date.parse('2026-11-07T14:00:00Z'), { ...loja, ...extra });
-      expect(j).toHaveLength(34);
+      expect(j).toHaveLength(51);
       expect(j.some(x => x.perfil === 'diario' && x.tipo === 'HISTORICO')).toBe(false);
       expect(j.filter(x => x.perfil === 'pagamentos' && x.tipo === 'HISTORICO')).toHaveLength(1);
     }
@@ -48,6 +49,15 @@ describe('INT-1.6 · calendário e materialização limitada', () => {
   });
   it('módulo autorizado mas não ativo apenas verifica acesso', () => {
     expect(planejarAnalytics(Date.parse('2026-11-07T14:00:00Z'), { ...loja, ativo: false }).map(j => j.tipo)).toEqual(['ACESSO']);
+  });
+  it('complementares têm marco/teto próprios e não interrompem os outros perfis', () => {
+    const agora = Date.parse('2026-11-07T14:00:00Z');
+    const j = planejarAnalytics(agora, { ...loja, complementares: { historicosPendentes: 0, primeiroDiaPlanejado: '2026-09-01' } });
+    expect(j.find(x => x.perfil === 'complementares' && x.tipo === 'HISTORICO')?.dia).toBe('2026-08-31');
+    const limite = planejarAnalytics(agora, { ...loja, complementares: { historicosPendentes: 20 } });
+    expect(limite.filter(x => x.perfil === 'complementares')).toHaveLength(16);
+    expect(limite.filter(x => x.perfil === 'diario')).toHaveLength(17);
+    expect(limite.filter(x => x.perfil === 'pagamentos')).toHaveLength(17);
   });
   it('ano bissexto não gera datas inexistentes', () => {
     const j = planejarAnalytics(Date.parse('2024-03-01T14:00:00Z'), loja);

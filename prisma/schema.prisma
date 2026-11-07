@@ -618,6 +618,7 @@ model ParceiroFlow {
   erpIntegracaoPayloads       IntegracaoPayload[]
   erpIntegracaoSnapshots      IntegracaoSnapshot[]
   erpIntegracaoPagamentoSnapshots IntegracaoPagamentoSnapshot[]
+  erpIntegracaoDistribuicaoSnapshots IntegracaoDistribuicaoSnapshot[]
   erpKpisIfoodDia             KpiIfoodDia[]
   erpIntegracaoFaturamentoDias IntegracaoFaturamentoDia[]
   erpIntegracaoFaturamentoFontes IntegracaoFaturamentoFonte[]
@@ -3097,6 +3098,7 @@ model IntegracaoExecucao {
   payloads           IntegracaoPayload[]
   snapshots          IntegracaoSnapshot[]
   pagamentoSnapshots IntegracaoPagamentoSnapshot[]
+  distribuicaoSnapshots IntegracaoDistribuicaoSnapshot[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, moduloId, dia, perfil])
@@ -3122,6 +3124,7 @@ model IntegracaoPayload {
   versaoContrato Int?
   recebidoEm    DateTime           @default(now()) @db.Timestamptz(3)
   pagamentoSnapshots IntegracaoPagamentoSnapshot[]
+  distribuicaoSnapshots IntegracaoDistribuicaoSnapshot[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, execucaoId, geracao, pagina])
@@ -3147,6 +3150,28 @@ model IntegracaoPagamentoSnapshot {
   @@unique([parceiroId, id], map: "IPagSnapshot_tenant_key")
   @@unique([parceiroId, execucaoId, geracao], map: "IPagSnapshot_geracao_key")
   @@index([parceiroId, execucaoId, situacao, geracao(sort: Desc)], map: "IPagSnapshot_exec_estado_geracao_idx")
+}
+
+// INT-1.8D: duas marginais da mesma versão; cada SQL NULL preserva sua ausência.
+model IntegracaoDistribuicaoSnapshot {
+  id             String @id @default(cuid())
+  parceiroId     String
+  parceiro       ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict, map: "ICompSnapshot_parceiro_fkey")
+  execucaoId     String
+  execucao       IntegracaoExecucao @relation(fields: [parceiroId, execucaoId], references: [parceiroId, id], onDelete: Restrict, map: "ICompSnapshot_execucao_fkey")
+  geracao        Int
+  paginaInicial  Int @default(1)
+  payloadInicial IntegracaoPayload @relation(fields: [parceiroId, execucaoId, geracao, paginaInicial], references: [parceiroId, execucaoId, geracao, pagina], onDelete: Restrict, map: "ICompSnapshot_payload_fkey")
+  versaoContrato Int
+  situacao       String
+  horarios       Json?
+  primeirosPedidos Json?
+  hash           String
+  criadoEm       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([parceiroId, id], map: "ICompSnapshot_tenant_key")
+  @@unique([parceiroId, execucaoId, geracao], map: "ICompSnapshot_geracao_key")
+  @@index([parceiroId, execucaoId, situacao, geracao(sort: Desc)], map: "ICompSnapshot_exec_estado_geracao_idx")
 }
 
 // Versão imutável, inclusive vazio oficial. PENDENTE_PERIODO não substitui o último PUBLICADO.

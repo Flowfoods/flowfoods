@@ -114,6 +114,7 @@ describe('429 OAuth conserva retomada até o cliente HTTP', () => {
       renovar: vi.fn(async () => {}), salvarPagina: vi.fn(async () => {}),
       publicar: vi.fn(async () => 'publicada' as const), verificarAcesso: vi.fn(async () => {}),
       publicarPagamentos: vi.fn(async () => 'publicada' as const),
+      publicarComplementares: vi.fn(async () => 'publicada' as const),
       falhar: vi.fn(async () => { entrou(); await persistencia; }),
     };
     let concluida = false;

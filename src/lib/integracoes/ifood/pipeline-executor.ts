@@ -4,6 +4,7 @@ import {
   ErroContratoAnalytics, lerPaginaAnalytics, type PaginaRecebidaAnalytics,
 } from './analytics';
 import { conferirIdentidadePagamentos, consultaPagamentos, normalizarPagamentosAnalytics } from './analytics-pagamentos';
+import { conferirIdentidadeComplementares, consultaComplementares, normalizarComplementaresAnalytics } from './analytics-complementares';
 import { criarClienteIfood, type OpcoesDoCliente } from './http';
 import { caminhoDosKpis } from './leitura-test';
 import {
@@ -18,6 +19,7 @@ export interface RepositorioDoExecutorAnalytics {
   salvarPagina(tarefa: TarefaAnalytics, pagina: PaginaDoTransporte): Promise<void>;
   publicar(tarefa: TarefaAnalytics): Promise<PublicacaoAnalytics>;
   publicarPagamentos(tarefa: TarefaAnalytics): Promise<Exclude<PublicacaoAnalytics, 'vazia'>>;
+  publicarComplementares(tarefa: TarefaAnalytics): Promise<Exclude<PublicacaoAnalytics, 'vazia'>>;
   verificarAcesso(tarefa: TarefaAnalytics): Promise<void>;
   falhar(tarefa: TarefaAnalytics, falha: FalhaAnalytics): Promise<void>;
 }
@@ -48,11 +50,14 @@ export async function executarTarefaAnalytics(tarefa: TarefaAnalytics, o: Opcoes
     // Não permite que opções de outro app/ambiente transportem a identidade adquirida.
     if (o.http.app.id !== tarefa.appId || o.http.app.ambiente !== tarefa.identidade.ambiente
       || (tarefa.perfil === 'diario' ? tarefa.identidade.perfil !== 'diario' : tarefa.perfil === 'acesso'
-        ? tarefa.identidade.perfil !== 'homologacao' : tarefa.identidade.perfil !== 'pagamentos')) {
+        ? tarefa.identidade.perfil !== 'homologacao' : tarefa.identidade.perfil !== tarefa.perfil)) {
       throw new ErroContratoAnalytics('IDENTIDADE', 'O cliente não corresponde à tarefa adquirida.');
     }
     if (tarefa.perfil === 'pagamentos') {
       conferirIdentidadePagamentos(tarefa.identidade);
+      if (tarefa.identidade.fuso !== tarefa.fuso) throw new ErroContratoAnalytics('IDENTIDADE', 'O fuso não corresponde à tarefa adquirida.');
+    } else if (tarefa.perfil === 'complementares') {
+      conferirIdentidadeComplementares(tarefa.identidade);
       if (tarefa.identidade.fuso !== tarefa.fuso) throw new ErroContratoAnalytics('IDENTIDADE', 'O fuso não corresponde à tarefa adquirida.');
     } else conferirPaginasAnalytics(tarefa.identidade, []); // antes de token ou rede
     const cliente = criarClienteIfood({
@@ -68,7 +73,8 @@ export async function executarTarefaAnalytics(tarefa: TarefaAnalytics, o: Opcoes
     for (let pagina = 1; pagina <= 1_000; pagina++) {
       await repo.renovar(tarefa);
       const consulta = tarefa.perfil === 'diario' ? consultaDoDia(tarefa.identidade.dia, pagina) : tarefa.perfil === 'pagamentos'
-        ? consultaPagamentos(tarefa.identidade.dia) : consultaMinima(tarefa.identidade.dia, pagina);
+        ? consultaPagamentos(tarefa.identidade.dia) : tarefa.perfil === 'complementares'
+          ? consultaComplementares(tarefa.identidade.dia) : consultaMinima(tarefa.identidade.dia, pagina);
       const resultado = await cliente.chamar({
         metodo: 'POST', caminho: caminhoDosKpis(tarefa.identidade.merchantId), familia: 'analytics',
         corpo: consulta, idempotente: true, preservarCorpo: true,
@@ -91,11 +97,15 @@ export async function executarTarefaAnalytics(tarefa: TarefaAnalytics, o: Opcoes
       if (resultado.status !== 200 || resposta === null) throw new ErroContratoAnalytics('ESQUEMA', 'A coleta exige JSON HTTP 200 não nulo.');
       // Conserva a evidência limitada, inclusive quando o contrato diário vier incompatível. Publicar revalida tudo.
       await repo.salvarPagina(tarefa, { pagina, corpoOriginal: resultado.corpoOriginal, http: resultado.status, requestId: resultado.requestId,
-        ...(tarefa.perfil === 'pagamentos' ? { versaoContrato: 1 as const } : {}) });
+        ...(['pagamentos', 'complementares'].includes(tarefa.perfil) ? { versaoContrato: 1 as const } : {}) });
       paginas++;
       if (tarefa.perfil === 'pagamentos') {
         normalizarPagamentosAnalytics(tarefa.identidade, [{ identidade: tarefa.identidade, paginaSolicitada: pagina, versaoContrato: 1, corpoOriginal: resultado.corpoOriginal }]);
         return { estado: await repo.publicarPagamentos(tarefa), paginas };
+      }
+      if (tarefa.perfil === 'complementares') {
+        normalizarComplementaresAnalytics(tarefa.identidade, [{ identidade: tarefa.identidade, paginaSolicitada: pagina, versaoContrato: 1, corpoOriginal: resultado.corpoOriginal }]);
+        return { estado: await repo.publicarComplementares(tarefa), paginas };
       }
       if (tarefa.perfil === 'acesso') {
         // Consulta mínima usa terms, não groupBy. Isto prova acesso, nunca cobertura ou receita do dia.

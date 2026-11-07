@@ -142,18 +142,19 @@ describe('INT-1.6 · fronteira da rotina automática', () => {
     expect(d.parceiro.mock.calls.map(([q]) => q.where.id?.gt ?? 'inicio')).toEqual(['', 'a', 'b', 'inicio']);
     expect(d.executar).not.toHaveBeenCalled();
   });
-  it('planeja dois históricos independentes, mas emite somente uma tarefa adquirida por rodada', async () => {
+  it('planeja três históricos independentes, mas executa somente uma tarefa adquirida por rodada', async () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-07T14:00:00Z'));
     d.primeiraJanela.mockImplementation(async q => q.where.perfil === 'diario'
       ? { dia: new Date('2026-10-01T00:00:00Z'), fuso: 'America/Sao_Paulo', unidade: 'REAL' } : null);
     const marginal = { ...tarefa, perfil: 'pagamentos' }; d.adquirir.mockResolvedValue(marginal);
     await criarRotinaAnalytics(vi.fn())();
-    expect(d.primeiraJanela.mock.calls.map(([q]) => q.where.perfil)).toEqual(['diario', 'pagamentos']);
-    expect(d.contarJanelas.mock.calls.map(([q]) => q.where.perfil)).toEqual(['diario', 'pagamentos']);
+    expect(d.primeiraJanela.mock.calls.map(([q]) => q.where.perfil)).toEqual(['diario', 'pagamentos', 'complementares']);
+    expect(d.contarJanelas.mock.calls.map(([q]) => q.where.perfil)).toEqual(['diario', 'pagamentos', 'complementares']);
     const janelas = d.planejar.mock.calls.map(([, j]) => j);
-    expect(janelas).toHaveLength(35);
+    expect(janelas).toHaveLength(52);
     expect(janelas.find(j => j.perfil === 'diario' && j.tipo === 'HISTORICO').dia).toBe('2026-09-30');
     expect(janelas.find(j => j.perfil === 'pagamentos' && j.tipo === 'HISTORICO').dia).toBe('2026-10-21');
+    expect(janelas.find(j => j.perfil === 'complementares' && j.tipo === 'HISTORICO').dia).toBe('2026-10-21');
     expect(d.executar).toHaveBeenCalledTimes(1); expect(d.executar.mock.calls[0][0]).toBe(marginal);
     expect(d.financeiro).toHaveBeenCalledTimes(1); expect(d.reservar).not.toHaveBeenCalled();
   });

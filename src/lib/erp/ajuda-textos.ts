@@ -1939,7 +1939,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['integracoes/analytics'],
     titulo: 'Painel iFood',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Escolha uma loja, as fontes e um período até ontem; sem datas, são consultados os últimos 30 dias.' },
       { texto: 'Os valores mostram vendas informadas pelo iFood, não repasse nem lucro.' },
@@ -1963,6 +1963,16 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'Esta distribuição conta ocorrências de métodos informadas pelo iFood. Não representa pedidos únicos, valores pagos ou repasses.' },
           { texto: 'Pagamentos têm leitura e cobertura próprias; completar os indicadores diários não completa essa distribuição. Uma revisão pendente preserva a publicação anterior.' },
           { texto: 'O percentual usa somente o total de ocorrências dos métodos no período. Sem ocorrências, não há percentual; se o provedor não informou o agregado, ele permanece sem dado.' },
+        ],
+      },
+      {
+        id: 'horario-primeiro-pedido',
+        titulo: 'Horário e primeiro pedido',
+        blocos: [
+          { texto: 'As horas são informadas pela origem, sem conversão de fuso. Horas ausentes não são preenchidas com zero.' },
+          { texto: 'Primeiro pedido é contado em cada estabelecimento de origem. Uma pessoa pode aparecer em mais de uma origem; a distribuição não mede clientes únicos nem retenção.' },
+          { texto: 'Cada tabela usa seu próprio total de ocorrências. Um agregado ausente mantém apenas aquela tabela sem dado; termos não reconhecidos são preservados e entram no total.' },
+          { texto: 'A cobertura dessas duas distribuições é independente dos indicadores diários e dos pagamentos. As tabelas não informam primeiro pedido por hora.' },
         ],
       },
     ],

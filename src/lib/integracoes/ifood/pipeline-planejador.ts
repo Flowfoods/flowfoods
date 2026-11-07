@@ -11,9 +11,10 @@ export interface AgendaDaLoja {
   historicosPendentes: number;
   /** Progresso independente: não emprestar o marco diário para saltar o histórico marginal. */
   pagamentos?: { primeiroDiaPlanejado?: string | null; historicosPendentes: number };
+  complementares?: { primeiroDiaPlanejado?: string | null; historicosPendentes: number };
 }
 
-/** Uma loja por vez; no máximo 35 janelas e uma histórica por perfil. Não faz I/O. */
+/** Uma loja por vez; no máximo 52 janelas e uma histórica por perfil. Não faz I/O. */
 export function planejarAnalytics(agora: number, loja: AgendaDaLoja): JanelaAnalytics[] {
   const instante = DateTime.fromMillis(agora, { zone: loja.fuso });
   const brasilia = DateTime.fromMillis(agora, { zone: 'America/Sao_Paulo' });
@@ -23,8 +24,8 @@ export function planejarAnalytics(agora: number, loja: AgendaDaLoja): JanelaAnal
   const janela = (dia: string, tipo: JanelaAnalytics['tipo'], perfil?: JanelaAnalytics['perfil']): JanelaAnalytics => ({ moduloId: loja.moduloId, dia, tipo, ciclo, fuso: loja.fuso, unidade: loja.unidade, ...(perfil ? { perfil } : {}) });
   const resultado = [janela(hoje.minus({ days: 1 }).toISODate()!, 'ACESSO')];
   if (!loja.ativo || brasilia.hour * 60 + brasilia.minute < 570) return resultado;
-  for (const perfil of ['diario', 'pagamentos'] as const) {
-    const marco = perfil === 'diario' ? loja : (loja.pagamentos ?? { historicosPendentes: 0 });
+  for (const perfil of ['diario', 'pagamentos', 'complementares'] as const) {
+    const marco = perfil === 'diario' ? loja : (loja[perfil] ?? { historicosPendentes: 0 });
     for (let n = 1; n <= 16; n++) resultado.push(janela(hoje.minus({ days: n }).toISODate()!, n === 1 ? 'D1' : 'REVISAO', perfil));
     if (marco.historicosPendentes >= 20) continue;
     const primeiro = marco.primeiroDiaPlanejado ? DateTime.fromISO(marco.primeiroDiaPlanejado, { zone: loja.fuso }) : hoje.minus({ days: 16 });

@@ -35,6 +35,7 @@ function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())]) {
     salvarPagina: vi.fn(async (_t, p) => { eventos.push(`pagina:${p.pagina}`); }),
     publicar: vi.fn(async () => { eventos.push('publicar'); return 'publicada' as const; }),
     publicarPagamentos: vi.fn(async () => { eventos.push('pagamentos'); return 'publicada' as const; }),
+    publicarComplementares: vi.fn(async () => { eventos.push('complementares'); return 'publicada' as const; }),
     verificarAcesso: vi.fn(async () => { eventos.push('acesso'); }),
     falhar: vi.fn(async () => { eventos.push('falhar'); }),
   };
@@ -52,6 +53,42 @@ function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())]) {
   const http = { app: APP, tokens, limitador, transporte, env: ENV, relogio: () => AGORA, dormir, maxTentativas: 6, esperaMaximaMs: 999_999 };
   return { repositorio, http, eventos, pedidos, sonos, transporte };
 }
+
+describe('INT-1.8D · tarefa complementar isolada', () => {
+  const tarefaD = (): TarefaAnalytics => ({ ...tarefaPagamentos(), perfil: 'complementares', identidade: {
+    ambiente: 'TEST', merchantId: '11111111-2222-4333-8444-555555555555', dia: '2026-11-06',
+    fuso: 'America/Sao_Paulo', perfil: 'complementares', versaoContrato: 1,
+  } });
+  const dupla = (h: unknown = { value: { '9': 2 } }, p: unknown = { value: { true: 2 } }) => ({ data: [{ orderCreationHour: h, customerFirstOrderInMerchant: p }], currentPage: 1, size: 1, totalItems: 1, totalPages: 1 });
+  it.each([[null, null], [null, { value: {} }], [{ value: { '01': 0, ['__proto__']: 7 } }, { value: { true: 2, NOVO: 3 } }]])('publica os dois termos sem acionar outro perfil %#', async (h, p) => {
+    const m = montar([json(dupla(h, p))]), t = tarefaD();
+    expect(await executarTarefaAnalytics(t, m)).toEqual({ estado: 'publicada', paginas: 1 });
+    expect(m.eventos).toEqual(['renovar', 'renovar', 'http', 'pagina:1', 'complementares']);
+    expect(m.repositorio.salvarPagina).toHaveBeenCalledWith(t, expect.objectContaining({ versaoContrato: 1 }));
+    expect(m.repositorio.publicar).not.toHaveBeenCalled(); expect(m.repositorio.publicarPagamentos).not.toHaveBeenCalled();
+    expect(JSON.parse(m.pedidos[0].corpo!).agg).toEqual({ terms: { orderCreationHour: ['count'], customerFirstOrderInMerchant: ['count'] } });
+    expect(m.pedidos).toHaveLength(1);
+  });
+  it('campo ausente guarda raw e recusa publicação sem solicitar outra página', async () => {
+    const m = montar([json({ ...dupla(), data: [{ orderCreationHour: null }] })]);
+    expect(await executarTarefaAnalytics(tarefaD(), m)).toEqual({ estado: 'falhou', paginas: 1 });
+    expect(m.repositorio.publicarComplementares).not.toHaveBeenCalled(); expect(m.repositorio.salvarPagina).toHaveBeenCalledOnce();
+    expect(m.pedidos).toHaveLength(1);
+  });
+  it.each([403, 429, 503])('recusa %i usa a fila existente sem espera local', async status => {
+    const m = montar([json({ error: true }, status, { 'retry-after': '600' })]);
+    expect(await executarTarefaAnalytics(tarefaD(), m)).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(m.repositorio.falhar).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ http: status }));
+    if (status === 429) expect(m.repositorio.falhar).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ naoAntesDe: '2026-11-07T12:10:00.000Z' }));
+    expect(m.sonos).toEqual([]); expect(m.pedidos).toHaveLength(1); expect(m.repositorio.publicarComplementares).not.toHaveBeenCalled();
+  });
+  it('recusa fuso forjado antes do OAuth e não esconde falha de persistência', async () => {
+    const t = tarefaD(); t.fuso = 'UTC'; const m = montar();
+    expect(await executarTarefaAnalytics(t, m)).toEqual({ estado: 'falhou', paginas: 0 }); expect(m.transporte).not.toHaveBeenCalled();
+    const n = montar([json(dupla())]); vi.mocked(n.repositorio.publicarComplementares).mockRejectedValue(new Error('commit'));
+    await expect(executarTarefaAnalytics(tarefaD(), n)).rejects.toThrow('commit'); expect(n.repositorio.falhar).not.toHaveBeenCalled();
+  });
+});
 
 describe('INT-1.8C · executor marginal usa a fila/cota existentes', () => {
   const marginal = (paymentMethod: unknown = { value: { PIX: 4 } }) => ({ data: [{ paymentMethod }], currentPage: 1, size: 1, totalItems: 1, totalPages: 1 });

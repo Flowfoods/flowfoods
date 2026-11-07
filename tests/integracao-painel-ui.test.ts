@@ -27,6 +27,10 @@ function painel(alteracoes: Partial<DadosPainel> = {}): DadosPainel {
     pagamentos: { cobertura: { completa: false, diasEsperados: 1, diasCompletos: 0, fontesSelecionadas: 1, paresEsperados: 1, paresCobertos: 0,
       dias: [{ dia: '2026-11-05', completo: false, fontes: [{ chave: A, estado: 'ausente', publicadaEm: null, revisaoPendente: false }] }] },
       distribuicao: { estado: 'sem-dado', motivo: 'cobertura-parcial' }, total: { estado: 'sem-dado', motivo: 'cobertura-parcial' } },
+    complementares: { cobertura: { completa: false, diasEsperados: 1, diasCompletos: 0, fontesSelecionadas: 1, paresEsperados: 1, paresCobertos: 0,
+      dias: [{ dia: '2026-11-05', completo: false, fontes: [{ chave: A, estado: 'ausente', publicadaEm: null, revisaoPendente: false }] }] },
+      horarios: { distribuicao: { estado: 'sem-dado', motivo: 'cobertura-parcial' }, total: { estado: 'sem-dado', motivo: 'cobertura-parcial' } },
+      primeirosPedidos: { distribuicao: { estado: 'sem-dado', motivo: 'cobertura-parcial' }, total: { estado: 'sem-dado', motivo: 'cobertura-parcial' } } },
     resumo: r, serie: [{ dia: '2026-11-05', completo: true, indicadores: r.indicadores }], ...alteracoes };
 }
 function resultado(p = painel()): ResultadoDoPainelAnalytics {
@@ -115,14 +119,27 @@ describe('INT-1.8B · painel de snapshots em UI', () => {
     expect(h).toContain('overflow-wrap:anywhere'); expect(h).not.toContain('truncate'); expect(h).not.toMatch(/\d[eE][+]\d/);
     expect(h).toContain('o sinal foi preservado');
   });
-  it('pagamentos vêm da marginal própria, sem inferência do agrupado diário; horário e primeiro pedido continuam indisponíveis', () => {
+  it('pagamentos, horário e primeiro pedido vêm das marginais próprias, sem inferência do agrupado diário', () => {
     const r: ResumoDoPainelAnalytics = resumo();
     r.distribuicoes.pagamento = { estado: 'disponivel', valor: [{ valor: 'PAGAMENTO_NAO_SUPORTADO', pedidos: '667788' }] };
+    r.distribuicoes.horario = { estado: 'disponivel', valor: [{ valor: 'HORA_NAO_SUPORTADA', pedidos: '998877' }] };
+    r.distribuicoes.primeiroPedido = { estado: 'disponivel', valor: [{ valor: 'PRIMEIRO_NAO_SUPORTADO', pedidos: '554433' }] };
     const h = html(resultado(painel({ resumo: r })));
-    for (const t of ['Formas de pagamento', 'Cobertura de pagamentos incompleta', 'Distribuição sem dado', 'Horário do pedido', 'Primeiro pedido do cliente', 'Indisponível']) expect(h).toContain(t);
-    expect(h).not.toMatch(/PAGAMENTO_NAO_SUPORTADO|667788/);
+    for (const t of ['Formas de pagamento', 'Cobertura de pagamentos incompleta', 'Distribuição sem dado', 'Horário informado pela origem', 'Primeiro pedido por estabelecimento de origem', 'Cobertura complementar incompleta']) expect(h).toContain(t);
+    expect(h).not.toMatch(/PAGAMENTO_NAO_SUPORTADO|667788|HORA_NAO_SUPORTADA|998877|PRIMEIRO_NAO_SUPORTADO|554433/);
     expect(cartao(h, 'Pedidos observados')).toMatch(/>3</);
     expect(cartao(h, 'GMV · todos os status')).toContain('R$ 110,00');
+  });
+  it('complementares completos permanecem disponíveis quando diário e pagamentos estão incompletos', () => {
+    const p = painel({ resumo: resumirPainelAnalytics(linhas, false) }); p.cobertura.completa = false;
+    p.complementares = { cobertura: { ...p.complementares.cobertura, completa: true, paresCobertos: 1, diasCompletos: 1 },
+      horarios: { total: { estado: 'disponivel', valor: '4' }, distribuicao: { estado: 'disponivel', valor: [{ termo: '2', ocorrencias: '1' }, { termo: '10', ocorrencias: '3' }] } },
+      primeirosPedidos: { total: { estado: 'disponivel', valor: '10' }, distribuicao: { estado: 'disponivel', valor: [{ termo: 'true', ocorrencias: '2' }, { termo: 'false', ocorrencias: '8' }] } } };
+    const h = html(resultado(p));
+    expect(cartao(h, 'Pedidos observados')).toContain('Sem dado'); expect(h).toContain('Cobertura de pagamentos incompleta');
+    expect(h).toContain('Cobertura complementar completa'); expect(h).toMatch(/>02h<.*25,0%/); expect(h).toMatch(/>Primeiro pedido no estabelecimento de origem<.*20,0%/);
+    expect(h).toContain('Datas do recorte em São Paulo'); expect(h).not.toContain('Dias e horários de São Paulo');
+    expect(h).not.toContain('Distribuições ainda indisponíveis');
   });
   it('pagamentos completos continuam disponíveis quando a cobertura diária é parcial, com denominador próprio', () => {
     const p = painel({ resumo: resumirPainelAnalytics(linhas, false) });
