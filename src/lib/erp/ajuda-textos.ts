@@ -311,8 +311,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos/classificar'],
     titulo: 'Classificar insumos',
-    versao: 1,
+    versao: 2,
     aula: [
+      { texto: 'Valores de estoque aparecem somente nas lojas em que você pode consultar compras; um valor parcial fica identificado.' },
       { texto: 'Insumos cadastrados antes das categorias ficam sem categoria; aqui ganham uma, pelo nome, sem mudar preço, unidade, saldo nem ficha.' },
       { texto: 'A prévia mostra para onde cada um iria, sem gravar nada; na dúvida, vai para “Outros / a classificar”, com o motivo.' },
       { texto: 'Na fila de revisão, marque vários e escolha a categoria: cada mudança fica no histórico, com o antes e o depois.' },
@@ -1567,9 +1568,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'estoque',
     rotas: ['estoque/[lojaId]/contagens/nova'],
     titulo: 'Planejar a contagem',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'Escolha o lugar (seco, refrigerado...) e quais insumos contar: os vencidos, todos do lugar ou só os mais caros.' },
+      { texto: 'Escolha o lugar e marque os insumos para contar, um a um ou o lugar todo.' },
+      { texto: 'Com acesso a compras na loja, os filtros por valor e frequência também ficam disponíveis.', para: ['compras.ver'] },
       { texto: 'Um pedaço por vez. Um insumo só entra em uma contagem aberta.' },
     ],
   },
@@ -1678,10 +1680,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'estoque',
     rotas: ['estoque/divergencias', 'estoque/[lojaId]/divergencias'],
     titulo: 'Divergências',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'O que a contagem acusa sem requisição, em reais.' },
-      { texto: '“Pequeno e repetido” é a diferença que passa despercebida. Por setor mostra onde olhar, não quem culpar.' },
+      { texto: 'O que a contagem acusa sem requisição, em quantidades.' },
+      { texto: 'Com acesso a compras na loja, você também vê valores, prioridade por custo e diferenças pequenas que se repetem.', para: ['compras.ver'] },
+      { texto: 'Por setor mostra os insumos que cada equipe pediu; confira a diferença antes de tirar conclusões.' },
     ],
     pontos: [
       {

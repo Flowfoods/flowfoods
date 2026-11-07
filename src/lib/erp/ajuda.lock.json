@@ -36,8 +36,8 @@
     "hash": "3fd4e67929b6dba1"
   },
   "insumo-classificar": {
-    "versao": 1,
-    "hash": "5c6cb0c4eec6fd8c"
+    "versao": 2,
+    "hash": "f98748a981ff749f"
   },
   "insumo-embalagem": {
     "versao": 2,
@@ -248,8 +248,8 @@
     "hash": "5b8b21e22d9a0494"
   },
   "contagem-nova": {
-    "versao": 1,
-    "hash": "bf3797052faee1e3"
+    "versao": 2,
+    "hash": "052333cc87bf2f2e"
   },
   "contagem": {
     "versao": 1,
@@ -280,8 +280,8 @@
     "hash": "f32d94555c2aeedb"
   },
   "divergencias": {
-    "versao": 1,
-    "hash": "0c4f542d977505e3"
+    "versao": 2,
+    "hash": "d880692b6801b174"
   },
   "faturamento": {
     "versao": 1,

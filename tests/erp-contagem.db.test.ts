@@ -59,6 +59,7 @@ import {
 } from '@/lib/erp/contagem';
 import { camposDasRegras, REGRAS_PADRAO } from '@/lib/erp/contagem-campos';
 import { listarHistorico } from '@/lib/erp/historico';
+import * as custosDaLeitura from '@/lib/erp/estoque';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import * as estoqueDaSessao from '@/app/erp/estoque/actions';
 import { cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
@@ -191,6 +192,31 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     expect(recontar.linhas.filter((l) => l.sugerido).map((l) => l.nome)).toEqual(['Pão brioche']);
   });
 
+  it('sem compras: planejamento manual não consulta custos nem muda com preços e regras monetárias', async () => {
+    const alcance = resolverAlcance({ perfilBase: 'GERENTE', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: ['compras.ver'], redeInteira: false, lojaIds: [ids.vp] });
+    const agora = new Date();
+    const ler = (quais: 'A' | 'vencidos' | 'todos') => planejamentoDoCiclo(a, alcance, ids.vp, { conservacao: '', quais }, agora);
+    const preco = await a.insumo.findUniqueOrThrow({ where: { id: ids.carne }, select: { precoEmbalagemCentavos: true } });
+    const regra = await a.loja.findUniqueOrThrow({ where: { id: ids.vp }, select: { contagemToleranciaCentavos: true, contagemFreqADias: true } });
+    const custo = vi.spyOn(custosDaLeitura, 'custosDaLoja').mockImplementation(async () => { throw new Error('Custo protegido consultado'); });
+    try {
+      const antes = (await ler('A'))!;
+      expect(antes).toMatchObject({ verValores: false, regras: null, filtro: { quais: 'manual' } });
+      expect(antes.linhas.every((l) => l.classe === null && l.situacao === null && l.venceEm === null && l.valorCentavos === null && !l.sugerido)).toBe(true);
+      await a.insumo.update({ where: { id: ids.carne }, data: { precoEmbalagemCentavos: 987654 } });
+      await a.loja.update({ where: { id: ids.vp }, data: { contagemToleranciaCentavos: 76543, contagemFreqADias: 1 } });
+      expect(await ler('vencidos')).toEqual(antes);
+      expect((await ler('todos'))!.linhas.every((l) => l.sugerido)).toBe(true);
+      const um = (await planejamentoDoCiclo(a, alcance, ids.vp, { conservacao: '', quais: 'A', insumo: ids.pao }, agora))!;
+      expect(um.linhas.filter((l) => l.sugerido).map((l) => l.insumoId)).toEqual([ids.pao]);
+      expect(custo).not.toHaveBeenCalled();
+    } finally {
+      custo.mockRestore();
+      await a.insumo.update({ where: { id: ids.carne }, data: preco });
+      await a.loja.update({ where: { id: ids.vp }, data: regra });
+    }
+  });
+
   it('operador não planeja; gerente da Delivery não alcança a Penha; lista vazia é recusada', async () => {
     expect(await iniciarCiclo(a, OPERADOR(), ids.vp, { insumoIds: [ids.cheddar], titulo: '' }, 'Caio')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/ajustar saldo/) } });
     expect(await iniciarCiclo(a, GERENTE_DELIVERY(), ids.vp, { insumoIds: [ids.cheddar], titulo: '' }, 'Gil')).toMatchObject({ ok: false, naoEncontrado: true });
@@ -200,7 +226,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
   });
 
   it('o gerente começa o ciclo dos refrigerados: lista congelada, prazo no fim do dia seguinte; o mesmo insumo não entra em outro ciclo aberto', async () => {
-    const r = await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [ids.cheddar, ids.presunto, ids.batata], titulo: '' }, 'Gil Gerente');
+    const semCompras = resolverAlcance({ perfilBase: 'GERENTE', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: ['compras.ver'], redeInteira: false, lojaIds: [ids.vp] });
+    const r = await iniciarCiclo(a, semCompras, ids.vp, { insumoIds: [ids.cheddar, ids.presunto, ids.batata], titulo: '' }, 'Gil Gerente');
     expect(r.ok).toBe(true);
     ids.ciclo = (r as { id: string }).id;
     const c = (await obterContagem(a, OPERADOR(), ids.vp, ids.ciclo))!;

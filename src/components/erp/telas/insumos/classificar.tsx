@@ -212,7 +212,7 @@ export function TelaClassificar({
           <p className="px-4 py-8 text-center text-sm text-suave sm:px-5">A fila está vazia: todos os insumos ativos têm uma categoria definida.</p>
         ) : (
           <>
-            <FormDaFila acao={acaoEmLote} linhas={fila.linhas} categorias={categorias} base={base} bloqueio={bloqueio} />
+            <FormDaFila visibilidadeDoValor={fila.visibilidadeDoValor} acao={acaoEmLote} linhas={fila.linhas} categorias={categorias} base={base} bloqueio={bloqueio} />
             <Paginacao
               de={de}
               ate={de + fila.linhas.length - 1}

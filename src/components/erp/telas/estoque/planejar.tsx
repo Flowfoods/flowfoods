@@ -29,7 +29,7 @@ export function lerFiltroDoPlanejamento(sp: Record<string, string | string[] | u
   const insumo = um('insumo');
   return {
     conservacao: (ORDEM_DAS_CONSERVACOES as readonly string[]).includes(c) ? (c as Conservacao) : '',
-    quais: q === 'todos' || q === 'A' ? q : 'vencidos',
+    quais: q === 'todos' || q === 'A' || q === 'manual' ? q : 'vencidos',
     ...(/^[a-z0-9]{1,64}$/i.test(insumo) ? { insumo } : {}),
   };
 }
@@ -37,7 +37,7 @@ export function lerFiltroDoPlanejamento(sp: Record<string, string | string[] | u
 const DIA_MES = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
 
 function apoio(l: PlanejamentoDoCiclo['linhas'][number]): string {
-  const partes = [ROTULO_DA_CLASSE[l.classe]];
+  const partes = l.classe ? [ROTULO_DA_CLASSE[l.classe]] : [];
   if (!l.ultima) partes.push('nunca contado aqui');
   else partes.push(`contado em ${DIA_MES.format(l.ultima)}`);
   if (l.situacao === 'vencido') partes.push(`venceu ${l.venceEm ? formatarData(l.venceEm, true) : ''}`.trim());
@@ -50,7 +50,6 @@ export function TelaPlanejarCiclo({
   p,
   base,
   contexto,
-  filtro,
   acao,
   podePlanejar,
   bloqueio,
@@ -63,6 +62,8 @@ export function TelaPlanejarCiclo({
   podePlanejar: boolean;
   bloqueio: string | null;
 }) {
+  // A URL não concede acesso a filtros derivados de custo; o domínio devolve o filtro efetivo.
+  const filtro = p.filtro;
   const aqui = `${base}/${p.loja.id}`;
   const href = (muda: Partial<{ conservacao: Conservacao | ''; quais: Quais }>) => {
     const g = { conservacao: filtro.conservacao, quais: filtro.quais, ...muda };
@@ -78,9 +79,9 @@ export function TelaPlanejarCiclo({
     nome: l.nome,
     conservacao: l.conservacao,
     apoio: apoio(l),
-    vencido: l.situacao !== 'em-dia',
+    vencido: l.situacao !== null && l.situacao !== 'em-dia',
     quantidade: l.saldoMilesimos < 0 ? `−${formatarQuantidade(-l.saldoMilesimos, l.unidade)}` : formatarQuantidade(l.saldoMilesimos, l.unidade),
-    valor: l.valorCentavos === null ? 'custo não informado' : formatarDinheiro(l.valorCentavos),
+    valor: !p.verValores ? null : l.valorCentavos === null ? 'custo não informado' : formatarDinheiro(l.valorCentavos),
     emOutraContagem: l.emOutraContagem,
     sugerido: l.sugerido,
   }));
@@ -92,7 +93,7 @@ export function TelaPlanejarCiclo({
         icone="estoque"
         cor={COR.estoque}
         titulo="Planejar contagem"
-        subtitulo={[contexto, p.loja.nome, `${vencidos} ${vencidos === 1 ? 'insumo vencido' : 'insumos vencidos'} para contar`].filter(Boolean).join(' · ')}
+        subtitulo={[contexto, p.loja.nome, p.verValores ? `${vencidos} ${vencidos === 1 ? 'insumo vencido' : 'insumos vencidos'} para contar` : 'Escolha os insumos para contar'].filter(Boolean).join(' · ')}
       />
       {p.fechamentoAberto && (
         <Aviso tom="alerta" titulo="O fechamento do período está em andamento.">
@@ -100,7 +101,7 @@ export function TelaPlanejarCiclo({
         </Aviso>
       )}
       <p className="max-w-3xl text-sm text-suave">
-        Conte um pedaço por vez, pelo lugar. O que mais pesa em valor volta mais vezes: os mais caros (A) a cada {p.regras.freqADias} dias, os médios (B) a cada {p.regras.freqBDias}, os menores (C) a cada {p.regras.freqCDias}. Vencido = passou desse prazo desde a última contagem.
+        {p.regras ? <>Conte um pedaço por vez, pelo lugar. O que mais pesa em valor volta mais vezes: os mais caros (A) a cada {p.regras.freqADias} dias, os médios (B) a cada {p.regras.freqBDias}, os menores (C) a cada {p.regras.freqCDias}. Vencido = passou desse prazo desde a última contagem.</> : 'Conte um pedaço por vez, pelo lugar. Marque os insumos que deseja contar ou marque o lugar todo.'}
       </p>
       <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:flex-wrap">
         <FiltroEmLinks
@@ -112,7 +113,7 @@ export function TelaPlanejarCiclo({
         />
         <FiltroEmLinks
           rotulo="Quais insumos vêm marcados"
-          opcoes={(['vencidos', 'todos', 'A'] as const).map((q) => ({ href: href({ quais: q }), rotulo: ROTULO_DE_QUAIS[q], ativo: filtro.quais === q && !filtro.insumo }))}
+          opcoes={(p.verValores ? ['vencidos', 'todos', 'A'] as const : ['manual', 'todos'] as const).map((q) => ({ href: href({ quais: q }), rotulo: ROTULO_DE_QUAIS[q], ativo: filtro.quais === q && !filtro.insumo }))}
         />
       </div>
       <FormPlanejarCiclo

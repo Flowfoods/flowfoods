@@ -24,7 +24,7 @@ describe('aviso de insumos sem categoria · estoque', () => {
   });
 
   it('com saldo mostra o valor; sem permissão de ver estoque (nulo) não diz nada do valor', () => {
-    expect(sp(renderToStaticMarkup(createElement(AvisoDaClassificacao, { resumo: resumo(123_456) })))).toContain('R$ 1.234,56 em estoque nas lojas que você acessa');
+    expect(sp(renderToStaticMarkup(createElement(AvisoDaClassificacao, { resumo: resumo(123_456) })))).toContain('R$ 1.234,56 em estoque nas lojas com acesso aos valores');
     const nulo = sp(renderToStaticMarkup(createElement(AvisoDaClassificacao, { resumo: resumo(null) })));
     expect(nulo).not.toContain('estoque');
     expect(nulo).not.toContain('saldo');
