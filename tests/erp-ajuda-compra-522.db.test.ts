@@ -94,7 +94,7 @@ describe.skipIf(!URL_TESTE)('Decisão 522 · pontos de ajuda de Lançar nota e d
       raiz: '/erp',
       alcance: alcanceDe('DONO'),
       preferencia: PREF as typeof PREF | null,
-      nova: () => ErpLancarNotaPage(),
+      nova: () => ErpLancarNotaPage({}),
       editar: (id: string) => ErpEditarNotaPage({ params: { id } }),
       nota: (id: string) => ErpNotaPage({ params: { id }, searchParams: {} }),
     },
@@ -322,7 +322,7 @@ describe.skipIf(!URL_TESTE)('Decisão 522 · pontos de ajuda de Lançar nota e d
     const soLanca = alcanceDe(null, ['compras.lancar', 'lojas.ver']);
     como(soLanca);
     atual.visao = { tipo: 'rede' };
-    const h = await naTela(await ErpLancarNotaPage(), '/erp/compras/nova', soLanca, PREF);
+    const h = await naTela(await ErpLancarNotaPage({}), '/erp/compras/nova', soLanca, PREF);
     expect(naOrdem(h)).toEqual(['tela', 'loja', 'data', 'itens', 'frete']);
     const ajudaDeQuemLanca = JSON.stringify(ajudaParaATela(soLanca).filter((e) => e.chave === 'compra-nova' || e.chave === 'compra').map((e) => e.pontos));
     expect(ajudaDeQuemLanca).not.toMatch(/R\$|\d+,\d{2}/);

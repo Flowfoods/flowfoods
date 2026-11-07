@@ -130,9 +130,11 @@ describe('3C · prévia protegida de foto pendente', () => {
     const caminho = caminhoDaFoto('parceiro-a', velha, pasta, true);
     const tempo = new Date(Date.now() - 25 * 60 * 60 * 1000);
     await utimes(caminho, tempo, tempo);
+    // Compare a precisão que o filesystem efetivamente armazenou, sem tolerância.
+    const antesDoGet = (await stat(caminho)).mtimeMs;
     const r = await fotoErp(pedido(velha));
     expect(r.status).toBe(404);
-    expect((await stat(caminho)).mtimeMs).toBe(tempo.getTime());
+    expect((await stat(caminho)).mtimeMs).toBe(antesDoGet);
   });
 
   it('recusa conteúdo vazio, tipo incompatível, diretório e tamanho acima do teto', async () => {

@@ -39,12 +39,16 @@ async function paraFornecedor() {
 export async function acaoSalvarNota(notaId: string, anterior: EstadoNota, form: FormData): Promise<EstadoNota> {
   const { ctx, negado } = await paraLancar();
   if (negado) return recusadoNaNota(anterior, negado);
+  const leitura = notaId ? recusaDaAcao(ctx, 'compras.ver') : null;
+  if (leitura) return recusadoNaNota(anterior, leitura);
   return executarNota(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(notaId), anterior, form, NOTAS);
 }
 
 export async function acaoCancelarNota(notaId: string, anterior: EstadoNota, form: FormData): Promise<EstadoNota> {
   const { ctx, negado } = await paraLancar();
   if (negado) return recusadoNaNota(anterior, negado);
+  const leitura = recusaDaAcao(ctx, 'compras.ver');
+  if (leitura) return recusadoNaNota(anterior, leitura);
   return executarCancelamento(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(notaId), anterior, form, NOTAS);
 }
 

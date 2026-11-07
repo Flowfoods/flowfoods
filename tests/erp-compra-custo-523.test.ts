@@ -178,14 +178,14 @@ describe('Decisão 523 · as frases depois de lançar, alterar, cancelar e conci
 describe('Decisão 523 · a ajuda não promete o custo a quem não o vê nem o custo novo para todo insumo', () => {
   it('a aula de "Lançar nota" para todos não fala de custo na prévia; a do detalhe diz onde editar e cancelar mudam o custo', () => {
     const lancar = entradaPorChave('compra-nova')!;
-    expect(lancar.versao).toBe(6);
+    expect(lancar.versao).toBe(7);
     const paraTodos = lancar.aula.filter((b) => !b.para).map((b) => b.texto);
     expect(paraTodos.join(' ')).not.toMatch(/custo/);
     expect(paraTodos).toContain('“Conferir o impacto” mostra o que a nota faz antes de lançar, sem gravar nada: passar do orçamento de compra da loja é aviso, a nota entra igual.');
     const detalhe = entradaPorChave('compra')!;
-    expect(detalhe.versao).toBe(6);
-    const errou = detalhe.aula.find((b) => b.texto.startsWith('Errou?'))!;
-    expect(errou.texto).toBe('Errou? Edite ou cancele com o motivo: o que a nota pôs no estoque é corrigido por estorno, e o custo só muda nos insumos em que ela é ou era a compra mais recente.');
+    expect(detalhe.versao).toBe(7);
+    const errou = detalhe.aula.find((b) => b.texto.startsWith('Com acesso para ver e lançar'))!;
+    expect(errou.texto).toBe('Com acesso para ver e lançar compras na loja, você pode editar ou cancelar com o motivo: o que a nota pôs no estoque é corrigido por estorno, e o custo só muda nos insumos em que ela é ou era a compra mais recente.');
     expect(errou.para).toEqual(['compras.lancar']);
   });
 });

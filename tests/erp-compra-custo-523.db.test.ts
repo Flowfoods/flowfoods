@@ -47,7 +47,9 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } 
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja, salvarCnpjDaLoja } from '@/lib/erp/estrutura';
-import { cadastrarFornecedor, lancarNota, obterNota, type PreviaDaNota } from '@/lib/erp/compras';
+import { cadastrarFornecedor, cancelarNota, editarNota, lancarNota, obterNota, previaDaNota, type PreviaDaNota } from '@/lib/erp/compras';
+import { lerEntradaDaNota } from '@/components/erp/telas/compras/executar';
+import { lerRetornoDeCompra } from '@/lib/erp/compra-retorno';
 import { obterDocumento, receberXml } from '@/lib/erp/documentos-fiscais';
 import { cadastrarVariante } from '@/lib/erp/variantes';
 import { cadastrarFicha } from '@/lib/erp/fichas';
@@ -108,7 +110,7 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
         { nome: 'vê e lança', alcance: VE_E_LANCA },
         { nome: 'dona', alcance: DONA },
       ],
-      nova: () => ErpLancarNotaPage(),
+      nova: () => ErpLancarNotaPage({}),
       editar: (id: string) => ErpEditarNotaPage({ params: { id } }),
       conferir: (form: FormData, notaId = '') => acoesDoParceiro.acaoSalvarNota(notaId, null, form),
     },
@@ -219,7 +221,7 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
     await db?.$disconnect();
   });
 
-  it('quem só lança (e o operador que lança), nas duas áreas: Lançar e Editar sem o custo de agora nem a data da última compra; a linha do item continua', async () => {
+  it('quem só lança (e o operador que lança), nas duas áreas: Lançar sem custo histórico e Editar recusado', async () => {
     for (const area of AREAS()) {
       for (const p of SEM_CUSTO()) {
         const onde = `${area.nome} · ${p.nome}`;
@@ -239,13 +241,7 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
         expect(nova.html, onde).not.toMatch(/· hoje|sem custo informado|R\$ 18,78|R\$ 37,13/);
 
         atual.caminho = `${area.raiz}/compras/${ids.outubro}/editar`;
-        const editar = await doNavegador(area.editar(ids.outubro));
-        expect(editar.json, onde).not.toMatch(/"custo"|"ultimaCompraEm"|2026-10-16/);
-        expect(editar.html, onde).not.toMatch(/· hoje|sem custo informado|R\$ 18,78|R\$ 37,13/);
-        // A linha do item: a conta do que está digitado (R$ 269,70 + R$ 6,00 ÷ 15 kg), sem o "hoje".
-        expect(texto(editar.html), onde).toContain('15 kg · R$ 18,38/kg com frete');
-        expect(texto(editar.html), onde).not.toContain('com frete ·');
-        expect(editar.html, onde).toContain('R$ 269,70 + R$ 6,00 de frete = R$ 275,70');
+        await expect(area.editar(ids.outubro), onde).rejects.toThrow();
       }
     }
   });
@@ -312,7 +308,7 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
     expect(await a.notaEntrada.count()).toBe(notas);
   });
 
-  it('"Conferir" na edição, nas duas áreas: quem só lança recebe a prévia sem custo nem fichas; quem vê compras, o custo de antes → depois e as fichas', async () => {
+  it('"Conferir" na edição, nas duas áreas: quem só lança é recusado; quem vê e lança mantém impacto e fichas', async () => {
     const versao = (await obterNota(a, DONA, ids.outubro))!.versao;
     const antes = await a.notaEntrada.findUnique({ where: { id: ids.outubro }, select: { atualizadoEm: true, totalCentavos: true } });
     for (const area of AREAS()) {
@@ -320,10 +316,8 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
         const onde = `${area.nome} · ${p.nome}`;
         como(p.alcance);
         const r = (await area.conferir(formDaPrevia({ versao }), ids.outubro)) as NonNullable<EstadoNota>;
-        expect(r.erros, onde).toEqual({});
-        const previa = r.previa!;
-        expect([previa.veCusto, previa.custos, previa.fichas, previa.maisFichas], onde).toEqual([false, [], [], 0]);
-        expect(previa.totalCentavos, onde).toBe(30_600);
+        expect(r.erros.geral, onde).toContain('ver compras e notas');
+        expect(r.previa, onde).toBeUndefined();
         expect(JSON.stringify(r), onde).not.toMatch(/18,78|40,00|Molho cheddar|"antes"|"depois"|"vale"/);
       }
       for (const p of area.quemVe) {
@@ -462,12 +456,12 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
   it('só lança em uma loja: páginas e action omitem custo atual, e recusam outra loja e outro parceiro', async () => {
     como(restrito(false));
     atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
-    const nova = await doNavegador(ErpLancarNotaPage());
+    const nova = await doNavegador(ErpLancarNotaPage({}));
     expect(nova.json).not.toMatch(/"custo"|ultimaCompraEm|987,65|Insumo privado B/);
     const r = (await acoesDoParceiro.acaoSalvarNota('', null, formDaPrevia()))!;
     expect(r.previa).toMatchObject({ veCusto: false, custos: [], fichas: [] });
-    await expect(ErpEditarNotaPage({ params: { id: ids.meier } })).rejects.toThrow('NOT_FOUND');
-    await expect(ErpEditarNotaPage({ params: { id: ids.notaB } })).rejects.toThrow('NOT_FOUND');
+    await expect(ErpEditarNotaPage({ params: { id: ids.meier } })).rejects.toThrow('SEM_ACESSO');
+    await expect(ErpEditarNotaPage({ params: { id: ids.notaB } })).rejects.toThrow('SEM_ACESSO');
     for (const lojaId of [ids.lojaOutra, ids.lojaB]) {
       const form = formDaPrevia();
       form.set('lojaId', lojaId);
@@ -487,12 +481,97 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
   it('sem permissão e parceiro suspenso: a action recusa antes de calcular ou gravar', async () => {
     const antes = await a.notaEntrada.count();
     como(proprio([]));
-    await expect(ErpLancarNotaPage()).rejects.toThrow('SEM_ACESSO');
+    await expect(ErpLancarNotaPage({})).rejects.toThrow('SEM_ACESSO');
     expect((await acoesDoParceiro.acaoSalvarNota('', null, formDaPrevia()))!.previa).toBeUndefined();
     atual.ctx = () => ({ parceiro: { ...A, status: 'SUSPENSO' }, alcance: DONA, cliente: doParceiro(A.id, db, { somenteLeitura: true }), bloqueio: 'Parceiro suspenso.', podeEscrever: false, sessao: { userId: 'u', autorNome: 'Teste' } });
     const suspenso = (await acoesDoParceiro.acaoSalvarNota('', null, formDaPrevia()))!;
     expect(suspenso.erros.geral).toBe('Parceiro suspenso.');
     expect(suspenso.previa).toBeUndefined();
     expect(await a.notaEntrada.count()).toBe(antes);
+  });
+
+  it('decisão de 07/11: lançamento retorna a uma nova compra limpa na mesma loja, com marcador diferente a cada sucesso', async () => {
+    const marcadores = new Set<string>();
+    for (const area of AREAS()) {
+      como(SO_LANCA);
+      atual.caminho = area.raiz + '/compras/nova';
+      for (let i = 0; i < 2; i++) {
+        const form = formDaPrevia();
+        form.set('intencao', 'lancar');
+        form.set('numero', '7000' + (area.nome === 'parceiro' ? '1' : '2') + i);
+        let destino = '';
+        try { await area.conferir(form); } catch (e) { destino = (e as { url?: string }).url ?? ''; }
+        const url = new URL(destino, 'http://fixture.local');
+        expect(url.pathname).toBe(area.raiz + '/compras/nova');
+        expect([...url.searchParams.keys()].sort()).toEqual(['feito', 'loja', 'nova']);
+        const query = Object.fromEntries(url.searchParams);
+        const retorno = lerRetornoDeCompra(query)!;
+        expect(retorno.lojaId).toBe(ids.vp);
+        expect(marcadores.has(retorno.chave)).toBe(false);
+        marcadores.add(retorno.chave);
+        const pagina = area.nome === 'parceiro' ? ErpLancarNotaPage({ searchParams: query })
+          : Nivel1LancarNotaPage({ params: { slug: A.slug }, searchParams: query });
+        const navegador = await doNavegador(pagina);
+        expect(navegador.html).toContain('Nota lançada.');
+        expect(navegador.form.inicial).toMatchObject({ lojaId: ids.vp, numero: '', fornecedorId: '', frete: '', total: '', itens: [] });
+        expect(navegador.form.cancelar).toBe(area.raiz);
+        expect(navegador.html).toContain('Voltar para o início');
+        expect(navegador.json).not.toMatch(/"custo"|"ultimaCompraEm"/);
+        const gravada = await a.notaEntrada.findFirst({ where: { numero: String(form.get('numero')) }, select: { id: true, totalCentavos: true } });
+        expect(gravada?.totalCentavos).toBe(30000);
+        expect(destino).not.toContain(gravada!.id);
+      }
+    }
+    expect(marcadores.size).toBe(4);
+  });
+
+  it('decisão de 07/11: a própria nota também é protegida no domínio e nas duas actions; recusas não alteram dados', async () => {
+    const form = formDaPrevia();
+    form.set('numero', 'propria-politica');
+    const criada = await lancarNota(a, SO_LANCA, lerEntradaDaNota(form), 'Marina');
+    if (!criada.ok) throw new Error(JSON.stringify(criada));
+    const nota = (await obterNota(a, DONA, criada.id))!;
+    form.set('versao', nota.versao);
+    form.set('intencao', 'lancar');
+    const snapshot = async () => ({
+      nota: await a.notaEntrada.findUnique({ where: { id: criada.id }, include: { itens: true } }),
+      historico: await a.historicoAlteracao.count(),
+      movimentos: await a.movimentoEstoque.findMany({ orderBy: { id: 'asc' } }),
+      documentos: await a.documentoFiscal.findMany({ orderBy: { id: 'asc' } }),
+    });
+    const antes = await snapshot();
+    const entrada = lerEntradaDaNota(form);
+    for (const alcance of [SO_LANCA, proprio(['compras.ver'])]) {
+      const editada = await editarNota(a, alcance, criada.id, entrada, 'Marina');
+      const cancelada = await cancelarNota(a, alcance, criada.id, 'Digitada em dobro', 'Marina');
+      const previa = await previaDaNota(a, alcance, entrada, criada.id);
+      expect(editada.ok).toBe(false);
+      expect(cancelada.ok).toBe(false);
+      expect(previa.ok).toBe(false);
+      como(alcance);
+      for (const area of AREAS()) expect((await area.conferir(form, criada.id))!.erros.geral).toBeTruthy();
+      const motivo = new FormData(); motivo.set('motivo', 'Digitada em dobro');
+      expect((await acoesDoParceiro.acaoCancelarNota(criada.id, null, motivo))!.erros.geral).toBeTruthy();
+      expect((await acoesDoNivel1.acaoCancelarNota(A.slug, criada.id, null, motivo))!.erros.geral).toBeTruthy();
+    }
+    expect(await obterNota(a, SO_LANCA, criada.id)).toBeNull();
+    expect(await snapshot()).toEqual(antes);
+    // Ambas as capacidades não ampliam o alcance: origem e destino são conferidos.
+    const restrito = resolverAlcance({ perfilBase: null, perfilProprio: ['compras.ver', 'compras.lancar', 'lojas.ver'], permissoesExtras: [], permissoesRemovidas: [], redeInteira: false, lojaIds: [ids.vp] });
+    expect((await editarNota(a, restrito, criada.id, { ...entrada, lojaId: ids.lojaOutra }, 'Gerente')).ok).toBe(false);
+    expect((await previaDaNota(a, restrito, { ...entrada, lojaId: ids.lojaOutra }, criada.id)).ok).toBe(false);
+    const fora = await lancarNota(a, DONA, { ...entrada, lojaId: ids.lojaOutra, numero: 'POL-FORA' }, 'Dona');
+    if (!fora.ok) throw new Error(JSON.stringify(fora));
+    const versaoFora = (await obterNota(a, DONA, fora.id))!.versao;
+    const antesFora = await snapshot();
+    expect((await editarNota(a, restrito, fora.id, { ...entrada, versao: versaoFora }, 'Gerente')).ok).toBe(false);
+    expect((await previaDaNota(a, restrito, entrada, fora.id)).ok).toBe(false);
+    expect(await snapshot()).toEqual(antesFora);
+    // O perfil autorizado continua editando e cancelando; a trilha é preservada.
+    entrada.numero = 'POL-EDITADA';
+    expect((await editarNota(a, VE_E_LANCA, criada.id, entrada, 'Gerente')).ok).toBe(true);
+    expect((await cancelarNota(a, VE_E_LANCA, criada.id, 'Digitada em dobro', 'Gerente')).ok).toBe(true);
+    expect((await obterNota(a, VE_E_LANCA, criada.id))?.cancelada).toBe(true);
+    expect(await a.historicoAlteracao.count()).toBeGreaterThan(antes.historico);
   });
 });

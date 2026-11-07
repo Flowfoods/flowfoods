@@ -835,6 +835,8 @@ export async function editarNota(
   entrada: EntradaDaNota & { versao?: unknown },
   autorNome = 'Sistema',
 ): Promise<ResultadoCompras> {
+  const acesso = recusa(alcance, 'compras.ver') ?? recusa(alcance, 'compras.lancar');
+  if (acesso) return { ok: false, erros: { geral: acesso } };
   const versao = new Date(typeof entrada.versao === 'string' ? entrada.versao : '');
   if (Number.isNaN(versao.getTime())) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_NOTA }, conflito: true };
   try {
@@ -842,7 +844,7 @@ export async function editarNota(
       await travarParaEscrever(tx);
       const atual = await notaVisivel(tx, alcance, id);
       if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
-      const negadoAntes = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
+      const negadoAntes = recusa(alcance, 'compras.ver', { lojaId: atual.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
       if (negadoAntes) throw new Recusa({ ok: false, erros: { geral: negadoAntes } });
       if (atual.status !== 'LANCADA') throw new Recusa({ ok: false, erros: { geral: MENSAGEM_NOTA_CANCELADA } });
       // F.1b: a nota que veio do XML (ou foi ligada a ele) é o que o documento fiscal diz: não se edita, se cancela e se concilia de novo.
@@ -851,7 +853,7 @@ export async function editarNota(
       const { lido, ctx } = await lerNota(tx, alcance, entrada, true, atual);
       if (!lido.ok) throw new Recusa(lido);
       const d = lido.dados;
-      const negado = recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
+      const negado = recusa(alcance, 'compras.ver', { lojaId: d.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
       if (negado) throw new Recusa({ ok: false, erros: { lojaId: negado } });
       // 2.2b: a data de ANTES e a de DEPOIS não podem cair em período fechado (mover para dentro ou para fora).
       const dataAntes = atual.entradaEm.toISOString().slice(0, 10);
@@ -902,12 +904,14 @@ export async function editarNota(
  * transação: a chave fica livre para conciliar de novo e nunca há duas notas ativas com ela.
  */
 export async function cancelarNotaNaTransacao(tx: ClienteDoParceiro, alcance: Alcance, id: string, motivo: string, autorNome: string): Promise<void> {
+  const acesso = recusa(alcance, 'compras.ver') ?? recusa(alcance, 'compras.lancar');
+  if (acesso) throw new Recusa({ ok: false, erros: { geral: acesso } });
   await travarParaEscrever(tx);
   // F.1b: a ordem das travas é SEMPRE documento fiscal → nota (descartar o documento e cancelar a nota ao mesmo tempo não se esperam).
   await tx.sql`SELECT 1 FROM "DocumentoFiscal" WHERE "parceiroId" = ${tx.parceiroId} AND "notaEntradaId" = ${id} FOR UPDATE`;
   const atual = await notaVisivel(tx, alcance, id);
   if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
-  const negado = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
+  const negado = recusa(alcance, 'compras.ver', { lojaId: atual.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
   if (negado) throw new Recusa({ ok: false, erros: { geral: negado } });
   const dataDaNota = atual.entradaEm.toISOString().slice(0, 10);
   const fechado = (await datasEmPeriodoFechado(tx, [dataDaNota])).get(dataDaNota);
@@ -1054,12 +1058,25 @@ export async function previaDaNota(
   /** O dia de hoje para o orçamento (2.5); os testes fixam. */
   hoje?: string,
 ): Promise<{ ok: true; previa: PreviaDaNota } | Recusada> {
+  // Uma prévia de edição também acessa uma nota gravada; lançar não autoriza essa leitura.
+  if (notaId) {
+    const acesso = recusa(alcance, 'compras.ver') ?? recusa(alcance, 'compras.lancar');
+    if (acesso) return { ok: false, erros: { geral: acesso } };
+  }
   return cliente.transacao(async (tx) => {
     const atual = notaId ? await notaVisivel(tx, alcance, notaId) : null;
     if (notaId && !atual) return { ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true };
+    if (atual) {
+      const acesso = recusa(alcance, 'compras.ver', { lojaId: atual.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
+      if (acesso) return { ok: false, erros: { geral: acesso } };
+    }
     const { lido, ctx } = await lerNota(tx, alcance, entrada, false, atual ?? undefined);
     if (!lido.ok) return lido;
     const d = lido.dados;
+    if (atual) {
+      const acesso = recusa(alcance, 'compras.ver', { lojaId: d.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
+      if (acesso) return { ok: false, erros: { lojaId: acesso } };
+    }
 
     /** O custo de cada insumo antes → depois e as fichas que mudam, em cascata (só para quem vê custo de compra). */
     const impactoNoCusto = async () => {
@@ -1266,6 +1283,7 @@ export async function opcoesDosFiltrosDeNota(cliente: ClienteDoParceiro, alcance
 
 /** Detalhe da nota (nas lojas do alcance): itens com o custo de cada um, se ela é a que vale no custo de cada insumo, alterações. */
 export async function obterNota(cliente: ClienteDoParceiro, alcance: Alcance, id: string) {
+  if (!pode(alcance, 'compras.ver')) return null;
   return cliente.transacao(async (tx) => {
     if (!ID.test(id)) return null;
     const n = await tx.notaEntrada.findFirst({

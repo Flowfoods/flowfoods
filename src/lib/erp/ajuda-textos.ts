@@ -1275,7 +1275,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     rotas: ['compras/nova', 'compras/[id]/editar'],
     titulo: 'Lançar nota',
     // Decisões 523 e 275: prévia protegida; limpeza e descartáveis também entram no CMV gerencial.
-    versao: 6,
+    versao: 7,
     aula: [
       { texto: 'Digite o valor total de cada linha, como está na nota.' },
       { texto: 'O frete é dividido entre os itens, e a soma tem que bater com o total da nota.' },
@@ -1283,6 +1283,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'A data da nota decide o período dela: se o DRE já fechou esse período, a nota não entra nem se edita. É também essa data que põe a nota no CMV de compra do período.', para: ['compras.lancar'] },
       { texto: 'Lance também materiais de limpeza e descartáveis da operação como itens de compra: eles entram no CMV gerencial, na categoria do insumo. Não lance o pagamento da mesma nota como despesa, para não contar o custo duas vezes.', para: ['compras.lancar'] },
     ],
+    secoes: [{
+      id: 'depois-de-lancar',
+      titulo: 'Depois de lançar',
+      blocos: [
+        { texto: 'Quem só lança não consulta, edita ou cancela notas já salvas, nem as próprias; depois de salvar, recebe a confirmação e pode lançar outra compra na mesma loja.' },
+        { texto: 'Editar ou cancelar exige ver e lançar compras na loja; com esses dois acessos, salvar continua abrindo o detalhe da nota.' },
+      ],
+    }],
     // Decisão 522: o que cada campo muda no custo, no estoque e no DRE, junto do campo. Saíram do corpo e moram aqui: o "o custo
     // dos insumos passa a ser o desta compra" do cabeçalho e o "É ela que diz qual compra é a mais nova." da data (no `data`), o
     // "O preço por kg, L ou un sai da conta, com o frete rateado." dos itens (no `itens`) e o apoio do frete (no `frete`). Na ordem
@@ -1334,12 +1342,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     rotas: ['compras/[id]'],
     titulo: 'Detalhe da nota',
     // Decisão 523 (versão 6): editar ou cancelar só muda o custo onde a nota é (ou era) a compra mais recente do insumo.
-    versao: 6,
+    versao: 7,
     aula: [
       { texto: 'A nota, o frete de cada item e o que ela fez no estoque.' },
       { texto: 'Nota que veio do XML da nota fiscal não se edita: cancele e concilie a nota fiscal de novo.', para: ['compras.lancar'] },
       { texto: 'Nota do período em curso mostra como ficou o orçamento de compra da loja: quanto ainda cabe, ou quanto passou. É só aviso.' },
-      { texto: 'Errou? Edite ou cancele com o motivo: o que a nota pôs no estoque é corrigido por estorno, e o custo só muda nos insumos em que ela é ou era a compra mais recente.', para: ['compras.lancar'] },
+      { texto: 'Com acesso para ver e lançar compras na loja, você pode editar ou cancelar com o motivo: o que a nota pôs no estoque é corrigido por estorno, e o custo só muda nos insumos em que ela é ou era a compra mais recente.', para: ['compras.lancar'] },
       { texto: 'Nota com data em período que o DRE já fechou não se edita nem se cancela.', para: ['compras.lancar'] },
     ],
     secoes: [
