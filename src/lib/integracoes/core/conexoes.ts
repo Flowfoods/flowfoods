@@ -42,6 +42,11 @@ export async function ligarConexao(
   const d = lido.dados;
   try {
     return await cliente.transacao(async (tx): Promise<ResultadoDaConexao> => {
+      // Serializa a inclusão de uma nova contribuição antes de qualquer trava de escrita.
+      // O gatilho de INSERT repete esta guarda também para o caminho SQL autorizado.
+      if (d.provedor === 'IFOOD' && d.ambiente === 'PRODUCAO') {
+        await tx.sql`SELECT erp_integracao_travar_cobertura(${tx.parceiroId}, ${d.lojaId})::text AS trava`;
+      }
       const loja = await tx.loja.findUnique({ where: { id: d.lojaId }, select: { id: true, nome: true } });
       if (!loja) return { ok: false, erros: { lojaId: 'Loja não encontrada neste parceiro.' } };
       const marca = d.marcaId ? await tx.marca.findUnique({ where: { id: d.marcaId }, select: { id: true, nome: true } }) : null;

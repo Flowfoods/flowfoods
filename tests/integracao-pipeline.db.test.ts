@@ -323,6 +323,11 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
     expect(s.linhas).toHaveLength(2);
     for (const l of s.linhas) expect(l).toMatchObject({ salesChannel: 'CANAL_NOVO', deliveredBy: null, category: null, gmv: 2147483648n, gmvWithoutDelivery: 1999n, netDeliveryFee: null, paymentTotalValue: 0n, benefitByTypePartnerTotalValue: null, refundedTotalValue: -1n });
     expect(s.linhas.map((l) => l.orderStatus)).toEqual(['OUTRO_STATUS', 'STATUS_NOVO']);
+    expect(await m.cliente.integracaoFaturamentoDia.findMany()).toMatchObject([{
+      lojaId: m.lojaId, dia: new Date(`${DIA}T00:00:00Z`), canal: 'IFOOD', fonte: 'ifood-analytics',
+      estado: 'PENDENTE', revisaoSolicitada: 1n, revisaoConferida: 0n, hashAplicado: null,
+    }]);
+    expect(await m.cliente.integracaoFaturamentoFonte.count()).toBe(0);
     expect(await m.cliente.faturamentoLancamento.count()).toBe(0);
   });
 
@@ -368,6 +373,11 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
     expect(await m.repo.publicar(revisao)).toBe('sem-mudanca');
     expect(await snapshots(m)).toEqual(antes);
     expect(await m.cliente.integracaoPayload.count()).toBe(2);
+    // Reenviar o mesmo conteúdo também sinaliza a retomada, sem gravar dinheiro aqui.
+    expect(await m.cliente.integracaoFaturamentoDia.findMany()).toMatchObject([{
+      revisaoSolicitada: 2n, revisaoConferida: 0n, hashAplicado: null,
+    }]);
+    expect(await m.cliente.faturamentoLancamento.count()).toBe(0);
   });
 
   it('revisão diferente acrescenta versão imutável e mantém o snapshot anterior', async () => {
@@ -387,6 +397,7 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
     const m = await massa();
     await publicar(m);
     const antes = await snapshots(m);
+    const recibosAntes = await m.cliente.integracaoFaturamentoDia.findMany();
     const t = await adquirir(m, { tipo: 'REVISAO', ciclo: '2026-10-21' });
     await m.repo.salvarPagina(t, pagina([grupo('PRIMEIRA'), grupo('SEGUNDA')]));
     const execucaoAntes = await m.cliente.integracaoExecucao.findUniqueOrThrow({ where: { id: t.id } });
@@ -409,6 +420,7 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
       await db.$executeRawUnsafe(`CREATE CONSTRAINT TRIGGER ${nome} AFTER INSERT ON "KpiIfoodDia" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.${nome}()`);
       await expect(m.repo.publicar(t)).rejects.toThrow(/QA rollback após snapshot e duas linhas/);
       expect(await snapshots(m)).toEqual(antes);
+      expect(await m.cliente.integracaoFaturamentoDia.findMany()).toEqual(recibosAntes);
       expect(await m.cliente.integracaoExecucao.findUniqueOrThrow({ where: { id: t.id } })).toEqual(execucaoAntes);
       expect(await m.cliente.integracaoPayload.findMany({ orderBy: { geracao: 'asc' } })).toEqual(rawAntes);
     } finally {
@@ -480,6 +492,7 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
     const m = await massa();
     await publicar(m);
     const [anterior] = await snapshots(m);
+    const recibosAntes = await m.cliente.integracaoFaturamentoDia.findMany();
     const periodo = await m.cliente.transacao((tx) => criarPeriodoFechadoDeTeste(tx, { nome: 'Período sintético', inicio: '2026-10-01', fim: '2026-10-31' }));
     const dre = await m.cliente.dreFotografia.findMany();
     const t = await adquirir(m, { tipo: 'REVISAO', ciclo: '2026-10-21' });
@@ -490,6 +503,7 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
     expect(depois[0]).toEqual(anterior);
     expect(depois[1]).toMatchObject({ geracao: 2, situacao: 'PENDENTE_PERIODO', pedidos: 8n });
     expect(await m.cliente.dreFotografia.findMany()).toEqual(dre);
+    expect(await m.cliente.integracaoFaturamentoDia.findMany()).toEqual(recibosAntes);
     expect(await m.cliente.periodoApuracao.findUnique({ where: { id: periodo.id } })).toMatchObject({ status: 'FECHADO' });
   });
 
@@ -591,6 +605,8 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
     expect(await teste.cliente.kpiIfoodDia.count()).toBe(1);
     expect(await producao.cliente.kpiIfoodDia.count()).toBe(0);
     expect(await teste.cliente.faturamentoLancamento.count()).toBe(0);
+    expect(await teste.cliente.integracaoFaturamentoDia.count()).toBe(0);
+    expect(await teste.cliente.integracaoFaturamentoFonte.count()).toBe(0);
     expect(await teste.cliente.dreFotografia.count()).toBe(0);
   });
 

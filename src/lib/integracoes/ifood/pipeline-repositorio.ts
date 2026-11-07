@@ -9,6 +9,7 @@ import { mudarModulo } from '../core/conexoes';
 import { DIMENSOES_DIARIAS, METRICAS_DIARIAS, normalizarDiaAnalytics } from './analytics';
 import { diaSeguinte } from './datas';
 import { classificar } from './respostas';
+import { sinalizarFaturamentoAnalytics } from './faturamento-pendencias';
 import {
   ErroPipelineAnalytics, LEASE_SEGUNDOS, LIMITE_BYTES_JANELA, LIMITE_GRUPOS_JANELA, PRIORIDADE,
   type FalhaAnalytics, type JanelaAnalytics, type PaginaDoTransporte, type TarefaAnalytics, type TipoJanela,
@@ -197,6 +198,7 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
         }
         const ultimo = await tx.integracaoSnapshot.findFirst({ where: { execucaoId: t.id, situacao: 'PUBLICADO' }, orderBy: { geracao: 'desc' } });
         if (ultimo?.hash === sha256) {
+          await sinalizarFaturamentoAnalytics(tx, ultimo.id, posse.id);
           await encerrar(tx, t, 'SUCESSO', { ultimoHash: sha256 });
           return 'sem-mudanca';
         }
@@ -213,6 +215,7 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
             ...Object.fromEntries(METRICAS_DIARIAS.map(m => [m, l.centavos[m] === null ? null : BigInt(l.centavos[m]!)])),
           })) });
         }
+        if (!fechado) await sinalizarFaturamentoAnalytics(tx, snapshot.id, posse.id);
         await encerrar(tx, t, fechado ? 'PENDENTE_PERIODO' : 'SUCESSO', {
           ultimoHash: sha256, ...(!fechado ? { ultimaPublicacaoEm: new Date() } : {}),
         });

@@ -69,6 +69,8 @@ export const MODELOS_DE_TENANT = [
   'integracaoPayload',
   'integracaoSnapshot',
   'kpiIfoodDia',
+  'integracaoFaturamentoDia',
+  'integracaoFaturamentoFonte',
   'liberacaoDeModulo',
 ] as const;
 
@@ -135,6 +137,8 @@ export const RELACOES_DE_TENANT = [
   'erpIntegracaoPayloads',
   'erpIntegracaoSnapshots',
   'erpKpisIfoodDia',
+  'erpIntegracaoFaturamentoDias',
+  'erpIntegracaoFaturamentoFontes',
   'erpLiberacoesDeModulo',
 ] as const;
 

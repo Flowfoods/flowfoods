@@ -604,6 +604,12 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
       continue;
     }
     if (!criacao && JSON.stringify(antes[c]) === JSON.stringify(depois[c])) continue;
+    // A referência completa continua no registro, mas seu id técnico não orienta a casa.
+    if (entidade === 'FaturamentoLancamento' && c === 'origemRef'
+      && typeof depois[c] === 'string' && depois[c].startsWith('ifood-analytics:')) {
+      out.push({ campo: 'leitura do iFood', antes: criacao ? null : 'anterior', depois: criacao ? 'registrada' : 'atualizada' });
+      continue;
+    }
     if (c === 'unidade' && juntarUnidade && criacao) continue;
     // De quem é a embalagem (ou o lançamento de faturamento) já está no "alvo" da linha.
     if (c === 'insumo' || c === 'alvo' || c === 'faturamentoLojaId' || c === 'faturamentoDia') continue;

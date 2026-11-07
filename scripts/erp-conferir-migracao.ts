@@ -408,6 +408,132 @@ export async function conferirPipelineIntegracao(db: Pick<PrismaClient, '$queryR
   return pendencias;
 }
 
+export const TABELAS_DA_PONTE_ANALYTICS = ['IntegracaoFaturamentoDia', 'IntegracaoFaturamentoFonte'] as const;
+export const FUNCOES_DA_PONTE_ANALYTICS: readonly [string, string, string, boolean, number][] = [
+  ['erp_integracao_travar_cobertura', 'text, text', 'void', true, 0],
+  ['erp_integracao_faturamento_sinalizar', 'text, text, text', 'text', true, 0],
+  ['erp_integracao_faturamento_preparar', 'text, text, date, text', 'jsonb', true, 0],
+  ['erp_integracao_faturamento_pendencia', 'text, text, text, text', 'boolean', true, 0],
+  ['erp_integracao_faturamento_concluir', 'text, text, text, text, integer, boolean', 'boolean', true, 1],
+  ['erp_integracao_faturamento_posse', 'text, text', 'boolean', false, 0],
+  ['erp_integracao_faturamento_validar', 'text, text', 'void', false, 0],
+  ['erp_integracao_faturamento_travas', 'text', 'boolean', false, 0],
+  ...['erp_integracao_conexao_cobertura', 'erp_integracao_faturamento_header', 'erp_integracao_faturamento_fonte', 'erp_integracao_faturamento_destino', 'erp_integracao_faturamento_final'].map(nome => [nome, '', 'trigger', false, 0] as [string, string, string, boolean, number]),
+];
+
+/** INT-1.7B: catálogo somente; não altera dados, grants nem a fila. */
+export async function conferirPonteAnalytics(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
+  const erros: string[] = [];
+  const tabelas = [...TABELAS_DA_PONTE_ANALYTICS];
+  const [marcas] = await db.$queryRaw<{ n: number; prisma: boolean; papel: boolean }[]>`
+    SELECT (SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relname=ANY(${tabelas}) AND c.relkind='r') AS n,
+      to_regclass('_prisma_migrations') IS NOT NULL AS prisma,EXISTS(SELECT 1 FROM pg_roles WHERE rolname='erp_tenant') AS papel`;
+  let instalada = (marcas?.n ?? 0) > 0;
+  if (!instalada && marcas?.prisma) {
+    const [m] = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "_prisma_migrations" WHERE migration_name='20261125000000_erp_integracao_faturamento' AND rolled_back_at IS NULL`;
+    instalada = (m?.n ?? 0) > 0;
+  }
+  if (!instalada) return erros;
+  const meta = await db.$queryRaw<{ nome: string; rls: boolean; forcada: boolean; leitura: boolean; inclusao: boolean; atualizacao: boolean; outros: boolean; publica: boolean }[]>`
+    SELECT c.relname AS nome,c.relrowsecurity AS rls,c.relforcerowsecurity AS forcada,
+      coalesce(has_table_privilege(r.oid,c.oid,'SELECT'),false) AS leitura,coalesce(has_table_privilege(r.oid,c.oid,'INSERT'),false) AS inclusao,
+      coalesce(has_table_privilege(r.oid,c.oid,'UPDATE'),false) AS atualizacao,
+      coalesce(has_table_privilege(r.oid,c.oid,'DELETE') OR has_table_privilege(r.oid,c.oid,'TRUNCATE') OR has_table_privilege(r.oid,c.oid,'REFERENCES') OR has_table_privilege(r.oid,c.oid,'TRIGGER'),false) AS outros,
+      EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee=0) AS publica
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_roles r ON r.rolname='erp_tenant'
+    WHERE n.nspname=current_schema() AND c.relname=ANY(${[...tabelas, 'Loja']}) AND c.relkind='r'`;
+  const rls = meta.find(t => t.nome === 'Loja')?.rls ?? false;
+  const politicas = await db.$queryRaw<{ tabela: string; nome: string; comando: string; permissiva: boolean; papel: boolean; usando: string | null; gravando: string | null }[]>`
+    SELECT c.relname AS tabela,p.polname AS nome,p.polcmd::text AS comando,p.polpermissive AS permissiva,
+      p.polroles=ARRAY[(SELECT oid FROM pg_roles WHERE rolname='erp_tenant')] AS papel,
+      pg_get_expr(p.polqual,p.polrelid) AS usando,pg_get_expr(p.polwithcheck,p.polrelid) AS gravando
+    FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relname=ANY(${tabelas})`;
+  const normalizar = (s: string | null) => (s ?? '').replace(/"([a-z_][a-z0-9_]*)"/g, '$1').replace(/::text|\s+|\(|\)/g, '').toLowerCase();
+  const regra = normalizar('"parceiroId" = NULLIF(current_setting(\'app.parceiro_id\'::text, true), \'\'::text)');
+  for (const tabela of tabelas) {
+    const t = meta.find(x => x.nome === tabela);
+    if (!t) { erros.push(`INT-1.7B: tabela ${tabela} NÃO existe.`); continue; }
+    const fonte = tabela === 'IntegracaoFaturamentoFonte';
+    if (t.publica || t.outros || (!fonte && (t.inclusao || t.atualizacao))) erros.push(`INT-1.7B: privilégios indevidos em ${tabela}; recibo é SELECT-only para erp_tenant.`);
+    if (rls || t.rls) {
+      if (!(t.rls && t.forcada && t.leitura && (!fonte || (t.inclusao && t.atualizacao)))) erros.push(`INT-1.7B: RLS/privilégios incompatíveis em ${tabela}.`);
+      const ps = politicas.filter(p => p.tabela === tabela);
+      if (ps.length !== 1 || !ps.some(p => p.nome === `${tabela}_do_parceiro` && p.comando === '*' && p.permissiva && p.papel && normalizar(p.usando) === regra && normalizar(p.gravando) === regra)) erros.push(`INT-1.7B: policy ${tabela}_do_parceiro incompatível.`);
+    }
+  }
+  const colunas = await db.$queryRaw<{ tabela: string; nome: string; tipo: string; precisao: number | null; nula: string; padrao: string | null }[]>`
+    SELECT table_name AS tabela,column_name AS nome,data_type AS tipo,datetime_precision AS precisao,is_nullable AS nula,column_default AS padrao
+    FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=ANY(${tabelas})`;
+  for (const tabela of tabelas) {
+    if (!colunas.some(c => c.tabela === tabela && c.nome === 'dia' && c.tipo === 'date' && c.nula === 'NO')) erros.push(`INT-1.7B: ${tabela}.dia deve ser date obrigatório.`);
+    const instantes = tabela === 'IntegracaoFaturamentoDia' ? ['solicitadaEm', 'conferidaEm', 'aplicadoEm', 'criadoEm', 'atualizadoEm'] : ['atualizadoEm'];
+    for (const nome of instantes) if (!colunas.some(c => c.tabela === tabela && c.nome === nome && c.tipo === 'timestamp with time zone' && c.precisao === 3)) erros.push(`INT-1.7B: ${tabela}.${nome} deve ser timestamptz(3).`);
+  }
+  for (const [nome, tipo] of [['transacaoAplicacao', 'bigint'], ['donoAplicacao', 'text']] as const) if (!colunas.some(c => c.tabela === 'IntegracaoFaturamentoDia' && c.nome === nome && c.tipo === tipo && c.nula === 'YES' && c.padrao === null)) erros.push(`INT-1.7B: marker ${nome} deve ser nullable sem default.`);
+  const constraints = await db.$queryRaw<{ tabela: string; nome: string; tipo: string; validado: boolean; expressao: string | null; destino: string | null; schema: boolean; de: string[]; para: string[]; excluir: string; atualizar: string }[]>`
+    SELECT t.relname AS tabela,c.conname AS nome,c.contype::text AS tipo,c.convalidated AS validado,ref.relname AS destino,ref.relnamespace=t.relnamespace AS schema,
+      pg_get_expr(c.conbin,c.conrelid) AS expressao,
+      ARRAY(SELECT a.attname FROM unnest(c.conkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.num ORDER BY k.ord) AS de,
+      ARRAY(SELECT a.attname FROM unnest(c.confkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.num ORDER BY k.ord) AS para,
+      c.confdeltype::text AS excluir,c.confupdtype::text AS atualizar
+    FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace LEFT JOIN pg_class ref ON ref.oid=c.confrelid WHERE n.nspname=current_schema() AND t.relname=ANY(${tabelas})`;
+  // Forma canônica do catálogo: conserva caixa dos literais/regex e todos os
+  // agrupamentos. Um nome correto com CHECK(true) não prova a proteção.
+  const checks: Record<string, string> = {
+    IFFDia_identidade: `((canal = 'IFOOD'::"CanalVenda") AND (fonte = 'ifood-analytics'::text) AND (dia >= '2020-01-01'::date))`,
+    IFFDia_estado: `((estado = ANY (ARRAY['PENDENTE'::text, 'APLICADO'::text, 'PENDENTE_DADOS'::text, 'PENDENTE_PERIODO'::text, 'PENDENTE_ACESSO'::text, 'PENDENTE_VINCULO'::text])) AND ((estado <> 'APLICADO'::text) OR ((motivo IS NULL) AND ("hashAplicado" IS NOT NULL))))`,
+    IFFDia_motivo: `((motivo IS NULL) OR (motivo = ANY (ARRAY['PERIODO_FECHADO'::text, 'COBERTURA_INCOMPLETA'::text, 'ACESSO'::text, 'VINCULO_AMBIGUO'::text, 'MARCA_DIVERGENTE'::text, 'OUTRA_INTEGRACAO'::text, 'DESTINO_DIVERGENTE'::text, 'IDENTIDADE'::text, 'SNAPSHOT_NAO_PUBLICADO'::text, 'SNAPSHOT_INCOMPLETO'::text, 'RECORTE_NAO_MAPEADO'::text, 'VALOR_AUSENTE'::text, 'NUMEROS_INVALIDOS'::text, 'LIMITE_FATURAMENTO'::text])))`,
+    IFFDia_revisoes: `(("revisaoConferida" >= 0) AND ("revisaoSolicitada" >= "revisaoConferida"))`,
+    IFFDia_aplicacao: `((("hashAplicado" IS NULL) AND ("versaoMapaAplicada" IS NULL) AND ("aplicadoEm" IS NULL)) OR (("hashAplicado" IS NOT NULL) AND ("hashAplicado" ~ '^[0-9a-f]{64}$'::text) AND ("versaoMapaAplicada" IS NOT NULL) AND ("versaoMapaAplicada" > 0) AND ("aplicadoEm" IS NOT NULL)))`,
+    IFFDia_preparacao: `((("transacaoAplicacao" IS NULL) AND ("donoAplicacao" IS NULL)) OR (("transacaoAplicacao" IS NOT NULL) AND ("transacaoAplicacao" > 0) AND ("donoAplicacao" IS NOT NULL) AND ("donoAplicacao" ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text)))`,
+    IFFFonte_merchant: `("merchantId" ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text)`,
+  };
+  const canonico = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim();
+  for (const [nome, expressao] of Object.entries(checks)) if (!constraints.some(c => c.nome === nome && c.tipo === 'c' && c.validado && canonico(c.expressao) === canonico(expressao))) erros.push(`INT-1.7B: CHECK ${nome} ausente, NOT VALID ou incorreto.`);
+  for (const tabela of tabelas) if (!constraints.some(c => c.tabela === tabela && c.tipo === 'p' && c.validado && JSON.stringify(c.de) === '["id"]')) erros.push(`INT-1.7B: chave primária de ${tabela} incompatível.`);
+  const fks: [string, string, string, string[], string[]][] = [
+    ...tabelas.map(t => [t, `${t}_parceiroId_fkey`, 'ParceiroFlow', ['parceiroId'], ['id']] as [string, string, string, string[], string[]]),
+    ['IntegracaoFaturamentoDia', 'IFFDia_loja_fkey', 'Loja', ['parceiroId', 'lojaId'], ['parceiroId', 'id']],
+    ['IntegracaoFaturamentoFonte', 'IFFFonte_recibo_fkey', 'IntegracaoFaturamentoDia', ['parceiroId', 'reciboId', 'dia'], ['parceiroId', 'id', 'dia']],
+    ...[['conexao', 'IntegracaoConexao', 'conexaoId'], ['modulo', 'IntegracaoConexaoModulo', 'moduloId'], ['snapshot', 'IntegracaoSnapshot', 'snapshotId'], ['lancamento', 'FaturamentoLancamento', 'lancamentoId'], ['marca', 'Marca', 'marcaAplicadaId']].map(([n, t, campo]) => ['IntegracaoFaturamentoFonte', `IFFFonte_${n}_fkey`, t, ['parceiroId', campo], ['parceiroId', 'id']] as [string, string, string, string[], string[]]),
+  ];
+  for (const [tabela, nome, destino, de, para] of fks) if (!constraints.some(c => c.tabela === tabela && c.nome === nome && c.tipo === 'f' && c.validado && c.destino === destino && c.schema && c.excluir === 'r' && c.atualizar === 'c' && JSON.stringify(c.de) === JSON.stringify(de) && JSON.stringify(c.para) === JSON.stringify(para))) erros.push(`INT-1.7B: FK ${nome} incompatível com tenant/RESTRICT.`);
+  const indices = await db.$queryRaw<{ tabela: string; nome: string; valido: boolean; pronto: boolean; unico: boolean; parcial: boolean; expressao: boolean; colunas: string[] }[]>`
+    SELECT t.relname AS tabela,c.relname AS nome,i.indisvalid AS valido,i.indisready AS pronto,i.indisunique AS unico,i.indpred IS NOT NULL AS parcial,i.indexprs IS NOT NULL AS expressao,
+      ARRAY(SELECT a.attname FROM unnest(i.indkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.num ORDER BY k.ord) AS colunas
+    FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid JOIN pg_class t ON t.oid=i.indrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname=current_schema() AND t.relname=ANY(${tabelas})`;
+  const esperados: [string, string, string[], boolean][] = [
+    ['IntegracaoFaturamentoDia', 'IFFDia_tenant_key', ['parceiroId', 'id'], true], ['IntegracaoFaturamentoDia', 'IFFDia_tenant_dia_key', ['parceiroId', 'id', 'dia'], true],
+    ['IntegracaoFaturamentoDia', 'IFFDia_grao_key', ['parceiroId', 'lojaId', 'canal', 'dia', 'fonte'], true], ['IntegracaoFaturamentoDia', 'IFFDia_pendentes_idx', ['parceiroId', 'estado', 'conferidaEm', 'id'], false],
+    ['IntegracaoFaturamentoFonte', 'IFFFonte_tenant_key', ['parceiroId', 'id'], true], ['IntegracaoFaturamentoFonte', 'IFFFonte_recibo_merchant_key', ['parceiroId', 'reciboId', 'merchantId'], true],
+    ['IntegracaoFaturamentoFonte', 'IFFFonte_merchant_dia_key', ['parceiroId', 'merchantId', 'dia'], true], ['IntegracaoFaturamentoFonte', 'IFFFonte_lancamento_key', ['parceiroId', 'lancamentoId'], true],
+  ];
+  for (const [tabela, nome, campos, unico] of esperados) if (!indices.some(i => i.nome === nome && i.tabela === tabela && i.valido && i.pronto && i.unico === unico && !i.parcial && !i.expressao && JSON.stringify(i.colunas) === JSON.stringify(campos))) erros.push(`INT-1.7B: índice ${nome} incompatível.`);
+  const gatilhos = await db.$queryRaw<{ tabela: string; nome: string; funcao: string; schema: boolean; ligado: string; tipo: number; adiavel: boolean; adiado: boolean }[]>`
+    SELECT c.relname AS tabela,t.tgname AS nome,p.proname AS funcao,p.pronamespace=c.relnamespace AS schema,t.tgenabled::text AS ligado,t.tgtype::int AS tipo,t.tgdeferrable AS adiavel,t.tginitdeferred AS adiado
+    FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid
+    WHERE n.nspname=current_schema() AND NOT t.tgisinternal AND c.relname=ANY(${[...tabelas, 'IntegracaoConexao', 'FaturamentoLancamento']})`;
+  const triggers: [string, string, string, number, boolean][] = [
+    ['IntegracaoConexao', 'IntegracaoConexao_cobertura', 'erp_integracao_conexao_cobertura', 7, false], ['IntegracaoConexao', 'IntegracaoConexao_sinaliza_cobertura', 'erp_integracao_conexao_cobertura', 5, false],
+    ['IntegracaoFaturamentoDia', 'IFFDia_protocolo', 'erp_integracao_faturamento_header', 31, false], ['IntegracaoFaturamentoDia', 'IFFDia_sem_truncate', 'erp_integracao_faturamento_header', 34, false],
+    ['IntegracaoFaturamentoFonte', 'IFFFonte_protocolo', 'erp_integracao_faturamento_fonte', 31, false], ['IntegracaoFaturamentoFonte', 'IFFFonte_sem_truncate', 'erp_integracao_faturamento_fonte', 34, false],
+    ['FaturamentoLancamento', 'FaturamentoLancamento_analytics', 'erp_integracao_faturamento_destino', 31, false],
+    ['IntegracaoFaturamentoDia', 'IFFDia_completo', 'erp_integracao_faturamento_final', 21, true], ['IntegracaoFaturamentoFonte', 'IFFFonte_completa', 'erp_integracao_faturamento_final', 21, true],
+    ['FaturamentoLancamento', 'FaturamentoLancamento_analytics_completo', 'erp_integracao_faturamento_final', 21, true],
+  ];
+  for (const [tabela, nome, funcao, tipo, adiado] of triggers) if (!gatilhos.some(t => t.tabela === tabela && t.nome === nome && t.funcao === funcao && t.schema && ['O', 'A'].includes(t.ligado) && t.tipo === tipo && t.adiavel === adiado && t.adiado === adiado)) erros.push(`INT-1.7B: gatilho ${nome} ausente/desligado/incompatível.`);
+  const funcoes = await db.$queryRaw<{ nome: string; argumentos: string; retorno: string; definer: boolean; padroes: number; config: string[] | null; caminho: string; publica: boolean; tenant: boolean }[]>`
+    SELECT p.proname AS nome,oidvectortypes(p.proargtypes) AS argumentos,format_type(p.prorettype,NULL) AS retorno,p.prosecdef AS definer,p.pronargdefaults::int AS padroes,
+      p.proconfig AS config,format('search_path=%I, pg_temp',n.nspname) AS caminho,
+      EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0 AND a.privilege_type='EXECUTE') AS publica,coalesce(has_function_privilege(r.oid,p.oid,'EXECUTE'),false) AS tenant
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace LEFT JOIN pg_roles r ON r.rolname='erp_tenant' WHERE n.nspname=current_schema() AND p.proname=ANY(${FUNCOES_DA_PONTE_ANALYTICS.map(f => f[0])})`;
+  for (const [nome, argumentos, retorno, tenant, padroes] of FUNCOES_DA_PONTE_ANALYTICS) {
+    const fs = funcoes.filter(f => f.nome === nome), f = fs[0];
+    if (fs.length !== 1 || !f || f.argumentos !== argumentos || f.retorno !== retorno || !f.definer || f.padroes !== padroes || !f.config?.includes(f.caminho) || f.publica || f.tenant !== (!!marcas?.papel && tenant)) erros.push(`INT-1.7B: função ${nome} com assinatura/segurança/EXECUTE incompatíveis.`);
+  }
+  return erros;
+}
+
 /** Os CHECKs que a 2.2a acrescentou em tabelas que já existiam (a tabela nova tem os dela de nascença). */
 export const CHECKS_DA_2_2A = [
   ['DreLinha', 'DreLinha_nome_curto'],
@@ -1129,6 +1255,7 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
   pendencias.push(...await conferirEnvioDaFicha(db));
   pendencias.push(...await conferirPipelineIntegracao(db));
   pendencias.push(...await conferirClientesDoFaturamento(db));
+  pendencias.push(...await conferirPonteAnalytics(db));
   return pendencias;
 }
 

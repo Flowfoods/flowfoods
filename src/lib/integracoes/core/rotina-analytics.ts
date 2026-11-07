@@ -13,6 +13,7 @@ import { ErroPipelineAnalytics } from '../ifood/pipeline-tipos';
 import { ServicoDeToken } from '../ifood/auth';
 import { Limitador } from '../ifood/limitador';
 import { transporteFetch } from '../ifood/transporte';
+import { processarUmFaturamentoPendente } from '../ifood/faturamento-pendencias';
 
 type Log = (estado: string, detalhe?: Record<string, string | number>) => void;
 const esperar = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
@@ -38,6 +39,12 @@ export function criarRotinaAnalytics(log: Log, signal?: AbortSignal) {
       if (!parceiro) return;
       ultimoParceiro = parceiro.id;
       const cliente = doParceiro(parceiro.id);
+      // A fonte persistida pode aguardar aplicação mesmo sem trabalho HTTP. O consumidor
+      // reconfere acesso/período/posse, registra pendências e não precisa de OAuth nem cota.
+      if (signal?.aborted || !integracaoIfoodAtiva() || !await posse.confirmar()) return;
+      const financeiro = await processarUmFaturamentoPendente(cliente, posse, () => !signal?.aborted && integracaoIfoodAtiva());
+      if (financeiro) log(`faturamento-${financeiro.estado}`);
+      if (signal?.aborted || !integracaoIfoodAtiva() || !await posse.confirmar()) return;
       const liberado = await cliente.liberacaoDeModulo.findFirst({ where: { modulo: 'integracao', liberado: true } });
       if (!liberado) return;
       const filtro = { modulo: 'ANALYTICS' as const, estado: { in: ['ATIVO' as const, 'AUTORIZADO' as const] }, conexao: { estado: 'ATIVA' as const, ambiente: 'PRODUCAO' as const } };
