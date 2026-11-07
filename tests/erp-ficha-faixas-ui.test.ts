@@ -154,9 +154,12 @@ describe('3B: dois grupos explícitos e retorno completo', () => {
     const resumo = celular.slice(celular.indexOf('Corresponde:'));
     expect(resumo).toMatch(/<dt[^>]*>Loja<\/dt>/); expect(resumo).toMatch(/<dt[^>]*>Delivery<\/dt>/); expect(resumo).toMatch(/<dt[^>]*>iFood<\/dt>/);
     expect(resumo.match(/30,0%/g)).toHaveLength(3);
-    expect(resumo.match(/Meta: 25% · acima da meta · todos os canais/g)).toHaveLength(1);
-    expect(resumo.match(/Confortável · todos os canais/g)).toHaveLength(1);
-    expect(resumo).not.toContain('<a ');
+    expect(resumo.match(/Acima da meta/g)).toHaveLength(3);
+    const canais = resumo.slice(resumo.indexOf('<dl'), resumo.indexOf('</dl>'));
+    expect(canais.match(/Confortável/g)).toHaveLength(3);
+    expect(resumo).not.toContain('todos os canais');
+    expect(resumo).toContain('Ver preço, meta e detalhes do CMV de Prato');
+    expect(resumo).toContain('href="/erp/fichas/f?de=');
   });
   it.each(['/erp/fichas', '/rodolfo/erp/casa-a/fichas'])('retorno mantém os dois pares repetidos e seção nas continuações de %s', base => {
     const de = deSeguroDaFicha('cmv=LOJA-acima&cmv=IFOOD-semDados&faixaCmv=LOJA-confortavel&faixaCmv=DELIVERY_PROPRIO-semDados&secao=secaoA&pagina=2');
