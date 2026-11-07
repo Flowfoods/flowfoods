@@ -30,7 +30,8 @@ import type { ClienteDoParceiro } from './tenant';
 import { ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
 import { idsDeFichaPelaBusca } from './busca';
-import { cmvDaLista } from './canais';
+import { cmvDaLista, custoPorCanal } from './canais';
+import { filtrosFaixasCmvCanonicos, type FiltroDaFaixaDoCmv } from './cmv-faixas-campos';
 import { classificacaoDaLinha, ErroDeClassificacao, resolverClassificacao, SELECAO_DA_CLASSIFICACAO, travarClassificacao } from './ficha-secoes';
 import type { ClassificacaoDaFicha } from './ficha-secoes-campos';
 import { diferenca, type Erros } from './insumo-campos';
@@ -829,7 +830,7 @@ const SELECAO_DA_LISTA = {
  */
 export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<FiltrosDeFicha> = {}, opcoes: { verPrecos?: boolean } = {}) {
   const verPrecos = opcoes.verPrecos === true;
-  const f = filtrosDaFichaPermitidos({ ...FILTROS_DE_FICHA_PADRAO, ...filtros, cmv: filtrosCmvCanonicos(filtros.cmv ?? []) }, verPrecos);
+  const f = filtrosDaFichaPermitidos({ ...FILTROS_DE_FICHA_PADRAO, ...filtros, cmv: filtrosCmvCanonicos(filtros.cmv ?? []), faixasCmv: filtrosFaixasCmvCanonicos(filtros.faixasCmv ?? []) }, verPrecos);
   if (!f.secao || f.secao === 'sem') f.subsecao = null;
   // Foto enviada e nunca salva (herança d da 1.3): sai também ao abrir a lista, de vez em quando.
   await faxinarPendentesDeVezEmQuando(cliente.parceiroId);
@@ -844,18 +845,21 @@ export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<
     let mapaCmv: Awaited<ReturnType<typeof cmvDaLista>> | undefined;
     let cascataCmv: Awaited<ReturnType<typeof custosEmCascata>> | undefined;
     const correspondencias = new Map<string, FiltroDoCmv[]>();
+    const correspondenciasFaixas = new Map<string, FiltroDaFaixaDoCmv[]>();
     let idsDoCmv: string[] | null = null;
-    if (f.cmv.length) {
+    if (f.cmv.length || f.faixasCmv.length) {
       // Um universo antes da página; OR entre os pares escolhidos, AND com todos os outros filtros.
       const ids = (await tx.fichaTecnica.findMany({ where: { AND: [base, { tipo: 'PRATO' }] }, select: { id: true } })).map(r => r.id);
       cascataCmv = await custosEmCascata(tx, ids);
       mapaCmv = await cmvDaLista(tx, ids.map(id => ({ id, tipo: 'PRATO', custo: cascataCmv!.custo(id)! })));
       idsDoCmv = ids.filter(id => {
         const pares = f.cmv.filter(par => mapaCmv!.get(id)?.some(c => c.canal === par.canal && c.status === par.status));
+        const faixas = f.faixasCmv.filter(par => mapaCmv!.get(id)?.some(c => c.canal === par.canal && c.farol.faixa === par.faixa));
         if (pares.length) correspondencias.set(id, pares);
-        return pares.length > 0;
+        if (faixas.length) correspondenciasFaixas.set(id, faixas);
+        return (!f.cmv.length || pares.length > 0) && (!f.faixasCmv.length || faixas.length > 0);
       });
-      if (f.tipo === 'PRE_PREPARO') avisoFiltro = 'A comparação de CMV é dos pratos vendidos. Retire esse filtro para ver pré-preparos.';
+      if (f.tipo === 'PRE_PREPARO') avisoFiltro = 'Os filtros de CMV são dos pratos vendidos. Retire esses filtros para ver pré-preparos.';
     }
     const where: Prisma.FichaTecnicaWhereInput = idsDoCmv === null ? base : { AND: [base, { id: { in: idsDoCmv } }] };
     const total = await tx.fichaTecnica.count({ where });
@@ -892,6 +896,7 @@ export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<
       ...(verPrecos ? {
         cmv: new Map([...mapaCmv!].filter(([id]) => visiveis.has(id))),
         correspondenciasCmv: new Map([...correspondencias].filter(([id]) => visiveis.has(id))),
+        correspondenciasFaixasCmv: new Map([...correspondenciasFaixas].filter(([id]) => visiveis.has(id))),
       } : {}),
     };
   }, { repetivel: true });
@@ -928,6 +933,16 @@ function itensDoPreparo(sub: FichaLida, custo: CustoDaFicha, fichas: ReadonlyMap
  * `verPrecos` (1.10): o histórico da ficha leva preço, margem e custo do canal
  * só para quem vê preços (`precos.ver`). Padrão: não.
  */
+/** Detalhe financeiro íntegro: custo da ficha, preços e configuração vêm do mesmo snapshot. */
+export async function obterFichaComCanais(cliente: ClienteDoParceiro, id: string, opcoes: { verPrecos?: boolean } = {}) {
+  return cliente.transacao(async tx => {
+    const ficha = await obterFicha(tx, id, opcoes);
+    if (!ficha) return null;
+    const canais = opcoes.verPrecos === true ? await custoPorCanal(tx, ficha) : null;
+    return { ficha, canais };
+  }, { repetivel: true });
+}
+
 export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes: { verPrecos?: boolean } = {}) {
   return cliente.transacao(async (tx) => {
     const f = await tx.fichaTecnica.findUnique({

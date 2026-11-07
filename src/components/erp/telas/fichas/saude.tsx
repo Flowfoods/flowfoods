@@ -58,7 +58,7 @@ export function PainelDeSaude({ saude, base, configuracaoHref }: { saude: SaudeD
     },
     semMeta > 0 && {
       titulo: 'Definir a meta de CMV dos canais',
-      texto: 'Sem meta não há farol nem preço sugerido. A meta vale para todos os pratos do canal.',
+      texto: 'Sem meta não há comparação com a meta nem preço sugerido. As faixas do farol são independentes. A meta vale para todos os pratos do canal.',
       href: configuracaoHref,
       acao: 'Abrir a Precificação',
     },
@@ -71,7 +71,7 @@ export function PainelDeSaude({ saude, base, configuracaoHref }: { saude: SaudeD
   ].filter(Boolean) as { titulo: string; texto: string; href: string; acao: string }[];
 
   return (
-    <Painel titulo="Saúde do cardápio" subtitulo={`${plural(saude.pratos, 'prato ativo', 'pratos ativos')} · CMV ao preço que você definiu, canal a canal`}>
+    <Painel titulo="Saúde do cardápio" subtitulo={`${plural(saude.pratos, 'prato ativo', 'pratos ativos')} · comparação do CMV com a meta, canal a canal`}>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <ul className="space-y-4">
           {saude.canais.map((s) => {

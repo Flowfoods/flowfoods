@@ -105,14 +105,16 @@ describe('3A · filtros da ficha e retorno seguro', () => {
     expect(deSeguroDaFicha(seguro)).toBe(seguro);
   });
 
-  it('retorno não aceita destino externo, parâmetros desconhecidos ou faixas ainda sem motor', () => {
+  it('retorno recusa destino externo e parâmetros desconhecidos, preservando somente pares de faixa válidos', () => {
     for (const entrada of [undefined, null, 7, 'https://externo.invalid/caminho', '//externo.invalid/caminho']) {
       expect(deSeguroDaFicha(entrada)).toBe('');
     }
-    const seguro = deSeguroDaFicha('q=prato&de=https%3A%2F%2Fexterno.invalid&faixaCmv=LOJA-critico&cmv=IFOOD-acima');
+    const seguro = deSeguroDaFicha('q=prato&de=https%3A%2F%2Fexterno.invalid&faixaCmv=LOJA-critico&faixaCmv=LOJA-inventada&faixaCmv=OUTRO-critico&cmv=IFOOD-acima');
     expect(new URLSearchParams(seguro).getAll('cmv')).toEqual(['IFOOD-acima']);
     expect(new URLSearchParams(seguro).get('q')).toBe('prato');
-    expect(seguro).not.toMatch(/externo|faixaCmv|critico/);
+    expect(new URLSearchParams(seguro).getAll('faixaCmv')).toEqual(['LOJA-critico']);
+    expect(seguro).toBe('q=prato&cmv=IFOOD-acima&faixaCmv=LOJA-critico');
+    expect(seguro).not.toMatch(/externo|inventada|OUTRO/);
   });
 });
 

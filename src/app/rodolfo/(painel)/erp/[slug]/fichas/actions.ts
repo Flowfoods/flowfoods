@@ -11,8 +11,9 @@
 import { prisma } from '@/lib/db';
 import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarFicha, editarFicha, mudarSituacaoFicha, type ResultadoFicha } from '@/lib/erp/fichas';
-import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
+import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarFaixasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
+import type { EstadoConfiguracao } from '@/lib/erp/canal-config-campos';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import { concluirEtapaDaFicha } from '@/components/erp/telas/fichas/continuar';
 import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
@@ -24,12 +25,15 @@ import { buscarClassificacao } from '@/lib/erp/ficha-secoes';
 import type { EstadoGestaoClassificacao, PedidoBuscaClassificacao, ResultadoBuscaClassificacao } from '@/lib/erp/ficha-secoes-campos';
 import {
   executarImportacao,
+  concluirConfiguracao,
+  recusarConfiguracao,
   executarGestaoClassificacao,
   executarPrevia,
   lerEnvioDaFicha,
   lerEnvioDasEmbalagens,
   lerEnvioDasMargens,
   lerEnvioDasMetas,
+  lerEnvioDasFaixas,
   lerEnvioDosPrecos,
   lerPedidoDeFoto,
 } from '@/components/erp/telas/fichas/executar';
@@ -126,14 +130,14 @@ export async function acaoSalvarEmbalagens(slug: string, id: string, anterior: E
 }
 
 /** 1.9: a taxa do iFood do parceiro. */
-export async function acaoSalvarTaxaDoIfood(slug: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+export async function acaoSalvarTaxaDoIfood(slug: string, anterior: EstadoConfiguracao, form: FormData): Promise<EstadoConfiguracao> {
   const ctx = await exigirParceiro(String(slug));
-  const negado = recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
-  if (negado) return recusado(anterior, negado);
+  if (negado) return recusarConfiguracao(anterior, negado);
   const r = await salvarTaxaDoIfood(ctx.cliente, { comissao: form.get('comissao'), pagamento: form.get('pagamento'), versao: form.get('versao') }, ctx.sessao.autorNome);
   if (r.ok) await auditar(ctx, 'erp_taxa_ifood', { id: r.id });
-  return concluir(r, anterior, base, { mudou: 'taxa', igual: 'taxa-igual' }, 'canais');
+  return concluirConfiguracao(r, anterior, base, { mudou: 'taxa', igual: 'taxa-igual' });
 }
 
 /** 1.10: preço de venda por canal da ficha (o nível 1 pode tudo; a mesma checagem). */
@@ -148,25 +152,35 @@ export async function acaoSalvarPrecos(slug: string, id: string, anterior: Estad
 }
 
 /** N.2: meta de CMV de cada canal do parceiro. */
-export async function acaoSalvarMetasDeCmv(slug: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+export async function acaoSalvarMetasDeCmv(slug: string, anterior: EstadoConfiguracao, form: FormData): Promise<EstadoConfiguracao> {
   const ctx = await exigirParceiro(String(slug));
   const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
-  if (negado) return recusado(anterior, negado);
+  if (negado) return recusarConfiguracao(anterior, negado);
   const r = await salvarMetasDeCmv(ctx.cliente, lerEnvioDasMetas(form), ctx.sessao.autorNome);
   if (r.ok && r.mudou.length) await auditar(ctx, 'erp_metas_cmv', { canais: r.mudou.join(',') });
-  return concluir(r, anterior, base, { mudou: 'metas', igual: 'metas-igual' }, 'canais');
+  return concluirConfiguracao(r, anterior, base, { mudou: 'metas', igual: 'metas-igual' });
 }
 
 /** 1.10: margem-alvo de cada canal do parceiro. */
-export async function acaoSalvarMargensAlvo(slug: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+export async function acaoSalvarFaixasDeCmv(slug: string, anterior: EstadoConfiguracao, form: FormData): Promise<EstadoConfiguracao> {
   const ctx = await exigirParceiro(String(slug));
   const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
-  if (negado) return recusado(anterior, negado);
+  if (negado) return recusarConfiguracao(anterior, negado);
+  const r = await salvarFaixasDeCmv(ctx.cliente, lerEnvioDasFaixas(form), ctx.sessao.autorNome);
+  if (r.ok && r.mudou.length) await auditar(ctx, 'erp_faixas_cmv', { canais: r.mudou.join(',') });
+  return concluirConfiguracao(r, anterior, base, { mudou: 'faixas', igual: 'faixas-igual' });
+}
+
+export async function acaoSalvarMargensAlvo(slug: string, anterior: EstadoConfiguracao, form: FormData): Promise<EstadoConfiguracao> {
+  const ctx = await exigirParceiro(String(slug));
+  const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
+  if (negado) return recusarConfiguracao(anterior, negado);
   const r = await salvarMargensAlvo(ctx.cliente, lerEnvioDasMargens(form), ctx.sessao.autorNome);
   if (r.ok && r.mudou.length) await auditar(ctx, 'erp_margens_alvo', { canais: r.mudou.join(',') });
-  return concluir(r, anterior, base, { mudou: 'margens', igual: 'margens-igual' }, 'canais');
+  return concluirConfiguracao(r, anterior, base, { mudou: 'margens', igual: 'margens-igual' });
 }
 
 /** F4: fotos da ficha (principal e de apoio), pelo nível 1. */

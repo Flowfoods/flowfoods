@@ -26,6 +26,10 @@ import { precosDasEmbalagens } from './conta-das-embalagens';
 import { FormTaxaDoIfood } from './form-taxa';
 import { FormMargensAlvo } from './form-margens';
 import { FormMetasDeCmv } from './form-metas-cmv';
+import { FormFaixasDeCmv } from './form-faixas-cmv';
+import { IntervalosDoFarol } from './farol';
+import type { ConfiguracaoDoFarol } from '@/lib/erp/cmv-faixas-campos';
+import type { AcaoConfiguracao } from '@/lib/erp/canal-config-campos';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 export function TelaEmbalagensDaFicha({
@@ -117,6 +121,9 @@ export function TelaCanaisDeVenda({
   metas,
   versaoDasMetas,
   acaoMetas,
+  faixas,
+  versaoDasFaixas,
+  acaoFaixas,
 }: {
   /** Base das fichas. */
   base: string;
@@ -129,16 +136,19 @@ export function TelaCanaisDeVenda({
   /** O atalho "Margem de cada prato" leva à lista de fichas: só com "ver fichas" (a rota recusaria). */
   podeVerFichas: boolean;
   bloqueio: string | null;
-  acao: AcaoDeCadastro;
+  acao: AcaoConfiguracao;
   feito?: string;
   /** 1.10: margem-alvo (líquida) de cada canal e a versão lida. */
   margens: Record<CanalVenda, number | null>;
   versaoDasMargens: string;
-  acaoMargens: AcaoDeCadastro;
+  acaoMargens: AcaoConfiguracao;
   /** N.2: meta de CMV de cada canal e a versão lida. */
   metas: Record<CanalVenda, number | null>;
   versaoDasMetas: string;
-  acaoMetas: AcaoDeCadastro;
+  acaoMetas: AcaoConfiguracao;
+  faixas: ConfiguracaoDoFarol;
+  versaoDasFaixas: string;
+  acaoFaixas: AcaoConfiguracao;
 }) {
   const temMargemAntiga = ORDEM_DOS_CANAIS.some((c) => margens[c] !== null);
   const mensagem = fraseDoFeitoDaFicha(feito);
@@ -235,7 +245,7 @@ export function TelaCanaisDeVenda({
             </div>
           </Painel>
 
-          <Painel titulo="Meta de CMV por canal" subtitulo="Quanto do preço o custo físico do prato pode ser: a sugestão de preço e o farol de cada ficha seguem isso">
+          <Painel titulo="Meta de CMV por canal" subtitulo="Quanto do preço o custo físico do prato pode ser: comanda a sugestão de preço e a comparação com a meta">
             {podeEditar ? (
               <FormMetasDeCmv acao={acaoMetas} aqui={`${base}/canais`} versao={versaoDasMetas} inicial={metas} bloqueio={bloqueio} />
             ) : (
@@ -243,6 +253,10 @@ export function TelaCanaisDeVenda({
                 {ORDEM_DOS_CANAIS.map((c) => `${CANAIS[c].rotulo}: ${metas[c] === null ? 'sem meta' : formatarPontosBase(metas[c]!)}`).join(' · ')}. Quem cuida dos preços muda aqui.
               </p>
             )}
+          </Painel>
+
+          <Painel titulo="Faixas do farol de CMV" subtitulo="Classifique o CMV de cada canal. Os limites não alteram a meta nem os preços definidos">
+            {podeEditar ? <FormFaixasDeCmv acao={acaoFaixas} aqui={`${base}/canais`} versao={versaoDasFaixas} inicial={faixas} bloqueio={bloqueio} /> : <div className="space-y-5">{ORDEM_DOS_CANAIS.map(canal => <section key={canal} className="space-y-2"><h3 className="text-[15px] font-semibold">{CANAIS[canal].rotulo}</h3><IntervalosDoFarol cortes={faixas[canal]} /></section>)}</div>}
           </Painel>
 
           {/* A margem-alvo (1.10) não comanda mais a sugestão. Fica guardada, à vista e editável para quem já tinha. */}

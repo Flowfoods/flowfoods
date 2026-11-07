@@ -10,8 +10,9 @@
 
 import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarFicha, editarFicha, mudarSituacaoFicha } from '@/lib/erp/fichas';
-import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
+import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarFaixasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
+import type { EstadoConfiguracao } from '@/lib/erp/canal-config-campos';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import { concluirEtapaDaFicha } from '@/components/erp/telas/fichas/continuar';
 import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
@@ -23,12 +24,15 @@ import { buscarClassificacao } from '@/lib/erp/ficha-secoes';
 import type { EstadoGestaoClassificacao, PedidoBuscaClassificacao, ResultadoBuscaClassificacao } from '@/lib/erp/ficha-secoes-campos';
 import {
   executarImportacao,
+  concluirConfiguracao,
+  recusarConfiguracao,
   executarGestaoClassificacao,
   executarPrevia,
   lerEnvioDaFicha,
   lerEnvioDasEmbalagens,
   lerEnvioDasMargens,
   lerEnvioDasMetas,
+  lerEnvioDasFaixas,
   lerEnvioDosPrecos,
   lerPedidoDeFoto,
 } from '@/components/erp/telas/fichas/executar';
@@ -111,12 +115,12 @@ export async function acaoSalvarEmbalagens(id: string, anterior: EstadoCadastro,
 }
 
 /** 1.9: a taxa do iFood do parceiro é condição comercial: só quem muda preços (a dona). */
-export async function acaoSalvarTaxaDoIfood(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+export async function acaoSalvarTaxaDoIfood(anterior: EstadoConfiguracao, form: FormData): Promise<EstadoConfiguracao> {
   const ctx = await exigirParceiroDaSessao();
-  const negado = recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
-  if (negado) return recusado(anterior, negado);
+  const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  if (negado) return recusarConfiguracao(anterior, negado);
   const r = await salvarTaxaDoIfood(ctx.cliente, { comissao: form.get('comissao'), pagamento: form.get('pagamento'), versao: form.get('versao') }, ctx.sessao.autorNome);
-  return concluir(r, anterior, BASE, { mudou: 'taxa', igual: 'taxa-igual' }, 'canais');
+  return concluirConfiguracao(r, anterior, BASE, { mudou: 'taxa', igual: 'taxa-igual' });
 }
 
 /**
@@ -132,21 +136,29 @@ export async function acaoSalvarPrecos(id: string, anterior: EstadoCadastro, for
 }
 
 /** N.2: meta de CMV de cada canal do parceiro (só quem muda preços). */
-export async function acaoSalvarMetasDeCmv(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+export async function acaoSalvarMetasDeCmv(anterior: EstadoConfiguracao, form: FormData): Promise<EstadoConfiguracao> {
   const ctx = await exigirParceiroDaSessao();
   const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
-  if (negado) return recusado(anterior, negado);
+  if (negado) return recusarConfiguracao(anterior, negado);
   const r = await salvarMetasDeCmv(ctx.cliente, lerEnvioDasMetas(form), ctx.sessao.autorNome);
-  return concluir(r, anterior, BASE, { mudou: 'metas', igual: 'metas-igual' }, 'canais');
+  return concluirConfiguracao(r, anterior, BASE, { mudou: 'metas', igual: 'metas-igual' });
 }
 
 /** 1.10: margem-alvo de cada canal do parceiro (só a dona). */
-export async function acaoSalvarMargensAlvo(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+export async function acaoSalvarFaixasDeCmv(anterior: EstadoConfiguracao, form: FormData): Promise<EstadoConfiguracao> {
   const ctx = await exigirParceiroDaSessao();
   const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
-  if (negado) return recusado(anterior, negado);
+  if (negado) return recusarConfiguracao(anterior, negado);
+  const r = await salvarFaixasDeCmv(ctx.cliente, lerEnvioDasFaixas(form), ctx.sessao.autorNome);
+  return concluirConfiguracao(r, anterior, BASE, { mudou: 'faixas', igual: 'faixas-igual' });
+}
+
+export async function acaoSalvarMargensAlvo(anterior: EstadoConfiguracao, form: FormData): Promise<EstadoConfiguracao> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  if (negado) return recusarConfiguracao(anterior, negado);
   const r = await salvarMargensAlvo(ctx.cliente, lerEnvioDasMargens(form), ctx.sessao.autorNome);
-  return concluir(r, anterior, BASE, { mudou: 'margens', igual: 'margens-igual' }, 'canais');
+  return concluirConfiguracao(r, anterior, BASE, { mudou: 'margens', igual: 'margens-igual' });
 }
 
 /** F4: fotos da ficha (principal e de apoio). A regra confere versão e lista da ficha de novo dentro da transação. */

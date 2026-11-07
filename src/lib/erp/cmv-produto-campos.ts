@@ -8,12 +8,13 @@
  *                      — taxas de plataforma ficam FORA do C
  *   sugerido         = C ÷ meta de CMV do canal (arredondado PARA CIMA ao centavo)
  *   CMV teórico      = C ÷ preço de venda definido pela pessoa × 100 (não é o CMV real do estoque nem o do DRE)
- *   farol            = dentro (CMV ≤ meta) · acima (CMV > meta) · sem dados (com o motivo) · não ofertado
+ *   comparação/meta  = dentro (CMV ≤ meta) · acima (CMV > meta) · sem dados (com o motivo) · não ofertado
+ *   farol absoluto   = cinco faixas pelos cortes do canal, independente da meta
  *   resultado após os custos informados = preço − C − taxa do canal sobre o preço (NÃO é lucro líquido:
  *                      aluguel, equipe, impostos e o resto da casa não entram)
  *
  * Regras de integridade (ponto 2 do registro de aprovações):
- *  - faltar custo, meta ou preço nunca vira zero, sugestão nem farol positivo: é "sem dados" com o motivo;
+ *  - faltar custo ou preço nunca vira zero nem faixa positiva; sem meta não há sugestão/comparação, mas pode haver faixa;
  *  - a taxa do iFood não configurada NÃO invalida o CMV nem a sugestão (a taxa não entra no CMV): só o
  *    resultado fica pendente, dito como tal;
  *  - o preço sugerido não é o preço praticado: sem preço definido pela pessoa, o CMV e o resultado ficam
@@ -27,6 +28,7 @@ import { camadasDoCanal, CANAIS, type CamadasDoCanal, type CanalVenda } from './
 import type { Erros, Leitura } from './insumo-campos';
 import { precoDeCardapio, type EntradaDoCanal } from './preco-campos';
 import { compararFracoes, formatarFracao, formatarPontosBase, lerPontosBase, somar, TETO_DE_EXIBICAO, type Fracao } from './unidades';
+import { classificarFarolDeCmv, type CortesDoFarol, type ResultadoDoFarol } from './cmv-faixas-campos';
 
 const BP = 10_000n;
 
@@ -42,7 +44,7 @@ export const LIMITES_DA_META_DE_CMV = { minimoBp: 1, maximoBp: 9_999 } as const;
 
 /**
  * Formulário → meta de CMV por canal, em pontos-base (25 % = 2500); vazio = sem meta (o canal fica
- * "sem dados" para o farol e sem sugestão). A meta não depende da taxa do canal: a taxa não entra no CMV.
+ * "sem dados" para a comparação com a meta e sem sugestão). As faixas são independentes, assim como a taxa do canal.
  */
 export function lerMetasDeCmv(entrada: Partial<Record<CanalVenda, unknown>>): Leitura<Record<CanalVenda, number | null>> {
   const erros: Erros = {};
@@ -149,17 +151,24 @@ export interface CmvDoCanal {
   /** CMV teórico ao preço definido; null = sem custo completo ou sem preço. */
   cmvBp: Fracao | null;
   status: StatusDoCmv;
+  /** Faixa absoluta, independente da meta e classificada antes de arredondar. */
+  farol: ResultadoDoFarol;
   /** Por que está "sem dados" (null nos outros status). */
   motivo: string | null;
   resultado: ResultadoDoCanal;
 }
 
 /** O que falta, numa frase só ("falta preço em “Sacola”; sem meta de CMV para o canal"). */
-function motivoDosDados(p: { fisico: CustoFisico; metaBp: number | null; precoCentavos: number | null }): string | null {
+function motivosFisicos(p: { fisico: CustoFisico; precoCentavos: number | null }): string[] {
   const partes: string[] = [];
   if (!p.fisico.completo) partes.push(`falta preço em ${p.fisico.falta.map((n) => `“${n}”`).join(', ')}`);
   if (p.fisico.completo && p.fisico.valor.num <= 0n) partes.push('custo físico zero (confira a receita)');
   if (p.precoCentavos === null) partes.push('preço de venda não definido');
+  return partes;
+}
+
+function motivoDosDados(p: { fisico: CustoFisico; metaBp: number | null; precoCentavos: number | null }): string | null {
+  const partes = motivosFisicos(p);
   if (p.metaBp === null) partes.push('sem meta de CMV para o canal');
   return partes.length ? partes.join('; ') : null;
 }
@@ -168,13 +177,14 @@ function motivoDosDados(p: { fisico: CustoFisico; metaBp: number | null; precoCe
  * A conta inteira de um canal pela meta de CMV. `ofertado: false` = o produto não é vendido neste canal
  * (diferente de dado ausente). `precoCentavos` = o preço DEFINIDO pela pessoa (null = não definido).
  */
-export function cmvDoCanal(e: EntradaDoCanal, p: { metaBp: number | null; precoCentavos: number | null; ofertado?: boolean }): CmvDoCanal {
+export function cmvDoCanal(e: EntradaDoCanal, p: { metaBp: number | null; precoCentavos: number | null; ofertado?: boolean; cortesDoFarol?: CortesDoFarol | null }): CmvDoCanal {
   const ofertado = p.ofertado ?? true;
   const base = camadasDoCanal(e);
   const fisico = custoFisicoDasCamadas(base);
   const sugerido = sugeridoPorCmv({ fisico, metaBp: p.metaBp });
+  const farol = (cmvBp: Fracao | null) => classificarFarolDeCmv({ ofertado, custoCompleto: fisico.completo, custoPositivo: fisico.valor.num > 0n, cmvBp, motivoSemDados: motivosFisicos({ fisico, precoCentavos: p.precoCentavos }).join('; ') || null }, p.cortesDoFarol ?? null);
   if (!ofertado) {
-    return { canal: e.canal, ofertado, fisico, metaBp: p.metaBp, sugerido, precoCentavos: p.precoCentavos, cmvBp: null, status: 'naoOfertado', motivo: null, resultado: { tipo: 'pendente', motivo: 'canal não ofertado' } };
+    return { canal: e.canal, ofertado, fisico, metaBp: p.metaBp, sugerido, precoCentavos: p.precoCentavos, cmvBp: null, status: 'naoOfertado', farol: farol(null), motivo: null, resultado: { tipo: 'pendente', motivo: 'canal não ofertado' } };
   }
   const preco = p.precoCentavos;
   const cmvBp = preco !== null && fisico.completo ? cmvTeoricoBp(fisico.valor, preco) : null;
@@ -190,6 +200,7 @@ export function cmvDoCanal(e: EntradaDoCanal, p: { metaBp: number | null; precoC
     precoCentavos: preco,
     cmvBp,
     status,
+    farol: farol(cmvBp),
     motivo: status === 'semDados' ? motivo ?? 'dados insuficientes' : null,
     resultado: resultadoDoCanal(base, fisico, preco),
   };
@@ -248,7 +259,7 @@ const reaisComSinal = (f: Fracao) => (f.num < 0n ? `−${formatarFracao({ num: -
 
 /**
  * Retrato da precificação para o histórico (N.2): por canal, o preço DEFINIDO ("não definido" quando vazio — a
- * sugestão não é preço praticado), o CMV com a meta e o farol, o resultado após os custos informados e o custo físico
+ * sugestão não é preço praticado), o CMV com a comparação à meta, o resultado após os custos informados e o custo físico
  * naquele instante. Nada é "lucro".
  */
 export function retratoDoCmv(contas: readonly CmvDoCanal[]): Record<string, string> {

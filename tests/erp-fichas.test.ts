@@ -364,7 +364,7 @@ describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
 describe('ERP 1.2 · filtros da lista de fichas na URL', () => {
   it('lê, devolve e ignora valor desconhecido', () => {
     const f = lerFiltrosDeFicha({ q: ' burger ', tipo: 'PRATO', situacao: 'xyz', custo: 'incompleto', pagina: '2' });
-    expect(f).toEqual({ q: 'burger', tipo: 'PRATO', situacao: 'ativas', incompleto: true, cmv: [], secao: null, subsecao: null, pagina: 2 });
+    expect(f).toEqual({ q: 'burger', tipo: 'PRATO', situacao: 'ativas', incompleto: true, cmv: [], faixasCmv: [], secao: null, subsecao: null, pagina: 2 });
     expect(queryDosFiltrosDeFicha(f)).toBe('q=burger&tipo=PRATO&custo=incompleto&pagina=2');
     expect(lerFiltrosDeFicha({ tipo: '__proto__' }).tipo).toBeNull();
     // F4: CMV por canal — canal e status de uma lista fechada; o resto vira "sem filtro"

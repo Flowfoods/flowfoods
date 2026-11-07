@@ -22,7 +22,8 @@ import { Printer } from 'lucide-react';
 import type { FichaNoPapel } from '@/lib/erp/ficha-papel';
 import type { ImpressaoFinanceira } from '@/lib/erp/ficha-impressao';
 import { CANAIS } from '@/lib/erp/canal-campos';
-import { parcelasEmTexto, porcentagemDoCmv, ROTULO_DO_RESULTADO, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import { parcelasEmTexto, porcentagemDoCmv, ROTULO_DO_RESULTADO, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import { AVISO_DO_ARREDONDAMENTO, FarolDeCmv } from './farol';
 import { custoIncompleto, formatarFator, formatarRendimento, porUnidadeDeRendimento, quantidadeBruta, TIPOS_DE_FICHA } from '@/lib/erp/ficha-campos';
 import { formatarData, hojeNoRio } from '@/lib/erp/compra-campos';
 import { formatarDinheiro, formatarFracao, formatarPontosBase, formatarQuantidade } from '@/lib/erp/unidades';
@@ -386,8 +387,7 @@ export function DocumentoDaFicha({
                         <td className={`${TD} text-right`}>{x.metaBp === null ? 'sem meta' : formatarPontosBase(x.metaBp)}</td>
                         <td className={`${TD} text-right`}>{x.precoCentavos === null ? 'não definido' : formatarDinheiro(x.precoCentavos)}</td>
                         <td className={`${TD} text-right`}>
-                          {x.cmvBp ? `${porcentagemDoCmv(x.cmvBp)} · ` : ''}
-                          {STATUS_DO_CMV[x.status].rotulo}
+                          <FarolDeCmv conta={x} modo="impressao" />
                         </td>
                         <td className={`${TD} text-right`}>
                           {x.resultado.tipo === 'ok' ? (
@@ -409,7 +409,7 @@ export function DocumentoDaFicha({
             </div>
             <p className="text-[11px] text-suave print:text-black">
               CMV teórico do prato ao preço definido, não o CMV real do estoque. O resultado desconta só o que está listado: aluguel, equipe, impostos e
-              outras despesas não entram. A taxa do iFood fica fora do CMV.
+              outras despesas não entram. A taxa do iFood fica fora do CMV. {AVISO_DO_ARREDONDAMENTO}
             </p>
           </section>
         )}

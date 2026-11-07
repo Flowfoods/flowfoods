@@ -41,6 +41,7 @@ function precosParaTela(c: CustoPorCanal): PrecosParaTela {
   return {
     entradas: c.entradas.map(entradaParaTela),
     metasDeCmv: c.metasDeCmv,
+    faixas: c.faixas,
     precosProprios: { LOJA: proprio('LOJA'), DELIVERY_PROPRIO: proprio('DELIVERY_PROPRIO'), IFOOD: proprio('IFOOD') },
     ofertados: c.ofertados,
     impressaoDosPrecos: c.impressaoDosPrecos,

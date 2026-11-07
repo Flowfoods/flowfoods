@@ -21,9 +21,11 @@ const textoCurto = (x: unknown): x is string => typeof x === 'string' && x.lengt
 /** Só para quem já passou pela permissão na ação. `versao` = o `atualizadoEm` (ISO) que a tela mostra. */
 export async function lerImpressaoFinanceira(cliente: ClienteDoParceiro, id: unknown, versao: unknown): Promise<ImpressaoFinanceira> {
   if (!textoCurto(id) || !textoCurto(versao)) return { ok: false, erro: 'Pedido de impressão inválido. Recarregue a página.' };
-  const ficha = await obterFicha(cliente, id, { verPrecos: true });
-  if (!ficha) return { ok: false, erro: 'Ficha não encontrada.' };
-  if (ficha.versao !== versao) return { ok: false, erro: FICHA_MUDOU_NA_IMPRESSAO };
-  const canais = (await custoPorCanal(cliente, ficha))?.cmv ?? null;
-  return { ok: true, ficha: fichaNoPapel(fichaNaTela(ficha, true)), canais };
+  return cliente.transacao(async tx => {
+    const ficha = await obterFicha(tx, id, { verPrecos: true });
+    if (!ficha) return { ok: false as const, erro: 'Ficha não encontrada.' };
+    if (ficha.versao !== versao) return { ok: false as const, erro: FICHA_MUDOU_NA_IMPRESSAO };
+    const canais = (await custoPorCanal(tx, ficha))?.cmv ?? null;
+    return { ok: true as const, ficha: fichaNoPapel(fichaNaTela(ficha, true)), canais };
+  }, { repetivel: true });
 }

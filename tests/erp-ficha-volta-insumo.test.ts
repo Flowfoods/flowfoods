@@ -16,11 +16,11 @@ vi.mock('@/lib/erp/contexto', async () => {
   const { exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return { exigirParceiroDaSessao: async () => atual.ctx, exigirParceiro: async () => atual.ctx, exigirPermissao, exigirPermissaoNaPagina: exigirPermissao, pode };
 });
-vi.mock('@/lib/erp/fichas', async (orig) => ({ ...(await orig<typeof import('@/lib/erp/fichas')>()), obterFicha: vi.fn() }));
+vi.mock('@/lib/erp/fichas', async (orig) => ({ ...(await orig<typeof import('@/lib/erp/fichas')>()), obterFicha: vi.fn(), obterFichaComCanais: vi.fn() }));
 vi.mock('@/lib/erp/canais', () => ({ custoPorCanal: vi.fn(async () => null) }));
 vi.mock('@/app/erp/fichas/actions', () => ({ acaoSalvarPrecos: vi.fn(), acaoSituacaoFicha: vi.fn() }));
 vi.mock('@/app/rodolfo/(painel)/erp/[slug]/fichas/actions', () => ({ acaoSalvarPrecos: vi.fn(), acaoSituacaoFicha: vi.fn() }));
-import { obterFicha } from '@/lib/erp/fichas';
+import { obterFicha, obterFichaComCanais } from '@/lib/erp/fichas';
 import { custoPorCanal } from '@/lib/erp/canais';
 import ErpFichaPage from '@/app/erp/fichas/[id]/page';
 import ParceiroFichaPage from '@/app/rodolfo/(painel)/erp/[slug]/fichas/[id]/page';
@@ -131,7 +131,9 @@ describe('páginas reais de ficha e SSR: retorno e portões preservados', () => 
   beforeEach(() => {
     vi.clearAllMocks();
     atual.ctx = { cliente: criarCliente().cliente, alcance: podeVoltar, parceiro: { slug: 'casa-a', nome: 'Casa A' }, bloqueio: null };
-    vi.mocked(obterFicha).mockResolvedValue(ficha);
+    // A página passou a pedir uma leitura coesa. Este teste isola o retorno/SSR;
+    // a transação real e o gate financeiro do helper têm cobertura DB própria.
+    vi.mocked(obterFichaComCanais).mockResolvedValue({ ficha, canais: null });
   });
   const abrir = (searchParams: Parameters<typeof ErpFichaPage>[0]['searchParams']) => ErpFichaPage({ params: { id: 'fichaA' }, searchParams });
 
@@ -142,7 +144,9 @@ describe('páginas reais de ficha e SSR: retorno e portões preservados', () => 
     expect(el.props.ficha.custo).toBeNull();
     expect(el.props.ficha.itens[0].custoDoInsumo).toBeNull();
     expect(custoPorCanal).not.toHaveBeenCalled();
-    expect(obterFicha).toHaveBeenCalledWith(expect.anything(), 'fichaA', { verPrecos: false });
+    expect(obterFichaComCanais).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ parceiroId: 'parceiroA' }), 'fichaA', { verPrecos: false });
+    expect(obterFicha).not.toHaveBeenCalled();
+    expect(el.props.canais).toBeNull();
     const html = renderToStaticMarkup(el);
     expect(html).toContain('Voltar para o insumo');
     expect(html).toContain('de=q%3DA');
@@ -174,7 +178,9 @@ describe('páginas reais de ficha e SSR: retorno e portões preservados', () => 
     expect(el.props.voltar).toBe(`${volta}#onde-e-usado`);
     expect(el.props.rotuloVoltar).toBe('Voltar para o insumo');
     expect(el.props.ficha.verCustos).toBe(true);
-    expect(custoPorCanal).toHaveBeenCalledTimes(1);
+    expect(obterFichaComCanais).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ parceiroId: 'parceiroA' }), 'fichaA', { verPrecos: true });
+    expect(obterFicha).not.toHaveBeenCalled();
+    expect(custoPorCanal).not.toHaveBeenCalled();
     expect(renderToStaticMarkup(el)).toContain('Voltar para o insumo');
     const outro = await ParceiroFichaPage({ params: { slug: 'casa-a', id: 'fichaA' }, searchParams: { volta: volta.replace('casa-a', 'casa-b'), de: 'q=Prato' } });
     expect(outro.props.voltar).toBe('/rodolfo/erp/casa-a/fichas?q=Prato');

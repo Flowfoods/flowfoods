@@ -184,8 +184,8 @@ describe.skipIf(!URL_TESTE)('ERP N.2 · preço pela meta de CMV, cenário de ref
     expect(await fichasDaSessao.acaoSalvarMetasDeCmv(null, formDasMetas(o.versaoDasMetas, { LOJA: '40', DELIVERY_PROPRIO: '25', IFOOD: '30' }))).toMatchObject({ ok: false });
     expect((await obterTaxaDoIfood(a)).metas.LOJA).toBe(2500);
     atual.ctx = ctxDe('DONO', 'Marina');
-    await expect(fichasDaSessao.acaoSalvarMetasDeCmv(null, formDasMetas(o.versaoDasMetas, { LOJA: '25', DELIVERY_PROPRIO: '25', IFOOD: '30' }))).rejects.toMatchObject({
-      url: '/erp/fichas/canais?feito=metas-igual',
+    expect(await fichasDaSessao.acaoSalvarMetasDeCmv(null, formDasMetas(o.versaoDasMetas, { LOJA: '25', DELIVERY_PROPRIO: '25', IFOOD: '30' }))).toMatchObject({
+      ok: true, confirmacao: { versao: o.versaoDasMetas, campos: { metaCmv_LOJA: '25', metaCmv_DELIVERY_PROPRIO: '25', metaCmv_IFOOD: '30' } },
     });
   });
 

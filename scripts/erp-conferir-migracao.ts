@@ -39,6 +39,40 @@ export const CHECKS_DA_2_1 = [
 
 export const INDICE_DO_GRAO = 'FaturamentoLancamento_grao_humano';
 export const CHECK_DA_META_SEM_TAXA = 'CanalConfig_taxa_pendente_coerente';
+export const CHECK_DAS_FAIXAS_DE_CMV = 'CanalConfig_farol_conjunto_valido';
+
+/** Colunas aditivas; o catálogo da fase anterior continua sendo um snapshot válido. */
+export async function conferirFaixasDeCmv(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
+  const pendencias: string[] = [];
+  const colunas = await db.$queryRaw<{ nome: string; tipo: string; nula: string; padrao: string | null }[]>`
+    SELECT column_name AS nome,data_type AS tipo,is_nullable AS nula,column_default AS padrao
+    FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='CanalConfig'
+    AND column_name IN ('farolABp','farolBBp','farolCBp','farolDBp')`;
+  let aplicada = colunas.length > 0;
+  if (!aplicada) {
+    const marca = await db.$queryRaw<{ tem: boolean }[]>`SELECT to_regclass('_prisma_migrations') IS NOT NULL AS tem`;
+    if (marca[0]?.tem) {
+      const r = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "_prisma_migrations" WHERE migration_name='20261121000000_erp_cmv_faixas' AND rolled_back_at IS NULL`;
+      aplicada = (r[0]?.n ?? 0) > 0;
+    }
+  }
+  if (!aplicada) return pendencias;
+  for (const nome of ['farolABp','farolBBp','farolCBp','farolDBp']) {
+    if (!colunas.some(c => c.nome === nome && c.tipo === 'integer' && c.nula === 'YES' && c.padrao === null)) pendencias.push(`3B: coluna CanalConfig.${nome} deve ser INTEGER nullable sem default.`);
+  }
+  const checks = await db.$queryRaw<{ validado: boolean; tipo: string; definicao: string }[]>`
+    SELECT c.convalidated AS validado,c.contype::text AS tipo,pg_get_constraintdef(c.oid) AS definicao
+    FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+    WHERE n.nspname=current_schema() AND t.relname='CanalConfig' AND c.conname=${CHECK_DAS_FAIXAS_DE_CMV}`;
+  const check = checks[0];
+  if (!check || !check.validado || check.tipo !== 'c') pendencias.push(`3B: CHECK ${CHECK_DAS_FAIXAS_DE_CMV} ausente ou NOT VALID.`);
+  const normalizar = (s: string) => s.replace(/\s+|\(|\)/g, '').toLowerCase();
+  const esperado = `CHECK (("farolABp" IS NULL AND "farolBBp" IS NULL AND "farolCBp" IS NULL AND "farolDBp" IS NULL)
+    OR ("farolABp" IS NOT NULL AND "farolBBp" IS NOT NULL AND "farolCBp" IS NOT NULL AND "farolDBp" IS NOT NULL
+      AND "farolABp" >= 0 AND "farolABp" < "farolBBp" AND "farolBBp" < "farolCBp" AND "farolCBp" < "farolDBp" AND "farolDBp" <= 2000000000))`;
+  if (check && normalizar(check.definicao) !== normalizar(esperado)) pendencias.push(`3B: CHECK ${CHECK_DAS_FAIXAS_DE_CMV} tem definição incorreta.`);
+  return pendencias;
+}
 
 export const CHECKS_DA_FICHA_3A = [
   ['SecaoFicha', 'SecaoFicha_nome_valido'], ['SecaoFicha', 'SecaoFicha_nomeChave_coerente'],
@@ -862,6 +896,7 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
     else if (!check[0].validado) pendencias.push(`CHECK ${CHECK_DA_META_SEM_TAXA} ficou NOT VALID: rode ALTER TABLE "CanalConfig" VALIDATE CONSTRAINT "${CHECK_DA_META_SEM_TAXA}";`);
   }
   pendencias.push(...await conferirClassificacaoDeFichas(db));
+  pendencias.push(...await conferirFaixasDeCmv(db));
   return pendencias;
 }
 

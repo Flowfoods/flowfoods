@@ -44,8 +44,8 @@
     "hash": "d6bbcf071f3e6faf"
   },
   "fichas": {
-    "versao": 5,
-    "hash": "88455626d5a04d9a"
+    "versao": 6,
+    "hash": "2ba19a51b9664164"
   },
   "ficha-nova": {
     "versao": 5,
@@ -156,16 +156,16 @@
     "hash": "83ece79d9848d788"
   },
   "ficha": {
-    "versao": 6,
-    "hash": "e53e830dd5e3627c"
+    "versao": 7,
+    "hash": "623fdbbf6ef65031"
   },
   "ficha-embalagens": {
-    "versao": 2,
-    "hash": "bedc68618c32593d"
+    "versao": 3,
+    "hash": "d61dbde0e55636b3"
   },
   "precificacao": {
-    "versao": 2,
-    "hash": "ce95f4913104c383"
+    "versao": 3,
+    "hash": "967a58f6e95eb0f6"
   },
   "compras": {
     "versao": 3,

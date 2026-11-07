@@ -7,15 +7,14 @@
  */
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
 import { taxaACadaDezReais } from '@/lib/erp/canal-campos';
 import { formatarPontosBase, lerPontosBase } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
-import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
-import { ErroGeral, useAvisoDeSaida } from '../cadastro/erros';
+import type { AcaoConfiguracao } from '@/lib/erp/canal-config-campos';
+import { ErroGeral } from '../cadastro/erros';
+import { useConfiguracaoConfirmada } from './configuracao-confirmada';
 
 export function FormTaxaDoIfood({
   acao,
@@ -26,7 +25,7 @@ export function FormTaxaDoIfood({
   cancelar,
   variante = 'primario',
 }: {
-  acao: AcaoDeCadastro;
+  acao: AcaoConfiguracao;
   aqui: string;
   /** `atualizadoEm` da linha lida ('' = sem linha; a linha pode ter só a meta, sem taxa). */
   versao: string;
@@ -36,11 +35,9 @@ export function FormTaxaDoIfood({
   /** 1.10: na tela dos canais, o principal é o das margens-alvo. */
   variante?: 'primario' | 'secundario';
 }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
-  const saida = useAvisoDeSaida(estado);
-  const [comissao, setComissao] = useState(inicial.comissao);
-  const [pagamento, setPagamento] = useState(inicial.pagamento);
-  const erros = estado?.erros ?? {};
+  const f = useConfiguracaoConfirmada(acao, versao, inicial);
+  const { comissao, pagamento } = f.campos;
+  const erros = f.erro?.erros ?? {};
   const c = lerPontosBase(comissao || '');
   const p = pagamento.trim() ? lerPontosBase(pagamento) : 0;
   const total = c !== null && p !== null && comissao.trim() ? c + p : null;
@@ -72,12 +69,13 @@ export function FormTaxaDoIfood({
     </div>
   );
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
-      <input type="hidden" name="versao" value={versao} />
-      <ErroGeral estado={estado} recarregar={aqui} />
-      <fieldset disabled={!!bloqueio} className="grid gap-4 sm:grid-cols-2">
-        {campo('comissao', 'Comissão do plano', comissao, setComissao, 'O que o iFood fica de cada pedido pelo plano contratado.')}
-        {campo('pagamento', 'Pagamento online', pagamento, setPagamento, 'Taxa sobre o pedido pago pelo app. Vazio = 0.')}
+    <form action={f.enviar} onChange={f.saida.aoMudar} onSubmit={f.saida.aoEnviar} noValidate className="space-y-4">
+      <input type="hidden" name="versao" value={f.versao} />
+      <ErroGeral estado={f.erro} recarregar={aqui} />
+      {f.estado?.ok && !f.alterado && <p role="status" className="text-sm text-ok">{f.estado.mensagem}</p>}
+      <fieldset disabled={!!bloqueio || f.pendente} className="grid gap-4 sm:grid-cols-2">
+        {campo('comissao', 'Comissão do plano', comissao, v => f.mudar('comissao', v), 'O que o iFood fica de cada pedido pelo plano contratado.')}
+        {campo('pagamento', 'Pagamento online', pagamento, v => f.mudar('pagamento', v), 'Taxa sobre o pedido pago pelo app. Vazio = 0.')}
       </fieldset>
       <p className="rounded-[10px] border border-linha px-4 py-3 text-[13px] tabular-nums text-texto" aria-live="polite">
         {total !== null && total < 10_000 ? (
@@ -95,7 +93,7 @@ export function FormTaxaDoIfood({
             Cancelar
           </Link>
         )}
-        <BotaoEnviar disabled={!!bloqueio} variante={variante} className="sm:min-w-44">
+        <BotaoEnviar disabled={!!bloqueio || f.pendente} variante={variante} className="sm:min-w-44">
           Salvar taxa do iFood
         </BotaoEnviar>
       </div>

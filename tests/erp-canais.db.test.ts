@@ -183,7 +183,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     expect(await a.canalConfig.count()).toBe(0);
 
     atual.ctx = ctxDe(a, A, 'DONO', 'Marina');
-    await expect(fichasDaSessao.acaoSalvarTaxaDoIfood(null, taxaForm)).rejects.toMatchObject({ url: '/erp/fichas/canais?feito=taxa' });
+    expect(await fichasDaSessao.acaoSalvarTaxaDoIfood(null, taxaForm)).toMatchObject({ ok: true, confirmacao: { versao: (await obterTaxaDoIfood(a)).versao, campos: { comissao: '23', pagamento: '3,2' } } });
     expect(await obterTaxaDoIfood(a)).toMatchObject({ taxa: { comissaoBp: 2300, pagamentoBp: 320 } });
   });
 

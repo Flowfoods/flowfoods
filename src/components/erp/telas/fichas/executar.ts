@@ -7,7 +7,8 @@
 
 import { revalidatePath } from 'next/cache';
 import type { EntradaDaFicha, ItemDigitado } from '@/lib/erp/ficha-campos';
-import type { EmbalagemDigitada } from '@/lib/erp/canal-campos';
+import { ORDEM_DOS_CANAIS, type EmbalagemDigitada } from '@/lib/erp/canal-campos';
+import { CAMPOS_DO_FAROL, campoDaFaixa, type EntradaDasFaixas } from '@/lib/erp/cmv-faixas-campos';
 import type { MudancaDeFoto } from '@/lib/erp/fichas';
 import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { decodificarPlanilha, LIMITE_DA_PLANILHA } from '@/lib/erp/ficha-planilha';
@@ -15,12 +16,27 @@ import { NOME_DA_FOTO } from '@/lib/erp/foto';
 import { entradaDoFormulario } from '@/lib/erp/validade';
 import type { PedidoDeFoto } from '@/lib/erp/ficha-fotos';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
-import type { EstadoImportacao } from './estado';
+import { fraseDoFeitoDaFicha, type EstadoImportacao } from './estado';
+import type { EstadoConfiguracao } from '@/lib/erp/canal-config-campos';
+import type { ResultadoDoCanal } from '@/lib/erp/canais';
 import { PREFIXO_DO_PREPARO } from './prefixo';
 import { classificacaoDoFormulario, type EstadoGestaoClassificacao } from '@/lib/erp/ficha-secoes-campos';
 import { gerirClassificacao } from '@/lib/erp/ficha-secoes';
 
 const textoDe = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');
+
+export function recusarConfiguracao(anterior: EstadoConfiguracao, motivo: string): EstadoConfiguracao {
+  return { ok: false, erros: { geral: motivo }, vez: (anterior?.vez ?? 0) + 1 };
+}
+
+/** Sem redirect: o formulário adota somente a confirmação da sua própria gravação. */
+export function concluirConfiguracao(r: ResultadoDoCanal, anterior: EstadoConfiguracao, base: string, feito: { mudou: string; igual: string }): EstadoConfiguracao {
+  const vez = (anterior?.vez ?? 0) + 1;
+  if (!r.ok) return { ok: false, erros: r.erros, conflito: r.conflito, vez };
+  if (!r.confirmacao) throw new Error('Configuração salva sem confirmação transacional.');
+  revalidatePath(base, 'layout');
+  return { ok: true, vez, mensagem: fraseDoFeitoDaFicha(r.mudou.length ? feito.mudou : feito.igual) ?? 'Configuração salva.', confirmacao: r.confirmacao };
+}
 
 
 /** FormData → entrada da ficha (itens na ordem da tela) + o que fazer com a foto. */
@@ -141,6 +157,14 @@ export function lerEnvioDasMetas(form: FormData) {
   return {
     versao: textoDe(form.get('versao')),
     metas: { LOJA: textoDe(form.get('metaCmv_LOJA')), DELIVERY_PROPRIO: textoDe(form.get('metaCmv_DELIVERY_PROPRIO')), IFOOD: textoDe(form.get('metaCmv_IFOOD')) },
+  };
+}
+
+/** Doze campos obrigatórios: null de campo omitido permanece inválido no parser, nunca vira retirada. */
+export function lerEnvioDasFaixas(form: FormData): { versao: unknown; faixas: EntradaDasFaixas } {
+  return {
+    versao: form.get('versao'),
+    faixas: Object.fromEntries(ORDEM_DOS_CANAIS.map(canal => [canal, Object.fromEntries(CAMPOS_DO_FAROL.map(campo => [campo, form.get(campoDaFaixa(canal, campo))]))])) as EntradaDasFaixas,
   };
 }
 

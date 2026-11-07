@@ -3,7 +3,7 @@
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { obterTaxaDoIfood } from '@/lib/erp/canais';
 import { TelaCanaisDeVenda } from '@/components/erp/telas/fichas/canais';
-import { acaoSalvarMargensAlvo, acaoSalvarMetasDeCmv, acaoSalvarTaxaDoIfood } from '../actions';
+import { acaoSalvarFaixasDeCmv, acaoSalvarMargensAlvo, acaoSalvarMetasDeCmv, acaoSalvarTaxaDoIfood } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +29,9 @@ export default async function ParceiroCanaisDeVendaPage({ params, searchParams }
       metas={t.metas}
       versaoDasMetas={t.versaoDasMetas}
       acaoMetas={acaoSalvarMetasDeCmv.bind(null, ctx.parceiro.slug)}
+      faixas={t.faixas}
+      versaoDasFaixas={t.versaoDasFaixas}
+      acaoFaixas={acaoSalvarFaixasDeCmv.bind(null, ctx.parceiro.slug)}
     />
   );
 }

@@ -19,6 +19,7 @@
  */
 
 import { z } from 'zod';
+import { filtrosFaixasCmvCanonicos, lerFiltroDaFaixaDoCmv, valorDoFiltroDaFaixaDoCmv, type FiltroDaFaixaDoCmv } from './cmv-faixas-campos';
 import { marcado, nomeObrigatorio, primeiroErroPorCampo, um, type Erros, type Leitura, type Retrato } from './insumo-campos';
 import {
   custoDaEmbalagem,
@@ -575,6 +576,8 @@ export interface FiltrosDeFicha {
   incompleto: boolean;
   /** OR de pares explícitos; aplicado antes da paginação, só para quem vê preços. */
   cmv: FiltroDoCmv[];
+  /** OR neste grupo; AND com o grupo de comparação com a meta. */
+  faixasCmv: FiltroDaFaixaDoCmv[];
   secao: string | null;
   subsecao: string | null;
   pagina: number;
@@ -601,10 +604,10 @@ export const valorDoFiltroDoCmv = (f: FiltroDoCmv): string => `${f.canal}-${f.st
 
 export const FICHAS_POR_PAGINA = 50;
 
-export const FILTROS_DE_FICHA_PADRAO: FiltrosDeFicha = { q: '', tipo: null, situacao: 'ativas', incompleto: false, cmv: [], secao: null, subsecao: null, pagina: 1 };
+export const FILTROS_DE_FICHA_PADRAO: FiltrosDeFicha = { q: '', tipo: null, situacao: 'ativas', incompleto: false, cmv: [], faixasCmv: [], secao: null, subsecao: null, pagina: 1 };
 
 export function filtrosDaFichaPermitidos(f: FiltrosDeFicha, verPrecos: boolean): FiltrosDeFicha {
-  return verPrecos ? f : { ...f, incompleto: false, cmv: [] };
+  return verPrecos ? f : { ...f, incompleto: false, cmv: [], faixasCmv: [] };
 }
 
 export function filtrosCmvCanonicos(valores: readonly FiltroDoCmv[]): FiltroDoCmv[] {
@@ -625,6 +628,7 @@ export function lerFiltrosDeFicha(sp: Record<string, string | string[] | undefin
     situacao: um(v('situacao'), ['ativas', 'desativadas', 'todas'] as const) ?? 'ativas',
     incompleto: marcado(v('custo')) || v('custo') === 'incompleto',
     cmv: filtrosCmvCanonicos(todos('cmv').flatMap(s => { const par = lerFiltroDoCmv(s); return par ? [par] : []; })),
+    faixasCmv: filtrosFaixasCmvCanonicos(todos('faixaCmv').flatMap(s => { const par = lerFiltroDaFaixaDoCmv(s); return par ? [par] : []; })),
     secao,
     subsecao: secao && secao !== 'sem' ? id(v('subsecao')) : null,
     pagina: Number.isSafeInteger(pagina) && pagina > 0 ? pagina : 1,
@@ -638,6 +642,7 @@ export function queryDosFiltrosDeFicha(f: FiltrosDeFicha): string {
   if (f.situacao !== 'ativas') p.set('situacao', f.situacao);
   if (f.incompleto) p.set('custo', 'incompleto');
   for (const par of filtrosCmvCanonicos(f.cmv)) p.append('cmv', valorDoFiltroDoCmv(par));
+  for (const par of filtrosFaixasCmvCanonicos(f.faixasCmv ?? [])) p.append('faixaCmv', valorDoFiltroDaFaixaDoCmv(par));
   if (f.secao) p.set('secao', f.secao);
   if (f.secao && f.secao !== 'sem' && f.subsecao) p.set('subsecao', f.subsecao);
   if (f.pagina > 1) p.set('pagina', String(f.pagina));
@@ -652,5 +657,5 @@ export function deSeguroDaFicha(valor: unknown, verPrecos = true): string {
 }
 
 export function temFiltroDeFicha(f: FiltrosDeFicha): boolean {
-  return !!(f.q || f.tipo || f.situacao !== 'ativas' || f.incompleto || f.cmv.length || f.secao || f.subsecao);
+  return !!(f.q || f.tipo || f.situacao !== 'ativas' || f.incompleto || f.cmv.length || f.faixasCmv?.length || f.secao || f.subsecao);
 }

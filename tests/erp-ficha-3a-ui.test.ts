@@ -83,7 +83,7 @@ describe('3A formulário e rascunho', () => {
 
 describe('3A filtros e apresentação', () => {
   const filtros = lerFiltrosDeFicha({ cmv: ['IFOOD-acima', 'LOJA-dentro'], secao: 'secaoA', subsecao: 'subA', q: 'Prato' });
-  it('CMV usa checkboxes por par, duas escolhas exatas e chips removíveis, sem controle de 3B', () => {
+  it('CMV usa checkboxes por par, duas escolhas exatas e chips removíveis junto ao grupo independente de faixas', () => {
     const h = renderToStaticMarkup(createElement(FiltrosDasFichas, { base: '/erp/fichas', filtros }));
     const selecionados = [...h.matchAll(/<input\b[^>]*name="cmv"[^>]*>/g)].map(([s]) => s).filter((s) => s.includes('checked=""'));
     expect(selecionados).toHaveLength(2);
@@ -92,11 +92,13 @@ describe('3A filtros e apresentação', () => {
     expect(h).toContain('Comparação com a meta (2)');
     expect(h).toContain('Limpar comparação');
     expect(h).toContain('aria-label="Tirar');
-    expect(h).not.toMatch(/<select[^>]*name="cmv"|faixaCmv|muito acima/i);
+    expect(h).not.toMatch(/<select[^>]*name="cmv"|muito acima/i);
+    expect(h).toContain('name="faixaCmv"');
+    expect([...h.matchAll(/<input\b[^>]*name="faixaCmv"[^>]*>/g)].filter(([s]) => s.includes('checked=""'))).toHaveLength(0);
   });
   it('visão operacional oculta todos os controles financeiros mesmo com URL forjada', () => {
     const h = renderToStaticMarkup(createElement(FiltrosDasFichas, { base: '/erp/fichas', filtros: { ...filtros, incompleto: true }, verCustos: false }));
-    expect(h).not.toMatch(/name="cmv"|name="custo"|Comparação com a meta|Comparações selecionadas/);
+    expect(h).not.toMatch(/name="cmv"|name="faixaCmv"|name="custo"|Comparação com a meta|Comparações selecionadas/);
   });
   it('nomes arquivados são texto operacional com quebra de linha e sem métricas', () => {
     const h = renderToStaticMarkup(createElement(TextoClassificacao, { classificacao: atual }));
@@ -111,7 +113,7 @@ describe('3A filtros e apresentação', () => {
     expect(tabela).toContain('<span class="2xl:hidden"> · rende 2 porções</span>');
     expect(tabela).toContain('Receita: R$ 18,00');
     expect(tabela).toContain('R$ 9,00');
-    expect(tabela).toContain('Corresponde: iFood · acima da meta.');
+    expect(tabela).toContain('Corresponde: Meta: iFood · acima da meta.');
     expect(tabela).toContain('aria-label="Editar Nome de classificação e ficha muito longo"');
     expect(tabela).not.toContain('overflow-hidden');
   });

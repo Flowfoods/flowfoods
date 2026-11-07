@@ -15,7 +15,8 @@ import { useFormState } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import type { EmbalagemDoFormulario } from '@/lib/erp/canais';
 import { CANAIS, CANAIS_COM_EMBALAGEM, chaveDaEmbalagem, embalagensTambemNaReceita, lerEmbalagens, LIMITES_DO_CANAL, type CanalComEmbalagem, type EmbalagemDoCadastro } from '@/lib/erp/canal-campos';
-import { contaDoSugeridoPorCmv, porcentagemDoCmv, STATUS_DO_CMV } from '@/lib/erp/cmv-produto-campos';
+import { contaDoSugeridoPorCmv } from '@/lib/erp/cmv-produto-campos';
+import { AVISO_DO_ARREDONDAMENTO, FarolDeCmv } from './farol';
 import { custoDoUso, custoPorUnidade, escalaDaSigla, formatarDinheiro, formatarFracao, formatarPontosBase, lerQuantidadeNa, SIGLAS_DIGITAVEIS, somar, ZERO, type Fracao } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro } from '../../ui/campos';
@@ -436,7 +437,6 @@ function SugestaoPelaMeta({ x }: { x: ContaDasEmbalagens }) {
  * detalhe e com as embalagens que estão na tela. Só leitura: o preço muda no passo de preços.
  */
 function PrecoComEstasEmbalagens({ canal, conta: x, recusa }: { canal: CanalComEmbalagem; conta: ContaDasEmbalagens | null; recusa: string | null }) {
-  const st = x ? STATUS_DO_CMV[x.status] : null;
   return (
     // aria-live no grupo (não no dl, que entra e sai): a passagem de "Corrija"/"Complete" para os valores também é anunciada.
     <div role="group" aria-live="polite" aria-label={`Preço e CMV do ${CANAIS[canal].rotulo} com estas embalagens`} className="mt-3 border-t border-linha pt-3">
@@ -468,17 +468,13 @@ function PrecoComEstasEmbalagens({ canal, conta: x, recusa }: { canal: CanalComE
           <div className="min-w-0">
             <dt className="text-[12px] text-suave">CMV ao seu preço</dt>
             <dd>
-              {x.cmvBp ? <span className="font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span> : TRACO}
-              <span className="mt-1 block">
-                <Selo tom={st!.tom}>{st!.rotulo}</Selo>
-              </span>
-              {x.motivo && <span className="mt-1 block whitespace-normal break-words text-[12px] text-suave">{x.motivo}</span>}
+              <FarolDeCmv conta={x} />
             </dd>
           </div>
         </dl>
       )}
       <p className="mt-2 text-[12px] text-suave">
-        Prévia com o que está na tela, antes de salvar. O preço muda só no passo de preços.
+        Prévia com o que está na tela, antes de salvar. O preço muda só no passo de preços. {AVISO_DO_ARREDONDAMENTO}
         {canal === 'IFOOD' ? ' A taxa do iFood fica fora do custo físico e do CMV.' : ''}
       </p>
     </div>

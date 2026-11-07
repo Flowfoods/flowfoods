@@ -29,13 +29,15 @@ import {
   type FiltrosDeFicha,
   type FiltroDoCmv,
 } from '@/lib/erp/ficha-campos';
-import { formatarDinheiro, formatarFracao, formatarPontosBase } from '@/lib/erp/unidades';
+import { formatarDinheiro, formatarFracao } from '@/lib/erp/unidades';
 import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { Miniatura } from './miniatura';
 import { CANAIS } from '@/lib/erp/canal-campos';
-import { porcentagemDoCmv, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import { STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import type { FiltroDaFaixaDoCmv } from '@/lib/erp/cmv-faixas-campos';
+import { APRESENTACAO_DA_FAIXA, AVISO_DO_ARREDONDAMENTO, FarolDeCmv, textoDoFarol } from './farol';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 import { TextoClassificacao } from './texto-classificacao';
 
@@ -44,35 +46,17 @@ import { TextoClassificacao } from './texto-classificacao';
  * cor), independente em cada canal. Sem dados diz por quê; canal sem preço definido não ganha farol.
  */
 function CmvNaLista({ x }: { x: CmvDoCanal }) {
-  const st = STATUS_DO_CMV[x.status];
-  if (x.status === 'naoOfertado') return <span className="block text-[12px] text-suave">não ofertado</span>;
-  const cor = x.status === 'dentro' ? 'text-ok' : x.status === 'acima' ? 'text-atencao' : 'text-suave';
-  // 24/10 (referência Nina): sem CMV, a célula diz só o que falta primeiro (custo → meta → preço), em vez de repetir
-  // "— / sem dados / sem preço / sem meta" em toda linha. O motivo inteiro continua no title e na ficha.
-  if (!x.cmvBp) {
-    const falta = !x.fisico.completo ? 'falta custo' : x.metaBp === null && x.precoCentavos === null ? 'sem meta e preço' : x.metaBp === null ? 'sem meta' : 'sem preço';
-    return (
-      <span className="block" title={x.motivo ?? undefined}>
-        <span className="block text-[12px] font-medium text-suave">{st.rotulo}</span>
-        <span className="block whitespace-nowrap text-[12px] text-suave">{falta}</span>
-      </span>
-    );
-  }
   return (
-    <span className="block" title={x.motivo ?? undefined}>
-      <span className="font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span>
-      <span className={`block text-[12px] font-medium ${cor}`}>{st.rotulo}</span>
-      <span className="block whitespace-nowrap text-[12px] text-suave">{x.precoCentavos !== null ? formatarDinheiro(x.precoCentavos) : 'sem preço'}</span>
-      <span className="block whitespace-nowrap text-[12px] text-suave">{x.metaBp !== null ? `meta ${formatarPontosBase(x.metaBp)}` : 'sem meta'}</span>
+    <span className="block min-w-0">
+      <FarolDeCmv conta={x} modo="lista" />
+      {x.ofertado && <span className="mt-1 block text-[12px] text-suave">{x.precoCentavos !== null ? formatarDinheiro(x.precoCentavos) : 'sem preço'}</span>}
     </span>
   );
 }
 
-/** Celular e tablet: cada canal com o CMV e a palavra do farol ("CMV: Loja 20,0% dentro da meta; iFood sem dados"). */
+/** Celular e tablet: faixa e comparação com a meta têm rótulos próprios. */
 function cmvEmLinha(contas: readonly CmvDoCanal[]): string {
-  const partes = contas.map((x) =>
-    x.cmvBp ? `${CANAIS[x.canal].curto} ${porcentagemDoCmv(x.cmvBp)} ${STATUS_DO_CMV[x.status].rotulo}` : `${CANAIS[x.canal].curto} ${STATUS_DO_CMV[x.status].rotulo}`,
-  );
+  const partes = contas.map(x => `${CANAIS[x.canal].curto}: ${textoDoFarol(x)}`);
   return `CMV: ${partes.join('; ')}`;
 }
 
@@ -123,9 +107,10 @@ function CustoPorRende({ l, empilhado = false }: { l: LinhaDeFicha; empilhado?: 
 
 export { FiltrosDasFichas } from './filtros';
 
-function Correspondencias({ pares }: { pares?: readonly FiltroDoCmv[] }) {
-  if (!pares?.length) return null;
-  return <span className="block break-words text-[12px] leading-snug text-suave">Corresponde: {pares.map((p) => `${CANAIS[p.canal].curto} · ${STATUS_DO_CMV[p.status].rotulo}`).join('; ')}.</span>;
+function Correspondencias({ pares, faixas }: { pares?: readonly FiltroDoCmv[]; faixas?: readonly FiltroDaFaixaDoCmv[] }) {
+  if (!pares?.length && !faixas?.length) return null;
+  const grupos = [pares?.length ? `Meta: ${pares.map(p => `${CANAIS[p.canal].curto} · ${STATUS_DO_CMV[p.status].rotulo}`).join('; ')}` : '', faixas?.length ? `Faixa: ${faixas.map(p => `${CANAIS[p.canal].curto} · ${APRESENTACAO_DA_FAIXA[p.faixa].rotulo}`).join('; ')}` : ''].filter(Boolean);
+  return <span className="block break-words text-[12px] leading-snug text-suave">Corresponde: {grupos.join('; ')}.</span>;
 }
 
 export function TelaListaFichas({
@@ -139,6 +124,7 @@ export function TelaListaFichas({
   importarHref,
   cmv: precos,
   correspondenciasCmv,
+  correspondenciasFaixasCmv,
   acoes = false,
 }: {
   /** /erp/fichas ou /rodolfo/erp/<slug>/fichas */
@@ -154,6 +140,7 @@ export function TelaListaFichas({
   /** N.2: preço, CMV e farol por canal das fichas de prato (só para quem vê preços; nem sai do servidor para os outros). */
   cmv?: ReadonlyMap<string, CmvDoCanal[]>;
   correspondenciasCmv?: ReadonlyMap<string, FiltroDoCmv[]>;
+  correspondenciasFaixasCmv?: ReadonlyMap<string, FiltroDaFaixaDoCmv[]>;
   /** F4: caneta e lixeira na linha (quem edita fichas e não está bloqueado; a página e a action conferem de novo). */
   acoes?: boolean;
 }) {
@@ -169,7 +156,7 @@ export function TelaListaFichas({
               </Link>
             }
           >
-            {f.tipo === 'PRE_PREPARO' && f.cmv.length > 0 ? 'Pré-preparos não são vendidos por canal. Retire a comparação com a meta para vê-los.' : 'A busca e os filtros continuam acima, como você deixou.'}
+            {f.tipo === 'PRE_PREPARO' && (f.cmv.length > 0 || f.faixasCmv.length > 0) ? 'Pré-preparos não são vendidos por canal. Retire os filtros de CMV para vê-los.' : 'A busca e os filtros continuam acima, como você deixou.'}
           </Vazio>
         ) : (
           <Vazio
@@ -207,20 +194,18 @@ export function TelaListaFichas({
     <Painel semRespiro>
       <ul className="divide-y divide-linha sm:hidden">
         {linhas.map((l) => (
-          <li key={l.id} className="flex items-center">
+          <li key={l.id}>
+            <div className="flex items-center">
             <Link href={hrefDoDetalhe(base, l.id, f)} className="ff-transicao flex min-h-16 min-w-0 flex-1 items-center gap-3 py-3 pl-4 pr-3 hover:bg-texto/[0.03]">
               <Miniatura base={base} id={l.id} foto={l.foto} />
               <span className="min-w-0 flex-1">
-                <span className={`block truncate font-medium ${l.ativa ? 'text-texto' : 'text-suave'}`}>{l.nome}</span>
-                <TextoClassificacao classificacao={l.classificacao} />
-                <Correspondencias pares={correspondenciasCmv?.get(l.id)} />
+                <span className={`block break-words font-medium [overflow-wrap:anywhere] ${l.ativa ? 'text-texto' : 'text-suave'}`}>{l.nome}</span>
                 <span className="block truncate text-[12px] text-suave">
                   {TIPOS_DE_FICHA[l.tipo]} · rende {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}
                   {!l.ativa && ' · Desativada'}
                 </span>
                 {/* 1.5 (herança d): validade em linha própria, quebrando em vez de cortar. */}
                 {(l.consumoImediato || validadesEmTexto(l.validades)) && <span className="mt-0.5 block text-[12px] leading-snug text-suave">{l.consumoImediato ? 'Consumo imediato' : validadesEmTexto(l.validades)}</span>}
-                {precos?.get(l.id) && <span className="mt-0.5 block text-[12px] leading-snug tabular-nums text-suave">{cmvEmLinha(precos.get(l.id)!)}</span>}
               </span>
               {l.custo && (
                 <span className="shrink-0 text-right text-sm tabular-nums">
@@ -233,6 +218,12 @@ export function TelaListaFichas({
                 <AcoesDaFicha l={l} base={base} f={f} empilhado />
               </span>
             )}
+            </div>
+            {(l.classificacao.secao || l.classificacao.subsecao || precos?.has(l.id) || correspondenciasCmv?.get(l.id)?.length || correspondenciasFaixasCmv?.get(l.id)?.length) ? <div className="min-w-0 space-y-2 px-4 pb-3">
+              <TextoClassificacao classificacao={l.classificacao} />
+              <Correspondencias pares={correspondenciasCmv?.get(l.id)} faixas={correspondenciasFaixasCmv?.get(l.id)} />
+              {precos?.get(l.id)?.map(x => <p key={x.canal} className="break-words text-[12px] leading-snug tabular-nums text-suave"><strong className="font-semibold text-texto">{CANAIS[x.canal].curto}:</strong> {textoDoFarol(x)}</p>)}
+            </div> : null}
           </li>
         ))}
       </ul>
@@ -302,7 +293,7 @@ export function TelaListaFichas({
                       {l.nome}
                     </Link>
                     <TextoClassificacao classificacao={l.classificacao} />
-                    <Correspondencias pares={correspondenciasCmv?.get(l.id)} />
+                    <Correspondencias pares={correspondenciasCmv?.get(l.id)} faixas={correspondenciasFaixasCmv?.get(l.id)} />
                     <div className="max-w-[19rem] break-words text-[12px] text-suave">
                       {TIPOS_DE_FICHA[l.tipo]}
                       <span className="2xl:hidden"> · rende {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}</span>
@@ -365,10 +356,11 @@ export function TelaListaFichas({
         <ExplicacaoNoPonto ponto="conta" className="hidden border-t border-linha px-5 py-1.5 2xl:block">
           <p className="hidden border-t border-linha px-5 py-2.5 text-[12px] text-suave 2xl:block">
             CMV = custo físico (insumos + embalagens do canal) ÷ o preço que você definiu; a taxa do iFood fica fora. Cada canal tem o seu farol. Sem
-            preço definido ou sem meta: sem dados (a sugestão não conta como preço).
+            custo completo ou preço definido: sem dados (a sugestão não conta como preço). Sem meta, a faixa ainda pode ser calculada.
           </p>
         </ExplicacaoNoPonto>
       )}
+      {precos && <p className="border-t border-linha px-4 py-2 text-[12px] text-suave sm:px-5">{AVISO_DO_ARREDONDAMENTO}</p>}
       <Paginacao
         de={de}
         ate={ate}

@@ -122,9 +122,9 @@ describe.skipIf(!URL_TESTE)('Meta iFood antes da taxa (Postgres local)', { timeo
     await expect(Pagina({ searchParams: {} })).rejects.toThrow();
     expect(await a.canalConfig.count()).toBe(0);
     contexto([]);
-    await expect(acoes.acaoSalvarMetasDeCmv(null, await envio())).rejects.toMatchObject({ url: '/erp/fichas/canais?feito=metas' });
+    expect(await acoes.acaoSalvarMetasDeCmv(null, await envio())).toMatchObject({ ok: true, confirmacao: { versao: (await obterTaxaDoIfood(a)).versaoDasMetas } });
     contexto([], outro, b);
-    await expect(acoesN1.acaoSalvarMetasDeCmv(outro.slug, null, await envio(b))).rejects.toMatchObject({ url: `/rodolfo/erp/${outro.slug}/fichas/canais?feito=metas` });
+    expect(await acoesN1.acaoSalvarMetasDeCmv(outro.slug, null, await envio(b))).toMatchObject({ ok: true, confirmacao: { versao: (await obterTaxaDoIfood(b)).versaoDasMetas } });
     expect(await b.canalConfig.findFirst({ where: { id: (await a.canalConfig.findFirstOrThrow()).id } })).toBeNull();
     expect((await obterTaxaDoIfood(a)).taxa).toBeNull();
     expect((await obterTaxaDoIfood(b)).taxa).toBeNull();
