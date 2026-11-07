@@ -40,6 +40,111 @@ export const CHECKS_DA_2_1 = [
 export const INDICE_DO_GRAO = 'FaturamentoLancamento_grao_humano';
 export const CHECK_DA_META_SEM_TAXA = 'CanalConfig_taxa_pendente_coerente';
 
+export const CHECKS_DA_FICHA_3A = [
+  ['SecaoFicha', 'SecaoFicha_nome_valido'], ['SecaoFicha', 'SecaoFicha_nomeChave_coerente'],
+  ['SubsecaoFicha', 'SubsecaoFicha_nome_valido'], ['SubsecaoFicha', 'SubsecaoFicha_nomeChave_coerente'],
+  ['FichaTecnica', 'FichaTecnica_classificacao_par_completo'],
+] as const;
+export const GATILHOS_DA_FICHA_3A = [
+  ['SecaoFicha', 'SecaoFicha_nome_normalizado', 'erp_classificacao_ficha_nome'],
+  ['SubsecaoFicha', 'SubsecaoFicha_nome_normalizado', 'erp_classificacao_ficha_nome'],
+  ['SecaoFicha', 'SecaoFicha_parceiro_imutavel', 'erp_parceiro_imutavel'],
+  ['SubsecaoFicha', 'SubsecaoFicha_parceiro_imutavel', 'erp_parceiro_imutavel'],
+  ['SubsecaoFicha', 'SubsecaoFicha_secao_imutavel', 'erp_subsecao_ficha_pai_imutavel'],
+] as const;
+
+/** Catalog-only: não lê linhas tenant, inclusive nos perfis antigos com FORCE RLS. */
+export async function conferirClassificacaoDeFichas(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
+  const pendencias: string[] = [];
+  const tabelas = ['SecaoFicha', 'SubsecaoFicha'];
+  const marcas = await db.$queryRaw<{ n: number; temPrisma: boolean }[]>`
+    SELECT (SELECT count(*)::int FROM information_schema.columns WHERE table_schema = current_schema()
+      AND ((table_name = 'FichaTecnica' AND column_name IN ('secaoId','subsecaoId')) OR table_name IN ('SecaoFicha','SubsecaoFicha'))) AS n,
+      to_regclass('_prisma_migrations') IS NOT NULL AS "temPrisma"`;
+  let aplicada = (marcas[0]?.n ?? 0) > 0;
+  if (!aplicada && marcas[0]?.temPrisma) {
+    const r = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "_prisma_migrations" WHERE migration_name = '20261120000000_erp_ficha_secoes' AND rolled_back_at IS NULL`;
+    aplicada = (r[0]?.n ?? 0) > 0;
+  }
+  if (!aplicada) return pendencias; // O conferidor também atende snapshots históricos sem 3A.
+  const meta = await db.$queryRaw<{ nome: string; rls: boolean; forcada: boolean; grants: boolean }[]>`
+    SELECT c.relname AS nome, c.relrowsecurity AS rls, c.relforcerowsecurity AS forcada,
+      coalesce(has_table_privilege(r.oid,c.oid,'SELECT') AND has_table_privilege(r.oid,c.oid,'INSERT')
+        AND has_table_privilege(r.oid,c.oid,'UPDATE') AND has_table_privilege(r.oid,c.oid,'DELETE'),false) AS grants
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_roles r ON r.rolname='erp_tenant'
+    WHERE n.nspname=current_schema() AND c.relname=ANY(${[...tabelas, 'Loja']}) AND c.relkind='r'`;
+  const policies = await db.$queryRaw<{ tabela: string; nome: string; comando: string; permissiva: boolean; papel: boolean; usando: string | null; gravando: string | null }[]>`
+    SELECT c.relname AS tabela,p.polname AS nome,p.polcmd::text AS comando,p.polpermissive AS permissiva,
+      p.polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname='erp_tenant')] AS papel,
+      pg_get_expr(p.polqual,p.polrelid) AS usando,pg_get_expr(p.polwithcheck,p.polrelid) AS gravando
+    FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname=current_schema() AND c.relname=ANY(${tabelas})`;
+  // pg_get_constraintdef omite aspas de identificadores minúsculos (nome), mas conserva "nomeChave".
+  const normalizar = (s: string | null) => (s ?? '').replace(/"([a-z_][a-z0-9_]*)"/g, '$1').replace(/::text|\s+|\(|\)/g, '').toLowerCase();
+  const regra = normalizar('"parceiroId" = NULLIF(current_setting(\'app.parceiro_id\'::text, true), \'\'::text)');
+  for (const tabela of tabelas) {
+    const t = meta.find(x => x.nome === tabela);
+    if (!t) { pendencias.push(`3A: tabela ${tabela} NÃO existe.`); continue; }
+    if (meta.find(x => x.nome === 'Loja')?.rls || t.rls) {
+      if (!(t.rls && t.forcada && t.grants)) pendencias.push(`3A: ${tabela} precisa de RLS forçada e SELECT/INSERT/UPDATE/DELETE para erp_tenant.`);
+      const ps = policies.filter(x => x.tabela === tabela);
+      if (ps.length !== 1 || !ps.some(p => p.nome === `${tabela}_do_parceiro` && p.comando === '*' && p.permissiva && p.papel && normalizar(p.usando) === regra && normalizar(p.gravando) === regra)) pendencias.push(`3A: policy ${tabela}_do_parceiro ausente ou incompatível com o tenant.`);
+    }
+  }
+  const colunas = await db.$queryRaw<{ nome: string; tipo: string; nula: string; padrao: string | null }[]>`
+    SELECT column_name AS nome,data_type AS tipo,is_nullable AS nula,column_default AS padrao FROM information_schema.columns
+    WHERE table_schema=current_schema() AND table_name='FichaTecnica' AND column_name IN ('secaoId','subsecaoId')`;
+  for (const nome of ['secaoId','subsecaoId']) if (!colunas.some(c => c.nome === nome && c.tipo === 'text' && c.nula === 'YES' && c.padrao === null)) pendencias.push(`3A: coluna FichaTecnica.${nome} deve ser TEXT nullable sem default.`);
+  const constraints = await db.$queryRaw<{ tabela: string; nome: string; tipo: string; validado: boolean; definicao: string; delete: string; update: string; destino: string | null; mesmoSchema: boolean; de: string[]; para: string[] }[]>`
+    SELECT t.relname AS tabela,c.conname AS nome,c.contype::text AS tipo,c.convalidated AS validado,pg_get_constraintdef(c.oid) AS definicao,
+      c.confdeltype::text AS delete,c.confupdtype::text AS update,ref.relname AS destino,ref.relnamespace=t.relnamespace AS "mesmoSchema",
+      ARRAY(SELECT a.attname FROM unnest(c.conkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.num ORDER BY k.ord) AS de,
+      ARRAY(SELECT a.attname FROM unnest(c.confkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.num ORDER BY k.ord) AS para
+    FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace LEFT JOIN pg_class ref ON ref.oid=c.confrelid
+    WHERE n.nspname=current_schema() AND t.relname=ANY(${[...tabelas,'FichaTecnica']})`;
+  for (const [tabela,nome] of CHECKS_DA_FICHA_3A) if (!constraints.some(c => c.tabela === tabela && c.nome === nome && c.tipo === 'c' && c.validado)) pendencias.push(`3A: CHECK ${nome} (${tabela}) ausente ou NOT VALID.`);
+  for (const tabela of tabelas) {
+    if (!constraints.some(c => c.tabela === tabela && c.tipo === 'p' && c.validado && JSON.stringify(c.de) === '["id"]')) pendencias.push(`3A: chave primária de ${tabela} ausente ou incompatível.`);
+    const nome = constraints.find(c => c.tabela === tabela && c.nome === `${tabela}_nome_valido`);
+    const chave = constraints.find(c => c.tabela === tabela && c.nome === `${tabela}_nomeChave_coerente`);
+    if (nome && normalizar(nome.definicao) !== normalizar('CHECK (char_length("nome") >= 2 AND char_length("nome") <= 80 AND "nome" = erp_limpar_nome_classificacao_ficha("nome"))')) pendencias.push(`3A: CHECK ${tabela}_nome_valido tem definição incorreta.`);
+    if (chave && normalizar(chave.definicao) !== normalizar('CHECK ("nomeChave" = erp_chave_nome_classificacao_ficha("nome") AND "nomeChave" <> \'\'::text)')) pendencias.push(`3A: CHECK ${tabela}_nomeChave_coerente tem definição incorreta.`);
+  }
+  const par = constraints.find(c => c.nome === 'FichaTecnica_classificacao_par_completo');
+  if (par && normalizar(par.definicao) !== normalizar('CHECK ("subsecaoId" IS NULL OR "secaoId" IS NOT NULL)')) pendencias.push('3A: CHECK FichaTecnica_classificacao_par_completo tem definição incorreta.');
+  const fks = [
+    ['SecaoFicha','SecaoFicha_parceiroId_fkey','ParceiroFlow',['parceiroId'],['id'],'c'],
+    ['SubsecaoFicha','SubsecaoFicha_parceiroId_fkey','ParceiroFlow',['parceiroId'],['id'],'c'],
+    ['SubsecaoFicha','SubsecaoFicha_parceiroId_secaoId_fkey','SecaoFicha',['parceiroId','secaoId'],['parceiroId','id'],'r'],
+    ['FichaTecnica','FichaTecnica_parceiroId_secaoId_fkey','SecaoFicha',['parceiroId','secaoId'],['parceiroId','id'],'r'],
+    ['FichaTecnica','FichaTecnica_parceiroId_secaoId_subsecaoId_fkey','SubsecaoFicha',['parceiroId','secaoId','subsecaoId'],['parceiroId','secaoId','id'],'r'],
+  ] as const;
+  for (const [tabela,nome,destino,de,para,update] of fks) if (!constraints.some(c => c.tabela===tabela && c.nome===nome && c.tipo==='f' && c.validado && c.destino===destino && c.mesmoSchema && c.delete==='r' && c.update===update && JSON.stringify(c.de)===JSON.stringify(de) && JSON.stringify(c.para)===JSON.stringify(para))) pendencias.push(`3A: FK ${nome} ausente, inválida ou com composição/RESTRICT incorretos.`);
+  const indices = await db.$queryRaw<{ tabela: string; nome: string; valido: boolean; pronto: boolean; unico: boolean; parcial: boolean; expressao: boolean; colunas: string[] }[]>`
+    SELECT t.relname AS tabela,c.relname AS nome,i.indisvalid AS valido,i.indisready AS pronto,i.indisunique AS unico,i.indpred IS NOT NULL AS parcial,i.indexprs IS NOT NULL AS expressao,
+      ARRAY(SELECT a.attname FROM unnest(i.indkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.num ORDER BY k.ord) AS colunas
+    FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid JOIN pg_class t ON t.oid=i.indrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+    WHERE n.nspname=current_schema() AND t.relname=ANY(${[...tabelas,'FichaTecnica']})`;
+  const esperados = [
+    ['SecaoFicha',['parceiroId','id'],true],['SecaoFicha',['parceiroId','nomeChave'],true],
+    ['SubsecaoFicha',['parceiroId','id'],true],['SubsecaoFicha',['parceiroId','secaoId','id'],true],['SubsecaoFicha',['parceiroId','secaoId','nomeChave'],true],
+    ['FichaTecnica',['parceiroId','secaoId'],false],['FichaTecnica',['parceiroId','secaoId','subsecaoId'],false],
+  ] as const;
+  for (const [tabela,colunas,unico] of esperados) {
+    const nome = `${tabela}_${colunas.join('_')}_${unico ? 'key' : 'idx'}`;
+    if (!indices.some(i=>i.nome===nome && i.tabela===tabela && i.valido && i.pronto && i.unico===unico && !i.parcial && !i.expressao && JSON.stringify(i.colunas)===JSON.stringify(colunas))) pendencias.push(`3A: índice ${nome} ausente, inválido ou com colunas incorretas.`);
+  }
+  const gatilhos = await db.$queryRaw<{ tabela: string; nome: string; funcao: string; ligado: string; tipo: number }[]>`
+    SELECT c.relname AS tabela,t.tgname AS nome,p.proname AS funcao,t.tgenabled::text AS ligado,t.tgtype::int AS tipo
+    FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid
+    WHERE n.nspname=current_schema() AND NOT t.tgisinternal AND c.relname=ANY(${tabelas})`;
+  for (const [tabela,nome,funcao] of GATILHOS_DA_FICHA_3A) {
+    const tipo = nome.endsWith('_nome_normalizado') ? 23 : 19; // ROW+BEFORE+UPDATE (+INSERT para normalização)
+    if (!gatilhos.some(t=>t.tabela===tabela && t.nome===nome && t.funcao===funcao && ['O','A'].includes(t.ligado) && t.tipo===tipo)) pendencias.push(`3A: gatilho ${nome} ausente, desligado ou com função/eventos incorretos.`);
+  }
+  return pendencias;
+}
+
 /** Os CHECKs que a 2.2a acrescentou em tabelas que já existiam (a tabela nova tem os dela de nascença). */
 export const CHECKS_DA_2_2A = [
   ['DreLinha', 'DreLinha_nome_curto'],
@@ -756,6 +861,7 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
     if (!check.length) pendencias.push(`CHECK ${CHECK_DA_META_SEM_TAXA} (CanalConfig) NÃO existe: a migration 20261119000000_erp_taxa_ifood_independente não foi aplicada por inteiro.`);
     else if (!check[0].validado) pendencias.push(`CHECK ${CHECK_DA_META_SEM_TAXA} ficou NOT VALID: rode ALTER TABLE "CanalConfig" VALIDATE CONSTRAINT "${CHECK_DA_META_SEM_TAXA}";`);
   }
+  pendencias.push(...await conferirClassificacaoDeFichas(db));
   return pendencias;
 }
 

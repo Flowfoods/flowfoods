@@ -19,6 +19,11 @@ export function SeletorDeItem({
   rotulo,
   invalido,
   descritoPor,
+  selecionada,
+  placeholder = 'Digite o nome ou a categoria',
+  vazio,
+  desabilitado = false,
+  buscaExterna,
 }: {
   id: string;
   name: string;
@@ -28,16 +33,31 @@ export function SeletorDeItem({
   rotulo: string;
   invalido?: boolean;
   descritoPor?: string;
+  /** A seleção pode estar fora da página da busca, inclusive um vínculo arquivado. */
+  selecionada?: OpcaoDoSeletor | null;
+  placeholder?: string;
+  vazio?: string;
+  desabilitado?: boolean;
+  buscaExterna?: {
+    aoBuscar: (texto: string) => void;
+    carregando: boolean;
+    temMais: boolean;
+    aoCarregarMais: () => void;
+  };
 }) {
   const lista = useId();
-  const escolhida = opcoes.find((o) => o.valor === valor) ?? null;
+  const escolhida = opcoes.find((o) => o.valor === valor) ?? (selecionada?.valor === valor ? selecionada : null);
   const [aberto, setAberto] = useState(false);
   const [texto, setTexto] = useState('');
   const [ativo, setAtivo] = useState(0);
   const caixa = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLInputElement>(null);
 
-  const { grupos, cortadas, total } = useMemo(() => filtrarOpcoes(opcoes, aberto ? texto : ''), [opcoes, texto, aberto]);
+  const externa = !!buscaExterna;
+  const { grupos, cortadas, total } = useMemo(
+    () => filtrarOpcoes(opcoes, externa ? '' : aberto ? texto : '', externa ? Number.MAX_SAFE_INTEGER : undefined),
+    [opcoes, texto, aberto, externa],
+  );
   const planas = useMemo(() => grupos.flatMap((g) => g.opcoes), [grupos]);
 
   useEffect(() => {
@@ -55,7 +75,9 @@ export function SeletorDeItem({
   }, [ativo, aberto, lista]);
 
   function abrir() {
+    if (desabilitado) return;
     setTexto('');
+    buscaExterna?.aoBuscar('');
     const i = escolhida ? planas.findIndex((o) => o.valor === escolhida.valor) : -1;
     setAtivo(Math.max(0, i));
     setAberto(true);
@@ -88,7 +110,7 @@ export function SeletorDeItem({
         setAberto(false);
         setTexto('');
       }
-    } else if (e.key === 'Tab') {
+    } else if (e.key === 'Tab' && !buscaExterna?.temMais) {
       setAberto(false);
       setTexto('');
     }
@@ -98,7 +120,7 @@ export function SeletorDeItem({
   let n = -1;
 
   return (
-    <div ref={caixa} className="relative">
+    <div ref={caixa} className="relative" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { setAberto(false); setTexto(''); } }} onKeyDown={(e) => { if (e.key === 'Escape') { setAberto(false); setTexto(''); } }}>
       <input type="hidden" name={name} value={valor} />
       <input
         ref={campo}
@@ -112,15 +134,18 @@ export function SeletorDeItem({
         aria-activedescendant={aberto && planas[ativo] ? `${lista}-op-${ativo}` : undefined}
         aria-invalid={invalido || undefined}
         aria-describedby={descritoPor}
+        disabled={desabilitado}
+        aria-busy={buscaExterna?.carregando || undefined}
         autoComplete="off"
         spellCheck={false}
-        placeholder={escolhida ? escolhida.nome : 'Digite o nome ou a categoria'}
+        placeholder={escolhida ? escolhida.nome : placeholder}
         value={mostrado}
         onFocus={() => !aberto && abrir()}
         onClick={() => !aberto && abrir()}
         onChange={(e) => {
           if (!aberto) setAberto(true);
           setTexto(e.target.value);
+          buscaExterna?.aoBuscar(e.target.value);
           setAtivo(0);
         }}
         onKeyDown={teclar}
@@ -130,13 +155,13 @@ export function SeletorDeItem({
         <path d="M4 6l4 4 4-4" />
       </svg>
       {aberto && (
+        <div className={`absolute left-0 right-0 z-30 mt-1 max-h-[min(22rem,60vh)] overflow-y-auto rounded-[7px] border border-linha-forte bg-fundo py-1 shadow-lg ${buscaExterna ? '' : 'sm:right-auto sm:min-w-[22rem]'}`}>
         <div
           id={lista}
           role="listbox"
           aria-label={rotulo}
-          className="absolute left-0 right-0 z-30 mt-1 max-h-[min(22rem,60vh)] overflow-y-auto rounded-[7px] border border-linha-forte bg-fundo py-1 shadow-lg sm:right-auto sm:min-w-[22rem]"
         >
-          {grupos.length === 0 && <p className="px-3 py-3 text-[13px] text-suave">Nada com “{texto.trim()}”. Confira a escrita ou cadastre o insumo.</p>}
+          {grupos.length === 0 && !buscaExterna?.carregando && <p className="px-3 py-3 text-[13px] text-suave">{vazio ?? `Nada com “${texto.trim()}”. Confira a escrita ou cadastre o insumo.`}</p>}
           {grupos.map((g, gi) => (
             <div key={g.grupo} role="group" aria-labelledby={`${lista}-g-${gi}`}>
               <p id={`${lista}-g-${gi}`} role="presentation" className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-suave">
@@ -169,6 +194,13 @@ export function SeletorDeItem({
               Mostrando {total - cortadas} de {total}. Digite mais para achar o resto.
             </p>
           )}
+        </div>
+        {buscaExterna?.carregando && <p role="status" className="px-3 py-2 text-[13px] text-suave">Buscando…</p>}
+        {buscaExterna?.temMais && (
+          <button type="button" disabled={buscaExterna.carregando} onClick={() => { buscaExterna.aoCarregarMais(); campo.current?.focus(); }} className="min-h-11 w-full px-3 py-2 text-left text-sm font-semibold text-texto underline underline-offset-4 disabled:opacity-50">
+            Carregar mais
+          </button>
+        )}
         </div>
       )}
     </div>

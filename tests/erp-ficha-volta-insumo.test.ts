@@ -119,6 +119,7 @@ describe('retorno da ficha: permissão e existência no parceiro', () => {
 
 const valor = { num: 73737n, den: 1n };
 const ficha: FichaDetalhada = {
+  classificacao: { secao: null, subsecao: null },
   id: 'fichaA', nome: 'Ficha A', tipo: 'PRATO', descricao: null, modoPreparo: null, passosPreparo: [], rendimentoMilesimos: 1000, unidadeRendimento: 'UN',
   ativa: true, origem: 'MANUAL', versao: '2026-10-30T00:00:00.000Z', foto: null, fotosApoio: [], insumoProduzido: null,
   validades: { principal: 'SECO', minutos: {} }, consumoImediato: true, usadaEm: [], historico: [],

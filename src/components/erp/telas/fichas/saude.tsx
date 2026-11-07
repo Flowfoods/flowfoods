@@ -21,7 +21,7 @@ const plural = (n: number, um: string, varios: string) => `${n.toLocaleString('p
 const noCanal = (c: SaudeDoCanal['canal']) => `${c === 'LOJA' ? 'na' : 'no'} ${CANAIS[c].curto}`;
 
 function filtroDoCanal(base: string, s: SaudeDoCanal): string {
-  return `${base}?${queryDosFiltrosDeFicha({ ...FILTROS_DE_FICHA_PADRAO, cmv: { canal: s.canal, status: 'semDados' } })}`;
+  return `${base}?${queryDosFiltrosDeFicha({ ...FILTROS_DE_FICHA_PADRAO, cmv: [{ canal: s.canal, status: 'semDados' }] })}`;
 }
 
 function BarraDoCanal({ s }: { s: SaudeDoCanal }) {

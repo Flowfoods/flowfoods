@@ -32,6 +32,7 @@ export default async function ParceiroFichaPage({
       // N.5: quem só opera recebe a ficha sem nenhum valor de custo (visão operacional automática).
       ficha={fichaNaTela(ficha, true)}
       base={`${base}/fichas`}
+      de={de}
       voltar={origem ?? (de ? `${base}/fichas?${de}` : `${base}/fichas`)}
       rotuloVoltar={origem ? 'Voltar para o insumo' : undefined}
       feito={searchParams.feito}
@@ -41,7 +42,7 @@ export default async function ParceiroFichaPage({
       acaoSituacao={acaoSituacaoFicha.bind(null, ctx.parceiro.slug, ficha.id)}
       linkDoInsumo={`${base}/insumos`}
       canais={canais}
-      linkDasEmbalagens={ctx.bloqueio ? undefined : `${base}/fichas/${ficha.id}/canais`}
+      linkDasEmbalagens={ctx.bloqueio ? undefined : `${base}/fichas/${ficha.id}/canais${de ? `?de=${encodeURIComponent(de)}` : ''}`}
       linkDaTaxa={`${base}/fichas/canais`}
       linkDoProduzir={ficha.ativa && !ctx.bloqueio ? `/rodolfo/erp/${ctx.parceiro.slug}/producao/nova?ficha=${ficha.id}` : undefined}
       podeConfigurarTaxa={!ctx.bloqueio}

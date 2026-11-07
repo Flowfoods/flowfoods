@@ -61,6 +61,9 @@ import { CamposDeValidade } from '../cadastro/campos-validade';
 import { CONSERVACOES, entradaDoFormulario, lerValidades, type Conservacao, type Validades } from '@/lib/erp/validade';
 import { PREFIXO_DO_PREPARO } from './prefixo';
 import { EditorDePassos } from './editor-passos';
+import { classificacaoVazia, type ClassificacaoDigitada, type RegistroDeClassificacao } from '@/lib/erp/ficha-secoes-campos';
+import { CamposDeClassificacao, type ContextoClassificacao } from './campos-classificacao';
+import { PainelClassificacao } from './painel-classificacao';
 
 export interface LinhaDoItem {
   /** Id do insumo, ou "ficha:<id>" do pré-preparo (o valor do seletor). */
@@ -84,6 +87,8 @@ export interface ValoresDaFicha {
   validades: Validades | null;
   /** F4: sai da cozinha para o cliente sem guardar (rascunho antigo, sem o campo: não). */
   consumoImediato?: boolean;
+  /** Ausência em rascunhos antigos preserva a classificação inicial da edição. */
+  classificacao?: ClassificacaoDigitada;
 }
 
 const VAZIA: LinhaDoItem = { escolha: '', quantidade: '', unidade: '', fator: '' };
@@ -110,6 +115,8 @@ const ROTULOS: Record<string, string> = {
   modoPreparo: 'Modo de preparo',
   conservacao: 'Conservação principal',
   consumoImediato: 'Consumo imediato',
+  secao: 'Seção',
+  subsecao: 'Subseção',
 };
 const rotuloDoCampo = (c: string) =>
   ROTULOS[c] ??
@@ -147,6 +154,7 @@ export function FormFicha(props: PropsDoFormFicha) {
   const recuperado = !descartou && r.valores ? r.valores : null;
   const criado = !descartou && r.insumoCriado ? props.opcoes.find((i) => i.id === r.insumoCriado) : undefined;
   let valores = recuperado ?? props.inicial ?? NOVA;
+  valores = { ...valores, classificacao: valores.classificacao ?? props.inicial?.classificacao ?? classificacaoVazia() };
   let escolhido = false;
   if (criado) {
     const colocado = colocarInsumoCriado(valores.itens, 'escolha', criado.id, { unidade: SIGLAS_DIGITAVEIS[criado.unidade][0] }, VAZIA, LIMITES_DA_FICHA.itens);
@@ -196,6 +204,8 @@ type PropsDoFormFicha = {
   bloqueio?: string | null;
   /** Link para cadastrar insumo (só para quem pode). */
   novoInsumo?: string;
+  classificacao?: ContextoClassificacao;
+  de?: string;
 };
 
 function FormFichaBase({
@@ -212,6 +222,8 @@ function FormFichaBase({
   versao,
   bloqueio = null,
   novoInsumo,
+  classificacao,
+  de,
   chaveDoRascunho,
   avisos,
 }: PropsDoFormFicha & { chaveDoRascunho: string; avisos: ReactNode }) {
@@ -221,6 +233,13 @@ function FormFichaBase({
   const [tipo, setTipo] = useState<TipoFicha>(inicial.tipo);
   const [consumo, setConsumo] = useState(inicial.consumoImediato === true);
   const [nome, setNome] = useState(inicial.nome);
+  const [classificada, setClassificada] = useState(inicial.classificacao ?? classificacaoVazia());
+  const [gerenciando, setGerenciando] = useState(false);
+  const [registros, setRegistros] = useState<RegistroDeClassificacao[]>(() => classificacao ? [
+    ...(classificacao.atual.secao ? [{ nivel: 'secao' as const, registro: classificacao.atual.secao }] : []),
+    ...(classificacao.atual.subsecao ? [{ nivel: 'subsecao' as const, registro: classificacao.atual.subsecao }] : []),
+  ] : []);
+  const [excluidos, setExcluidos] = useState<string[]>([]);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [rendimento, setRendimento] = useState(inicial.rendimento);
   const [rendeEm, setRendeEm] = useState<RendeEm>(inicial.tipo === 'PRATO' ? 'kg' : inicial.rendimentoUnidade);
@@ -324,6 +343,7 @@ function FormFichaBase({
       itens: linhas.map(({ chave: _c, ...l }) => l),
       validades: v.ok ? v.validades : null,
       consumoImediato: consumo,
+      classificacao: classificada,
     };
     guardarRascunho(chaveDoRascunho, valores, modo === 'editar' ? versao : undefined);
   }
@@ -332,8 +352,10 @@ function FormFichaBase({
   const unidadeDoRende = tipo === 'PRATO' ? 'porção' : UNIDADES[RENDE_EM[rendeEm].unidade].sigla;
 
   return (
+    <>
     <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
+      {de && <input type="hidden" name="de" value={de} />}
       {avisos}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoCampo} />
       <ErroGeral estado={estado} recarregar={aqui} />
@@ -342,6 +364,7 @@ function FormFichaBase({
         <Painel titulo="O que é">
           {/* No computador, a descrição comercial e a foto lado a lado (a ordem de leitura e de Tab não muda). */}
           <div className="grid gap-4 lg:grid-cols-2 lg:gap-x-6">
+            {classificacao && <CamposDeClassificacao valor={classificada} aoMudar={(v) => { setClassificada(v); saida.aoMudar(); }} contexto={classificacao} registros={registros} excluidos={excluidos} erros={erros} bloqueio={!!bloqueio} aoGerenciar={() => setGerenciando(true)} />}
             <div className="lg:col-span-2">
               <label htmlFor={`${idBase}-nome`} className={ROTULO}>
                 Nome da ficha
@@ -685,5 +708,13 @@ function FormFichaBase({
       {tipo === 'PRATO' && verCustos && <p className="text-right text-[13px] text-suave">Primeiro salve a receita e o rendimento. Depois, confira as embalagens e o preço de cada canal. O preço manual fica preservado.</p>}
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
     </form>
+    {gerenciando && classificacao && <PainelClassificacao buscar={classificacao.buscar} gerir={classificacao.gerir} aoFechar={() => setGerenciando(false)} aoAlterar={(r) => {
+      if (r.alterado) {
+        const alterado = r.alterado;
+        setRegistros((antes) => [...antes.filter((x) => x.registro.id !== alterado.registro.id), alterado]);
+      }
+      if (r.excluido) { const id = r.excluido.id; setExcluidos((antes) => [...antes, id]); }
+    }} />}
+    </>
   );
 }

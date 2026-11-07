@@ -258,7 +258,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
 
   it('editor sem ver preços: criar e editar recebem do servidor opções e pré-preparos sem nenhum custo', async () => {
     atual.ctx = editorSemCustos;
-    const paginas = [await ErpNovaFichaPage(), await ErpEditarFichaPage({ params: { id: ids.ficha } })] as Formulario[];
+    const paginas = [await ErpNovaFichaPage({}), await ErpEditarFichaPage({ params: { id: ids.ficha } })] as Formulario[];
     for (const pagina of paginas) {
       expect(pagina.props.verCustos).toBe(false);
       expect(pagina.props.opcoes.length).toBeGreaterThan(0);
@@ -303,7 +303,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
   it('gerente e nível 1 preservam os custos na criação e edição', async () => {
     atual.ctx = ctxDe('GERENTE');
     const paginas = [
-      await ErpNovaFichaPage(),
+      await ErpNovaFichaPage({}),
       await ErpEditarFichaPage({ params: { id: ids.ficha } }),
       await ParceiroNovaFichaPage({ params: { slug: 'visoes' } }),
       await ParceiroEditarFichaPage({ params: { slug: 'visoes', id: ids.ficha } }),

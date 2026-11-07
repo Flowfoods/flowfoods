@@ -3,13 +3,14 @@
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiro, exigirPermissao, pode } from '@/lib/erp/contexto';
 import { obterFicha } from '@/lib/erp/fichas';
+import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import { custoPorCanal, embalagensParaEscolher } from '@/lib/erp/canais';
 import { TelaEmbalagensDaFicha } from '@/components/erp/telas/fichas/canais';
 import { acaoSalvarEmbalagens } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroEmbalagensDaFichaPage({ params, searchParams }: { params: { slug: string; id: string }; searchParams?: { feito?: string } }) {
+export default async function ParceiroEmbalagensDaFichaPage({ params, searchParams }: { params: { slug: string; id: string }; searchParams?: { feito?: string; de?: string | string[] } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.editar');
   exigirPermissao(ctx, 'precos.ver');
@@ -17,12 +18,14 @@ export default async function ParceiroEmbalagensDaFichaPage({ params, searchPara
   if (!ficha) notFound();
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;
   const canais = await custoPorCanal(ctx.cliente, ficha);
-  if (!ficha.ativa || !canais) redirect(`${base}/fichas/${ficha.id}`);
+  const de = deSeguroDaFicha(searchParams?.de);
+  if (!ficha.ativa || !canais) redirect(`${base}/fichas/${ficha.id}${de ? `?de=${encodeURIComponent(de)}` : ''}`);
   return (
     <TelaEmbalagensDaFicha
       ficha={ficha}
       canais={canais}
       base={`${base}/fichas`}
+      de={de}
       contexto={ctx.parceiro.nome}
       acao={acaoSalvarEmbalagens.bind(null, ctx.parceiro.slug, ficha.id)}
       opcoes={await embalagensParaEscolher(ctx.cliente, canais.embalagens.map((e) => e.insumoId))}

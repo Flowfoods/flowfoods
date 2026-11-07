@@ -41,6 +41,7 @@ import {
 import { ORDEM_DOS_CANAIS, type CanalVenda } from './canal-campos';
 import type { StatusDoCmv } from './cmv-produto-campos';
 import { lerValidades, retratoDaValidade, type EntradaDeValidade, type Validades } from './validade';
+import { idDeClassificacaoValido, lerClassificacaoDigitada, type ClassificacaoDaFicha } from './ficha-secoes-campos';
 
 export const TIPOS_DE_FICHA = {
   PRATO: 'Prato',
@@ -129,6 +130,8 @@ export interface ItemDigitado {
 
 /** O que chega do formulário (ou da planilha, já casada com os doCadastro). */
 export interface EntradaDaFicha {
+  /** Ausente em importações antigas: preservar; presente: validar e resolver na transação da ficha. */
+  classificacao?: unknown;
   nome?: unknown;
   tipo?: unknown;
   descricao?: unknown;
@@ -149,6 +152,8 @@ export interface EntradaDaFicha {
 }
 
 export interface DadosFicha {
+  /** Resolvida pelo servidor; ausente apenas nas leituras puras/antigas. */
+  classificacao?: ClassificacaoDaFicha;
   nome: string;
   tipo: TipoFicha;
   descricao: string | null;
@@ -253,6 +258,10 @@ export function lerFormFicha(
   const preparos = opcoes.preparos ?? new Map<string, PreparoDaFicha>();
   const r = formFicha.safeParse({ nome: entrada.nome, tipo: entrada.tipo || 'PRATO' });
   const erros: Erros = r.success ? {} : primeiroErroPorCampo(r.error.issues);
+  if (entrada.classificacao !== undefined) {
+    const classificacao = lerClassificacaoDigitada(entrada.classificacao);
+    if (!classificacao.ok) Object.assign(erros, classificacao.erros);
+  }
   const tipo: TipoFicha = r.success ? r.data.tipo : entrada.tipo === 'PRE_PREPARO' ? 'PRE_PREPARO' : 'PRATO';
 
   const descricao = textoLivre(entrada.descricao)?.replace(/\s+/g, ' ') ?? null;
@@ -529,6 +538,7 @@ export function retratoDaFicha(
 ): Retrato {
   return {
     nome: d.nome,
+    ...(d.classificacao ? { secaoId: d.classificacao.secao?.id ?? null, secao: d.classificacao.secao?.nome ?? null, subsecaoId: d.classificacao.subsecao?.id ?? null, subsecao: d.classificacao.subsecao?.nome ?? null } : {}),
     tipo: d.tipo,
     rendimento: formatarRendimento(d.rendimentoMilesimos, d.unidadeRendimento, d.tipo),
     descricao: d.descricao,
@@ -563,8 +573,10 @@ export interface FiltrosDeFicha {
   situacao: SituacaoDaFicha;
   /** Só fichas com custo incompleto (insumo "Sem preço", inclusive dentro de pré-preparo). */
   incompleto: boolean;
-  /** Só pratos com este status do CMV neste canal (lido no servidor sobre o conjunto todo; só para quem vê preços). */
-  cmv: FiltroDoCmv | null;
+  /** OR de pares explícitos; aplicado antes da paginação, só para quem vê preços. */
+  cmv: FiltroDoCmv[];
+  secao: string | null;
+  subsecao: string | null;
   pagina: number;
 }
 
@@ -589,17 +601,33 @@ export const valorDoFiltroDoCmv = (f: FiltroDoCmv): string => `${f.canal}-${f.st
 
 export const FICHAS_POR_PAGINA = 50;
 
-export const FILTROS_DE_FICHA_PADRAO: FiltrosDeFicha = { q: '', tipo: null, situacao: 'ativas', incompleto: false, cmv: null, pagina: 1 };
+export const FILTROS_DE_FICHA_PADRAO: FiltrosDeFicha = { q: '', tipo: null, situacao: 'ativas', incompleto: false, cmv: [], secao: null, subsecao: null, pagina: 1 };
 
-export function lerFiltrosDeFicha(sp: Record<string, string | string[] | undefined>): FiltrosDeFicha {
-  const v = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : sp[k]);
+export function filtrosDaFichaPermitidos(f: FiltrosDeFicha, verPrecos: boolean): FiltrosDeFicha {
+  return verPrecos ? f : { ...f, incompleto: false, cmv: [] };
+}
+
+export function filtrosCmvCanonicos(valores: readonly FiltroDoCmv[]): FiltroDoCmv[] {
+  const presentes = new Set(valores.map(valorDoFiltroDoCmv));
+  return ORDEM_DOS_CANAIS.flatMap(canal => STATUS_DO_FILTRO_DE_CMV.flatMap(status => presentes.has(`${canal}-${status}`) ? [{ canal, status }] : []));
+}
+
+export function lerFiltrosDeFicha(sp: Record<string, string | string[] | undefined> | URLSearchParams): FiltrosDeFicha {
+  const todos = (k: string): string[] => sp instanceof URLSearchParams ? sp.getAll(k) : Array.isArray(sp[k]) ? sp[k] : sp[k] === undefined ? [] : [sp[k]];
+  const v = (k: string) => todos(k)[0];
+  // Um ID malformado preserva um recorte vazio, nunca amplia silenciosamente para todas as fichas.
+  const id = (s: string | undefined) => !s ? null : s === 'sem' || idDeClassificacaoValido(s) ? s : '!invalido';
+  const secao = id(v('secao'));
+  const pagina = Number(v('pagina'));
   return {
     q: (v('q') ?? '').trim().slice(0, 80),
     tipo: um(v('tipo'), Object.keys(TIPOS_DE_FICHA) as TipoFicha[]),
     situacao: um(v('situacao'), ['ativas', 'desativadas', 'todas'] as const) ?? 'ativas',
     incompleto: marcado(v('custo')) || v('custo') === 'incompleto',
-    cmv: lerFiltroDoCmv(v('cmv')),
-    pagina: Math.max(1, Math.trunc(Number(v('pagina'))) || 1),
+    cmv: filtrosCmvCanonicos(todos('cmv').flatMap(s => { const par = lerFiltroDoCmv(s); return par ? [par] : []; })),
+    secao,
+    subsecao: secao && secao !== 'sem' ? id(v('subsecao')) : null,
+    pagina: Number.isSafeInteger(pagina) && pagina > 0 ? pagina : 1,
   };
 }
 
@@ -609,17 +637,20 @@ export function queryDosFiltrosDeFicha(f: FiltrosDeFicha): string {
   if (f.tipo) p.set('tipo', f.tipo);
   if (f.situacao !== 'ativas') p.set('situacao', f.situacao);
   if (f.incompleto) p.set('custo', 'incompleto');
-  if (f.cmv) p.set('cmv', valorDoFiltroDoCmv(f.cmv));
+  for (const par of filtrosCmvCanonicos(f.cmv)) p.append('cmv', valorDoFiltroDoCmv(par));
+  if (f.secao) p.set('secao', f.secao);
+  if (f.secao && f.secao !== 'sem' && f.subsecao) p.set('subsecao', f.subsecao);
   if (f.pagina > 1) p.set('pagina', String(f.pagina));
   return p.toString();
 }
 
 /** F4: o "de onde eu vim" da lista de fichas, dado de fora: só os filtros que a lista conhece sobrevivem. */
-export function deSeguroDaFicha(valor: unknown): string {
-  if (typeof valor !== 'string' || valor.length > 600) return '';
-  return queryDosFiltrosDeFicha(lerFiltrosDeFicha(Object.fromEntries(new URLSearchParams(valor))));
+export function deSeguroDaFicha(valor: unknown, verPrecos = true): string {
+  // Cabe todos os pares legais atuais/futuros e nomes codificados; rejeita excesso, não corta pares.
+  if (typeof valor !== 'string' || valor.length > 8192) return '';
+  return queryDosFiltrosDeFicha(filtrosDaFichaPermitidos(lerFiltrosDeFicha(new URLSearchParams(valor)), verPrecos));
 }
 
 export function temFiltroDeFicha(f: FiltrosDeFicha): boolean {
-  return !!(f.q || f.tipo || f.situacao !== 'ativas' || f.incompleto || f.cmv);
+  return !!(f.q || f.tipo || f.situacao !== 'ativas' || f.incompleto || f.cmv.length || f.secao || f.subsecao);
 }

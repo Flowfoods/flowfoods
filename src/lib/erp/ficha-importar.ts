@@ -190,6 +190,8 @@ function planejarUma(
     modoPreparo: lido.dados.modoPreparo ?? atual?.modoPreparo ?? null,
     // N.4: a planilha não traz etapas: as que a ficha já tem ficam.
     passosPreparo: atual?.passosPreparo ?? [],
+    // 3A: a planilha não tem classificação. Preserva inclusive vínculos arquivados e sua prévia.
+    classificacao: atual ? dadosDaFichaGravada(atual).classificacao : undefined,
     validades: entrada.validade === undefined ? (atual ? validadesDaLinha(atual) : null) : lido.dados.validades,
   };
   // A planilha não traz essa marca; seguir a mesma preservação de editarFicha, inclusive quando informa uma guarda.

@@ -197,10 +197,10 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     const f = (await obterFicha(a, ids.burger))!;
     expect(f.custo.faltaPreco).toEqual(['Picles']);
     expect(f.custo.preparosIncompletos).toEqual(['Molho cheddar']);
-    expect((await listarFichas(a, { incompleto: true })).linhas.map((l) => l.nome)).toEqual(['Burger cheddar', 'Molho cheddar']);
+    expect((await listarFichas(a, { incompleto: true }, { verPrecos: true })).linhas.map((l) => l.nome)).toEqual(['Burger cheddar', 'Molho cheddar']);
     // Volta ao normal.
     expect((await editarFicha(a, ids.molho, { ...molho(), versao: await versao(ids.molho) })).ok).toBe(true);
-    expect((await listarFichas(a, { incompleto: true })).linhas).toEqual([]);
+    expect((await listarFichas(a, { incompleto: true }, { verPrecos: true })).linhas).toEqual([]);
   });
 
   it('isolamento: pré-preparo de A numa ficha de B é recusado pela regra E pelo banco', async () => {
@@ -353,8 +353,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     let consultas = 0;
     const vistas: string[] = [];
     contado.$on('query', (e) => {
-      // Só as consultas (BEGIN/COMMIT chegam no evento depois da promessa resolver).
-      if (!/^(BEGIN|COMMIT|ROLLBACK)/.test(e.query)) {
+      // Só consultas de dados; 3A acrescenta SET TRANSACTION para a fotografia repetível.
+      if (!/^(BEGIN|COMMIT|ROLLBACK|SET TRANSACTION)/.test(e.query)) {
         consultas++;
         vistas.push(e.query.slice(0, 90));
       }
@@ -380,7 +380,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     // + L.3: com texto na busca, uma consulta de ids para a busca sem acento (a mesma com 3 ou com 30 fichas: não é N+1)
     expect(com30).toBe(10);
     expect(vistas.filter((q) => q.includes('DISTINCT ON'))).toHaveLength(1);
-    expect(vistas.filter((q) => q.includes('"FichaTecnica"."id", "public"."FichaTecnica"."nome"'))).toHaveLength(2);
+    // A projeção da página agora inclui secaoId/subsecaoId entre id e nome; continuam duas leituras de fichas.
+    expect(vistas.filter((q) => q.startsWith('SELECT "public"."FichaTecnica"."id",'))).toHaveLength(2);
     await contado.$disconnect();
   });
 

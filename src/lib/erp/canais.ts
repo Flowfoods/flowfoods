@@ -645,8 +645,8 @@ export async function precosDaLista(cliente: ClienteDoParceiro, fichas: readonly
 }
 
 /**
- * N.2: preço, CMV e farol pela meta de CMV de cada canal das fichas de prato da página — a MESMA leitura em lote da
- * `precosDaLista`, com a conta da meta de CMV ao lado. Só sai do servidor para quem vê preços (a página confere).
+ * N.2/3A: apuração canônica em lote. listarFichas passa o tx repetível e reutiliza este mapa para filtro e células;
+ * contasDaLista reaproveita a transação existente. Só sai do servidor para quem vê preços.
  */
 export async function cmvDaLista(cliente: ClienteDoParceiro, fichas: readonly { id: string; tipo: string; custo: CustoDaFicha }[]) {
   const pratos = fichas.filter((f) => f.tipo === 'PRATO');
@@ -673,8 +673,9 @@ async function contasDaLista(cliente: ClienteDoParceiro, pratos: readonly { id: 
     await anexarUltimasCompras(tx, insumos);
     let n = 0;
     const comCompra = produtos.map((p) => ({ ...p, embalagens: p.embalagens.map((e) => ({ ...e, insumo: insumos[n++] })) }));
+    const porFicha = new Map(comCompra.map(p => [p.fichaId, p]));
     for (const f of pratos) {
-      const p = comCompra.find((x) => x.fichaId === f.id);
+      const p = porFicha.get(f.id);
       const entradas: EntradaDoCanal[] = ORDEM_DOS_CANAIS.map((canal) => ({
         canal,
         custoDaFicha: f.custo,

@@ -19,6 +19,25 @@ import { FormFicha, type ValoresDaFicha } from './form-ficha';
 import { TelaImportarFichas } from './importar';
 import { urlDaFoto } from './miniatura';
 import { PREFIXO_DO_PREPARO } from './prefixo';
+import { classificacaoParaCampos, type AcaoBuscarClassificacao, type AcaoGerirClassificacao, type ClassificacaoDaFicha } from '@/lib/erp/ficha-secoes-campos';
+import type { ContextoClassificacao } from './campos-classificacao';
+
+/** Consultas já autorizadas pelas actions da rota; selecionados não dependem da primeira página. */
+export async function carregarClassificacaoDoFormulario(buscar: AcaoBuscarClassificacao, gerir: AcaoGerirClassificacao, atual: ClassificacaoDaFicha = { secao: null, subsecao: null }): Promise<ContextoClassificacao> {
+  const [secoes, subsecoes] = await Promise.all([
+    buscar({ contexto: 'formulario', nivel: 'secao', selecionados: atual.secao ? [atual.secao.id] : [] }),
+    atual.secao ? buscar({ contexto: 'formulario', nivel: 'subsecao', secaoId: atual.secao.id, selecionados: atual.subsecao ? [atual.subsecao.id] : [] }) : null,
+  ]);
+  return { atual, buscar, gerir, secoesIniciais: secoes.ok ? secoes.pagina : { itens: [], selecionados: [], proximoCursor: null }, subsecoesIniciais: subsecoes?.ok ? subsecoes.pagina : null };
+}
+
+export async function carregarClassificacaoDosFiltros(buscar: AcaoBuscarClassificacao, secao: string | null, subsecao: string | null) {
+  const [secoes, subsecoes] = await Promise.all([
+    buscar({ contexto: 'filtro', nivel: 'secao', selecionados: secao && secao !== 'sem' ? [secao] : [] }),
+    secao && secao !== 'sem' ? buscar({ contexto: 'filtro', nivel: 'subsecao', secaoId: secao, selecionados: subsecao && subsecao !== 'sem' ? [subsecao] : [] }) : null,
+  ]);
+  return { buscar, secoesIniciais: secoes.ok ? secoes.pagina : { itens: [], selecionados: [], proximoCursor: null }, subsecoesIniciais: subsecoes?.ok ? subsecoes.pagina : null };
+}
 
 export function CabecalhoDasFichas({
   subtitulo,
@@ -26,6 +45,7 @@ export function CabecalhoDasFichas({
   podeEditar,
   bloqueio,
   children,
+  de,
 }: {
   subtitulo: string;
   base: string;
@@ -33,6 +53,7 @@ export function CabecalhoDasFichas({
   podeEditar: boolean;
   bloqueio: string | null;
   children: ReactNode;
+  de?: string;
 }) {
   return (
     <PageHeader
@@ -47,7 +68,7 @@ export function CabecalhoDasFichas({
               <FileUp size={16} aria-hidden />
               Importar planilha
             </BotaoOuMotivo>
-            <BotaoOuMotivo href={`${base}/nova`} bloqueio={bloqueio} variante="primario">
+            <BotaoOuMotivo href={`${base}/nova${de ? `?de=${encodeURIComponent(de)}` : ''}`} bloqueio={bloqueio} variante="primario">
               <Plus size={16} aria-hidden />
               Nova ficha
             </BotaoOuMotivo>
@@ -70,6 +91,8 @@ export function TelaFormFicha({
   bloqueio,
   novoInsumo,
   verCustos,
+  classificacao,
+  de = '',
 }: {
   /** Ausente = nova. */
   ficha?: FichaNaTela;
@@ -82,6 +105,8 @@ export function TelaFormFicha({
   verCustos: boolean;
   bloqueio: string | null;
   novoInsumo?: string;
+  classificacao?: ContextoClassificacao;
+  de?: string;
 }) {
   const rende = ficha && rendimentoParaCampo(ficha.rendimentoMilesimos, ficha.unidadeRendimento, ficha.tipo);
   const inicial: ValoresDaFicha | undefined = ficha && {
@@ -99,8 +124,10 @@ export function TelaFormFicha({
     })),
     validades: ficha.validades,
     consumoImediato: ficha.consumoImediato,
+    classificacao: classificacao ? classificacaoParaCampos(classificacao.atual) : undefined,
   };
-  const volta = ficha ? `${base}/${ficha.id}` : base;
+  const busca = de ? `?de=${encodeURIComponent(de)}` : '';
+  const volta = ficha ? `${base}/${ficha.id}${busca}` : `${base}${de ? `?${de}` : ''}`;
   return (
     <div className="mx-auto max-w-4xl space-y-6 xl:max-w-6xl">
       <TrilhaDaPagina itens={ficha ? [{ rotulo: ficha.nome, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Nova ficha' }]} />
@@ -116,7 +143,7 @@ export function TelaFormFicha({
         acao={acao}
         modo={ficha ? 'editar' : 'criar'}
         base={base}
-        aqui={ficha ? `${base}/${ficha.id}/editar` : `${base}/nova`}
+        aqui={`${ficha ? `${base}/${ficha.id}/editar` : `${base}/nova`}${busca}`}
         cancelar={volta}
         opcoes={opcoes}
         preparos={preparos}
@@ -125,6 +152,8 @@ export function TelaFormFicha({
         versao={ficha?.versao}
         bloqueio={bloqueio}
         novoInsumo={novoInsumo}
+        classificacao={classificacao}
+        de={de}
       />
     </div>
   );

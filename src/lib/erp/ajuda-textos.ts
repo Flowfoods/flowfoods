@@ -336,12 +336,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas'],
     titulo: 'Fichas técnicas',
-    versao: 4,
+    versao: 5,
     aula: [
       { texto: 'Cada receita da casa, com o que rende e o que leva.' },
       { texto: 'Pré-preparo (molho, base) entra dentro de outras fichas.' },
+      { texto: 'Seção agrupa as fichas e subseção refina o grupo; combine com nome, tipo e situação, ou use Sem seção para encontrar as fichas ainda sem classificação.' },
       { texto: 'O custo por porção aparece para quem vê os preços. “Incompleto” quer dizer que falta preço em algum insumo.', para: ['precos.ver'] },
-      { texto: 'Ao lado, cada canal tem o seu preço, o CMV e o farol: dentro da meta, acima da meta, sem dados ou não ofertado. O filtro “CMV” mostra só os pratos de um farol num canal, contando a lista inteira.', para: ['precos.ver'] },
+      { texto: 'Em “Comparação com a meta”, marque uma ou mais opções por canal: entram os pratos que atendem a qualquer opção marcada, uma vez cada. Os outros filtros continuam valendo, e a contagem considera a lista inteira.', para: ['precos.ver'] },
     ],
     pontos: [
       {
@@ -356,10 +357,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/nova', 'fichas/[id]/editar'],
     titulo: 'Montar a ficha',
-    versao: 4,
+    versao: 5,
     aula: [
-      { texto: 'Monte a receita com a quantidade limpa, sem casca e sem osso. O fator de correção cobre a perda da limpeza: cebola 1,18 quer dizer que 354 g sujas dão 300 g limpas.' },
-      { texto: 'Pré-preparo diz quanto rende pronto. Diga também onde guarda e quanto dura, ou marque consumo imediato quando nada fica guardado.' },
+      { texto: 'Monte a receita com a quantidade limpa, sem casca e sem osso; o fator de correção cobre a perda da limpeza: cebola 1,18 quer dizer que 354 g sujas dão 300 g limpas.' },
+      { texto: 'Pré-preparo diz quanto rende pronto, onde guarda e quanto dura; marque consumo imediato quando nada fica guardado.' },
+      { texto: 'Seção e subseção são opcionais, para pratos e pré-preparos. Escolha uma existente ou escreva um nome novo; o nome novo só é criado ao salvar a ficha.' },
     ],
     secoes: [
       {
@@ -372,6 +374,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       },
     ],
     pontos: [
+      {
+        id: 'classificacao',
+        titulo: 'Seção e subseção',
+        blocos: [
+          { texto: 'A subseção pertence à seção escolhida; trocar a seção limpa a subseção anterior, sem mudar os ingredientes nem o preparo.' },
+          { texto: 'Em Gerenciar seções, renomear conserva os vínculos e arquivar retira a opção de novas escolhas. As fichas que já a usam continuam vinculadas, e só se exclui uma classificação vazia e sem vínculos.' },
+        ],
+      },
       {
         id: 'tipo',
         titulo: 'Prato ou pré-preparo',
@@ -875,9 +885,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/[id]', 'fichas/[id]/imprimir'],
     titulo: 'Detalhe da ficha',
-    versao: 5,
+    versao: 6,
     aula: [
-      { texto: 'Foto, descrição comercial, o que a receita leva e o modo de preparo em etapas.' },
+      { texto: 'Foto, descrição comercial, seção e subseção (com aviso quando arquivadas), o que a receita leva e o modo de preparo em etapas.' },
       { texto: 'O custo por porção e de cada item, com a conta à mostra.', para: ['precos.ver'] },
       { texto: 'Pré-preparo: “Produzir” planeja um lote dele, com os insumos tirados da receita.', para: ['producao.registrar'] },
       { texto: 'Em “Preço e CMV por canal”: o custo físico de cada canal, a meta de CMV, o preço sugerido pela meta, o seu preço, o CMV e o resultado após os custos informados.', para: ['precos.ver'] },

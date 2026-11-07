@@ -570,6 +570,8 @@ model ParceiroFlow {
   erpFornecedores             Fornecedor[]
   erpInsumoVariantes          InsumoVariante[]
   erpFichasTecnicas           FichaTecnica[]
+  erpSecoesFicha              SecaoFicha[]
+  erpSubsecoesFicha           SubsecaoFicha[]
   erpFichaItens               FichaItem[]
   erpProdutosVenda            ProdutoVenda[]
   erpProdutoCanais            ProdutoCanal[]
@@ -1327,12 +1329,52 @@ enum FichaTipo {
   PRE_PREPARO // subficha: produz um Insumo PRE_PREPARO (ou é usada direto)
 }
 
+// 3A: taxonomia própria e opcional da ficha; nomes únicos também entre arquivadas.
+model SecaoFicha {
+  id           String       @id @default(cuid())
+  parceiroId   String
+  parceiro     ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  nome         String
+  // O gatilho calcula a chave normalizada, inclusive para SQL direto.
+  nomeChave    String       @default("")
+  ativa        Boolean      @default(true)
+  criadoEm     DateTime     @default(now())
+  atualizadoEm DateTime     @updatedAt
+  subsecoes    SubsecaoFicha[]
+  fichas       FichaTecnica[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, nomeChave])
+}
+
+model SubsecaoFicha {
+  id           String       @id @default(cuid())
+  parceiroId   String
+  parceiro     ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  secaoId      String
+  secao        SecaoFicha   @relation(fields: [parceiroId, secaoId], references: [parceiroId, id], onDelete: Restrict, onUpdate: Restrict)
+  nome         String
+  nomeChave    String       @default("")
+  ativa        Boolean      @default(true)
+  criadoEm     DateTime     @default(now())
+  atualizadoEm DateTime     @updatedAt
+  fichas       FichaTecnica[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, secaoId, id])
+  @@unique([parceiroId, secaoId, nomeChave])
+}
+
 model FichaTecnica {
   id                     String       @id @default(cuid())
   parceiroId             String
   parceiro               ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
   nome                   String
   tipo                   FichaTipo
+  secaoId                String?
+  secao                  SecaoFicha? @relation(fields: [parceiroId, secaoId], references: [parceiroId, id], onDelete: Restrict, onUpdate: Restrict)
+  subsecaoId             String?
+  subsecao               SubsecaoFicha? @relation(fields: [parceiroId, secaoId, subsecaoId], references: [parceiroId, secaoId, id], onDelete: Restrict, onUpdate: Restrict)
   // Quanto a receita rende, na unidade de rendimento (PRATO: 1 un = 1000).
   rendimentoMilesimos    Int
   unidadeRendimento      UnidadeBase
@@ -1381,6 +1423,8 @@ model FichaTecnica {
   @@unique([parceiroId, nome])
   @@unique([parceiroId, insumoProduzidoId])
   @@index([parceiroId, tipo])
+  @@index([parceiroId, secaoId])
+  @@index([parceiroId, secaoId, subsecaoId])
 }
 
 // Linha da ficha: OU um insumo OU outra ficha (subficha) — CHECK no banco.

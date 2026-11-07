@@ -24,21 +24,20 @@ import {
   formatarRendimento,
   porUnidadeDeRendimento,
   queryDosFiltrosDeFicha,
-  STATUS_DO_FILTRO_DE_CMV,
-  valorDoFiltroDoCmv,
   temFiltroDeFicha,
   TIPOS_DE_FICHA,
   type FiltrosDeFicha,
+  type FiltroDoCmv,
 } from '@/lib/erp/ficha-campos';
 import { formatarDinheiro, formatarFracao, formatarPontosBase } from '@/lib/erp/unidades';
-import { CAMPO, MARCAR } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { Miniatura } from './miniatura';
-import { CANAIS, ORDEM_DOS_CANAIS } from '@/lib/erp/canal-campos';
+import { CANAIS } from '@/lib/erp/canal-campos';
 import { porcentagemDoCmv, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
+import { TextoClassificacao } from './texto-classificacao';
 
 /**
  * N.2: o CMV de um canal na lista — o preço que a pessoa definiu, o CMV a esse preço e o farol EM PALAVRA (nunca só a
@@ -97,7 +96,7 @@ function AcoesDaFicha({ l, base, f, empilhado = false }: { l: { id: string; nome
   return (
     <span className={`inline-flex gap-1.5 ${empilhado ? 'flex-col' : ''}`}>
       {l.ativa ? (
-        <Link href={`${base}/${l.id}/editar`} className={ICONE_DE_ACAO} aria-label={`Editar ${l.nome}`} title="Editar">
+        <Link href={`${base}/${l.id}/editar${de}`} className={ICONE_DE_ACAO} aria-label={`Editar ${l.nome}`} title="Editar">
           <Pencil size={16} aria-hidden />
         </Link>
       ) : (
@@ -122,80 +121,11 @@ function CustoPorRende({ l, empilhado = false }: { l: LinhaDeFicha; empilhado?: 
   );
 }
 
-const ROTULO_DA_SITUACAO = { ativas: 'Ativas', desativadas: 'Desativadas', todas: 'Todas' } as const;
+export { FiltrosDasFichas } from './filtros';
 
-/** Busca e filtros (GET: o estado vai para a URL). */
-/** `verCustos` (N.5): quem só opera não vê o filtro de custo (é assunto da precificação). */
-export function FiltrosDasFichas({ base, filtros: f, verCustos = true }: { base: string; filtros: FiltrosDeFicha; verCustos?: boolean }) {
-  const SELECT = `${CAMPO} pr-8`;
-  return (
-    <form role="search" action={base} className={`grid grid-cols-2 gap-2 ${verCustos ? 'lg:grid-cols-4 2xl:grid-cols-[minmax(18rem,1fr)_repeat(3,minmax(10.5rem,auto))_auto]' : 'lg:grid-cols-[minmax(18rem,1fr)_repeat(2,minmax(10.5rem,auto))]'}`}>
-      <div className={`col-span-2 flex gap-2 ${verCustos ? 'lg:col-span-4 2xl:col-span-1' : 'lg:col-span-1'}`}>
-        <label htmlFor="fichas-q" className="sr-only">
-          Buscar ficha pelo nome
-        </label>
-        <input id="fichas-q" name="q" type="search" defaultValue={f.q} placeholder="Buscar pelo nome" className={`${CAMPO} min-w-0 flex-1`} />
-        <button type="submit" className={classeDeBotao('secundario', 'shrink-0')}>
-          Filtrar
-        </button>
-        {temFiltroDeFicha(f) && (
-          <Link href={base} className={classeDeBotao('fantasma', 'shrink-0 px-3')}>
-            Limpar
-          </Link>
-        )}
-      </div>
-      <div>
-        <label htmlFor="fichas-tipo" className="sr-only">
-          Tipo
-        </label>
-        <select id="fichas-tipo" name="tipo" defaultValue={f.tipo ?? ''} className={SELECT}>
-          <option value="">Todos os tipos</option>
-          {Object.entries(TIPOS_DE_FICHA).map(([k, r]) => (
-            <option key={k} value={k}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="fichas-situacao" className="sr-only">
-          Situação
-        </label>
-        <select id="fichas-situacao" name="situacao" defaultValue={f.situacao} className={SELECT}>
-          {(Object.keys(ROTULO_DA_SITUACAO) as (keyof typeof ROTULO_DA_SITUACAO)[]).map((k) => (
-            <option key={k} value={k}>
-              {ROTULO_DA_SITUACAO[k]}
-            </option>
-          ))}
-        </select>
-      </div>
-      {verCustos && (
-        <div className="col-span-2 sm:col-span-1">
-          <label htmlFor="fichas-cmv" className="sr-only">
-            CMV por canal
-          </label>
-          <select id="fichas-cmv" name="cmv" defaultValue={f.cmv ? valorDoFiltroDoCmv(f.cmv) : ''} className={SELECT}>
-            <option value="">CMV: todos</option>
-            {ORDEM_DOS_CANAIS.map((canal) => (
-              <optgroup key={canal} label={CANAIS[canal].rotulo}>
-                {STATUS_DO_FILTRO_DE_CMV.map((st) => (
-                  <option key={st} value={valorDoFiltroDoCmv({ canal, status: st })}>
-                    {CANAIS[canal].curto} · {STATUS_DO_CMV[st].rotulo}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-      )}
-      {verCustos && (
-        <label className="col-span-2 flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] border border-linha-forte bg-campo px-3 text-sm text-texto sm:min-h-[42px] lg:col-span-1">
-          <input type="checkbox" name="custo" value="incompleto" defaultChecked={f.incompleto} className={MARCAR} />
-          <span className="whitespace-nowrap">Só custo incompleto</span>
-        </label>
-      )}
-    </form>
-  );
+function Correspondencias({ pares }: { pares?: readonly FiltroDoCmv[] }) {
+  if (!pares?.length) return null;
+  return <span className="block break-words text-[12px] leading-snug text-suave">Corresponde: {pares.map((p) => `${CANAIS[p.canal].curto} · ${STATUS_DO_CMV[p.status].rotulo}`).join('; ')}.</span>;
 }
 
 export function TelaListaFichas({
@@ -208,6 +138,7 @@ export function TelaListaFichas({
   novaHref,
   importarHref,
   cmv: precos,
+  correspondenciasCmv,
   acoes = false,
 }: {
   /** /erp/fichas ou /rodolfo/erp/<slug>/fichas */
@@ -222,6 +153,7 @@ export function TelaListaFichas({
   importarHref?: string;
   /** N.2: preço, CMV e farol por canal das fichas de prato (só para quem vê preços; nem sai do servidor para os outros). */
   cmv?: ReadonlyMap<string, CmvDoCanal[]>;
+  correspondenciasCmv?: ReadonlyMap<string, FiltroDoCmv[]>;
   /** F4: caneta e lixeira na linha (quem edita fichas e não está bloqueado; a página e a action conferem de novo). */
   acoes?: boolean;
 }) {
@@ -237,7 +169,7 @@ export function TelaListaFichas({
               </Link>
             }
           >
-            A busca e os filtros continuam acima, como você deixou.
+            {f.tipo === 'PRE_PREPARO' && f.cmv.length > 0 ? 'Pré-preparos não são vendidos por canal. Retire a comparação com a meta para vê-los.' : 'A busca e os filtros continuam acima, como você deixou.'}
           </Vazio>
         ) : (
           <Vazio
@@ -280,6 +212,8 @@ export function TelaListaFichas({
               <Miniatura base={base} id={l.id} foto={l.foto} />
               <span className="min-w-0 flex-1">
                 <span className={`block truncate font-medium ${l.ativa ? 'text-texto' : 'text-suave'}`}>{l.nome}</span>
+                <TextoClassificacao classificacao={l.classificacao} />
+                <Correspondencias pares={correspondenciasCmv?.get(l.id)} />
                 <span className="block truncate text-[12px] text-suave">
                   {TIPOS_DE_FICHA[l.tipo]} · rende {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}
                   {!l.ativa && ' · Desativada'}
@@ -309,7 +243,7 @@ export function TelaListaFichas({
         </caption>
         <thead>
           {precos && (
-            <tr className="hidden bg-forte text-[12px] text-suave lg:table-row">
+            <tr className="hidden bg-forte text-[12px] text-suave 2xl:table-row">
               <td colSpan={4} />
               <th scope="colgroup" colSpan={3} className="border-b border-linha px-3 pr-5 pt-2 text-center font-semibold">
                 CMV ao seu preço
@@ -321,7 +255,7 @@ export function TelaListaFichas({
             <th scope="col" className="h-10 pl-4 pr-3 font-semibold sm:pl-5">
               Ficha
             </th>
-            <th scope="col" className="hidden h-10 px-3 font-semibold md:table-cell">
+            <th scope="col" className="hidden h-10 px-3 font-semibold 2xl:table-cell">
               Rende
             </th>
             <th scope="col" className={`h-10 px-3 text-right font-semibold ${verCustos ? `hidden ${precos ? '' : 'md:table-cell'}` : ''}`}>
@@ -329,7 +263,7 @@ export function TelaListaFichas({
             </th>
             {verCustos && (
               <>
-                <th scope="col" className="h-10 px-3 text-right font-semibold">
+                <th scope="col" className="hidden h-10 px-3 text-right font-semibold 2xl:table-cell">
                   Custo da receita
                 </th>
                 <th scope="col" className="h-10 px-3 text-right font-semibold">
@@ -339,7 +273,7 @@ export function TelaListaFichas({
             )}
             {precos &&
               (['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] as const).map((c) => (
-                <th key={c} scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
+                <th key={c} scope="col" className="hidden h-10 px-3 text-right font-semibold 2xl:table-cell">
                   <span className="sr-only">CMV no </span>
                   {CANAIS[c].curto}
                 </th>
@@ -363,28 +297,31 @@ export function TelaListaFichas({
                   <div className="min-w-0">
                     <Link
                       href={hrefDoDetalhe(base, l.id, f)}
-                      className={`ff-transicao rounded-[5px] font-medium underline-offset-4 hover:underline ${l.ativa ? 'text-texto' : 'text-suave'}`}
+                      className={`ff-transicao rounded-[5px] font-medium underline-offset-4 hover:underline [overflow-wrap:anywhere] ${l.ativa ? 'text-texto' : 'text-suave'}`}
                     >
                       {l.nome}
                     </Link>
-                    <div className="max-w-[15rem] truncate text-[12px] text-suave lg:max-w-[19rem]">
+                    <TextoClassificacao classificacao={l.classificacao} />
+                    <Correspondencias pares={correspondenciasCmv?.get(l.id)} />
+                    <div className="max-w-[19rem] break-words text-[12px] text-suave">
                       {TIPOS_DE_FICHA[l.tipo]}
+                      <span className="2xl:hidden"> · rende {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}</span>
                       {l.preparos > 0 ? ` · com ${l.preparos === 1 ? '1 pré-preparo' : `${l.preparos} pré-preparos`}` : ''}
                       {l.descricao ? ` · ${l.descricao}` : ''}
                       <span className={precos ? '' : 'lg:hidden'}>{!l.ativa && ' · Desativada'}</span>
                     </div>
                     {(l.consumoImediato || validadesEmTexto(l.validades)) && <div className="text-[12px] leading-snug text-suave">{l.consumoImediato ? 'Consumo imediato' : validadesEmTexto(l.validades)}</div>}
-                    {precos?.get(l.id) && <div className="text-[12px] leading-snug tabular-nums text-suave lg:hidden">{cmvEmLinha(precos.get(l.id)!)}</div>}
+                    {precos?.get(l.id) && <div className="text-[12px] leading-snug tabular-nums text-suave 2xl:hidden">{cmvEmLinha(precos.get(l.id)!)}</div>}
                   </div>
                 </div>
               </td>
-              <td className="hidden whitespace-nowrap px-3 py-2 text-suave md:table-cell">
+              <td className="hidden whitespace-nowrap px-3 py-2 text-suave 2xl:table-cell">
                 {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}
               </td>
               <td className={`px-3 py-2 text-right text-suave ${verCustos ? `hidden ${precos ? '' : 'md:table-cell'}` : ''}`}>{l.itens}</td>
               {l.custo && (
                 <>
-                  <td className="whitespace-nowrap px-3 py-2 text-right">
+                  <td className="hidden whitespace-nowrap px-3 py-2 text-right 2xl:table-cell">
                     {custoIncompleto(l.custo) ? (
                       <span className="text-suave" title={`Falta preço em: ${l.custo.faltaPreco.join(', ')}`}>
                         {formatarFracao(l.custo.total)} + ?
@@ -395,18 +332,19 @@ export function TelaListaFichas({
                   </td>
                   <td className="px-3 py-2 text-right">
                     <CustoPorRende l={{ ...l, custo: l.custo }} />
+                    <span className="block text-[12px] text-suave 2xl:hidden">Receita: {formatarFracao(l.custo.total)}{custoIncompleto(l.custo) ? ' + ?' : ''}</span>
                   </td>
                 </>
               )}
               {precos &&
                 (precos.get(l.id) ? (
                   precos.get(l.id)!.map((x) => (
-                    <td key={x.canal} className="hidden px-2.5 py-2 text-right align-top last:pr-5 lg:table-cell">
+                    <td key={x.canal} className="hidden px-2.5 py-2 text-right align-top last:pr-5 2xl:table-cell">
                       <CmvNaLista x={x} />
                     </td>
                   ))
                 ) : (
-                  <td colSpan={3} className="hidden px-3 py-2 pr-5 text-right text-[12px] text-suave lg:table-cell">
+                  <td colSpan={3} className="hidden px-3 py-2 pr-5 text-right text-[12px] text-suave 2xl:table-cell">
                     não se vende
                   </td>
                 ))}
@@ -424,8 +362,8 @@ export function TelaListaFichas({
       </table>
 
       {precos && (
-        <ExplicacaoNoPonto ponto="conta" className="hidden border-t border-linha px-5 py-1.5 lg:block">
-          <p className="hidden border-t border-linha px-5 py-2.5 text-[12px] text-suave lg:block">
+        <ExplicacaoNoPonto ponto="conta" className="hidden border-t border-linha px-5 py-1.5 2xl:block">
+          <p className="hidden border-t border-linha px-5 py-2.5 text-[12px] text-suave 2xl:block">
             CMV = custo físico (insumos + embalagens do canal) ÷ o preço que você definiu; a taxa do iFood fica fora. Cada canal tem o seu farol. Sem
             preço definido ou sem meta: sem dados (a sugestão não conta como preço).
           </p>

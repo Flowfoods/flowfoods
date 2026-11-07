@@ -25,13 +25,14 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
   const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos });
   if (!ficha) notFound();
   const canais = verPrecos ? await custoPorCanal(ctx.cliente, ficha) : null;
-  const de = deSeguroDaFicha(searchParams.de);
+  const de = deSeguroDaFicha(searchParams.de, verPrecos);
   const origem = await voltaDaFichaAoInsumo(searchParams.volta, '/erp', ctx.cliente, ctx.alcance);
   return (
     <TelaDetalheFicha
       // N.5: quem só opera recebe a ficha sem nenhum valor de custo (visão operacional automática).
       ficha={fichaNaTela(ficha, verPrecos)}
       base={BASE}
+      de={de}
       voltar={origem ?? (de ? `${BASE}?${de}` : BASE)}
       rotuloVoltar={origem ? 'Voltar para o insumo' : undefined}
       feito={searchParams.feito}
@@ -40,7 +41,7 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
       acaoSituacao={acaoSituacaoFicha.bind(null, ficha.id)}
       linkDoInsumo={pode(ctx.alcance, 'insumos.ver') ? '/erp/insumos' : undefined}
       canais={canais}
-      linkDasEmbalagens={pode(ctx.alcance, 'fichas.editar') && verPrecos && !ctx.bloqueio ? `${BASE}/${ficha.id}/canais` : undefined}
+      linkDasEmbalagens={pode(ctx.alcance, 'fichas.editar') && verPrecos && !ctx.bloqueio ? `${BASE}/${ficha.id}/canais${de ? `?de=${encodeURIComponent(de)}` : ''}` : undefined}
       linkDaTaxa={verPrecos ? `${BASE}/canais` : undefined}
       linkDoProduzir={pode(ctx.alcance, 'producao.registrar') && ficha.ativa && !ctx.bloqueio ? `/erp/producao/nova?ficha=${ficha.id}` : undefined}
       podeConfigurarTaxa={pode(ctx.alcance, 'precos.editar') && !ctx.bloqueio}

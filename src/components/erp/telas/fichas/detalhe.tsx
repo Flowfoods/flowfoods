@@ -32,6 +32,7 @@ import type { CustoPorCanal } from '@/lib/erp/canais';
 import { entradaParaTela } from '@/lib/erp/preco-campos';
 import { PrecoEMargemPorCanal, type PrecosParaTela } from './custo-por-canal';
 import { EtapaPrecos } from './etapa-precos';
+import { TextoClassificacao } from './texto-classificacao';
 
 /** A conta dos canais como o navegador recebe (BigInt em texto): a prévia refaz com a mesma função. */
 function precosParaTela(c: CustoPorCanal): PrecosParaTela {
@@ -64,6 +65,7 @@ export function TelaDetalheFicha({
   podeConfigurarTaxa = false,
   acaoPrecos,
   linkDoProduzir,
+  de = '',
 }: {
   /** N.5: com ou sem os custos, conforme a permissão efetiva (o servidor decide e já manda sem os números). */
   ficha: FichaNaTela;
@@ -88,6 +90,7 @@ export function TelaDetalheFicha({
   acaoPrecos?: AcaoDeCadastro;
   /** 3.1: "Produzir" leva ao planejamento do lote deste pré-preparo; só para quem registra produção e com a ficha ativa. */
   linkDoProduzir?: string;
+  de?: string;
 }) {
   const quantidade = (q: number, fator: number, unidade: Parameters<typeof formatarQuantidade>[1]) =>
     fator === 1000 ? null : `bruto ${formatarQuantidade(quantidadeBruta(q, fator), unidade)} · fator ${formatarFator(fator)}`;
@@ -96,6 +99,7 @@ export function TelaDetalheFicha({
   const incompleto = f.custo ? custoIncompleto(f.custo) : false;
   const verCustos = f.verCustos;
   const mensagem = fraseDoFeitoDaFicha(feito);
+  const busca = de ? `?de=${encodeURIComponent(de)}` : '';
 
   return (
     <div className="space-y-6">
@@ -116,7 +120,7 @@ export function TelaDetalheFicha({
               Imprimir ou PDF
             </Link>
             {podeEditar && f.ativa && (
-              <BotaoOuMotivo href={`${base}/${f.id}/editar`} bloqueio={bloqueio} variante="primario">
+              <BotaoOuMotivo href={`${base}/${f.id}/editar${busca}`} bloqueio={bloqueio} variante="primario">
                 Editar ficha
               </BotaoOuMotivo>
             )}
@@ -171,6 +175,7 @@ export function TelaDetalheFicha({
               )}
               </div>
               <div className="min-w-0 flex-1 space-y-4">
+                <div><h2 className="text-[13px] font-semibold text-suave">Seção e subseção</h2><div className="mt-1"><TextoClassificacao classificacao={f.classificacao} vazio /></div></div>
                 <div>
                   <h2 className="text-[13px] font-semibold text-suave">Descrição comercial</h2>
                   <p className="mt-1 text-[15px] leading-relaxed text-texto">{f.descricao ?? <span className="text-suave">Sem descrição comercial.</span>}</p>
@@ -207,7 +212,7 @@ export function TelaDetalheFicha({
                             {podeEditar && f.ativa && !bloqueio ? (
                               <>
                                 {' '}
-                                <Link href={`${base}/${f.id}/editar`} className={LINK_DE_TEXTO}>
+                                <Link href={`${base}/${f.id}/editar${busca}`} className={LINK_DE_TEXTO}>
                                   Dizer em Editar ficha
                                 </Link>
                               </>
@@ -345,7 +350,8 @@ export function TelaDetalheFicha({
               linkDosCanais={linkDaTaxa}
               podeConfigurar={podeConfigurarTaxa}
               acao={f.ativa ? acaoPrecos : undefined}
-              aqui={`${base}/${f.id}`}
+              aqui={`${base}/${f.id}${busca}`}
+              de={de}
             />
             </EtapaPrecos>
           )}
@@ -438,7 +444,7 @@ export function TelaDetalheFicha({
               {bloqueio ? (
                 <p className="text-sm text-suave">{bloqueio}</p>
               ) : (
-                <FormSituacao acao={acaoSituacao} ativo={f.ativa} oQue="ficha" idBase="situacao-ficha" />
+                <FormSituacao acao={acaoSituacao} ativo={f.ativa} oQue="ficha" idBase="situacao-ficha" ocultos={{ de }} />
               )}
             </Painel>
           )}

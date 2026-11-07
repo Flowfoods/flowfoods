@@ -18,7 +18,7 @@ export const FILTROS: { valor: string; rotulo: string; entidades?: string[] }[] 
   // Insumos e as outras embalagens de compra deles.
   { valor: 'Insumo', rotulo: 'Insumos', entidades: ['Insumo', 'InsumoVariante'] },
   // 1.9: a taxa do iFood (canal de venda) mora com as fichas: é o custo do prato por canal.
-  { valor: 'FichaTecnica', rotulo: 'Fichas técnicas', entidades: ['FichaTecnica', 'CanalConfig'] },
+  { valor: 'FichaTecnica', rotulo: 'Fichas técnicas', entidades: ['FichaTecnica', 'CanalConfig', 'SecaoFicha', 'SubsecaoFicha'] },
   // 1.5: notas de compra e fornecedores.
   { valor: 'NotaEntrada', rotulo: 'Compras', entidades: ['NotaEntrada', 'Fornecedor', 'DocumentoFiscal', 'VinculoItemFornecedor'] },
   // 3.1: os lotes de produção (o custo deles só para quem tem "ver insumos e custos"). 3.2: e a lista do dia.

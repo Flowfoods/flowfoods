@@ -39,6 +39,7 @@ export function TelaEmbalagensDaFicha({
   novoInsumo,
   feito,
   podeConferirPrecos,
+  de = '',
 }: {
   ficha: FichaDetalhada;
   canais: CustoPorCanal;
@@ -50,8 +51,10 @@ export function TelaEmbalagensDaFicha({
   novoInsumo?: string;
   feito?: string;
   podeConferirPrecos: boolean;
+  de?: string;
 }) {
-  const volta = `${base}/${ficha.id}`;
+  const busca = de ? `?de=${encodeURIComponent(de)}` : '';
+  const volta = `${base}/${ficha.id}${busca}`;
   const mensagem = fraseDoFeitoDaFicha(feito);
   const inicial: LinhaDaEmbalagem[] = canais.embalagens.map((e) => {
     const q = quantidadeParaCampo(e.quantidadeMilesimos, e.unidade);
@@ -68,10 +71,11 @@ export function TelaEmbalagensDaFicha({
         {' '}A quantidade é por porção de cada produto, inclusive a sacola. Configure apenas o uso que ainda não está na receita; usos diferentes do mesmo insumo podem coexistir.
         {' '}Salvar esta previsão de custo não movimenta estoque. Condimentos comestíveis continuam como ingredientes.
       </p>
-      <Link href={`${volta}/editar`} className={classeDeBotao('secundario')}>Revisar receita e rendimento</Link>
+      <Link href={`${base}/${ficha.id}/editar${busca}`} className={classeDeBotao('secundario')}>Revisar receita e rendimento</Link>
       <FormEmbalagens
         acao={acao}
-        aqui={`${base}/${ficha.id}/canais`}
+        aqui={`${base}/${ficha.id}/canais${busca}`}
+        de={de}
         cancelar={volta}
         opcoes={opcoes}
         inicial={inicial}

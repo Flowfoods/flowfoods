@@ -31,6 +31,8 @@ import { ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
 import { idsDeFichaPelaBusca } from './busca';
 import { cmvDaLista } from './canais';
+import { classificacaoDaLinha, ErroDeClassificacao, resolverClassificacao, SELECAO_DA_CLASSIFICACAO, travarClassificacao } from './ficha-secoes';
+import type { ClassificacaoDaFicha } from './ficha-secoes-campos';
 import { diferenca, type Erros } from './insumo-campos';
 import {
   chaveDoItem,
@@ -38,6 +40,9 @@ import {
   custoIncompleto,
   FICHAS_POR_PAGINA,
   FILTROS_DE_FICHA_PADRAO,
+  filtrosDaFichaPermitidos,
+  filtrosCmvCanonicos,
+  type FiltroDoCmv,
   lerFormFicha,
   retratoDaFicha,
   type CustoDaFicha,
@@ -153,6 +158,7 @@ export async function preparosTravados(tx: ClienteDoParceiro, ids: string[]): Pr
  */
 export async function travarGrafoDeFichas(tx: ClienteDoParceiro): Promise<void> {
   await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp:fichas:${tx.parceiroId}`}, 0))::text AS "trava"`;
+  await travarClassificacao(tx);
 }
 
 async function erroDeNomeRepetido(cliente: ClienteDoParceiro, nome: string): Promise<ResultadoFicha> {
@@ -197,6 +203,7 @@ function prepararMudancaDeFoto(foto: MudancaDeFoto): { erro: string } | Extract<
 
 /** Como a ficha está gravada (edição e importação). */
 export const SELECAO_PARA_EDITAR = {
+  ...SELECAO_DA_CLASSIFICACAO,
   id: true,
   nome: true,
   tipo: true,
@@ -218,6 +225,7 @@ export type FichaGravada = Prisma.FichaTecnicaGetPayload<{ select: typeof SELECA
 
 /** Dados gravados → o formato do leitor (para comparar retratos). */
 export function dadosGravados(f: {
+  classificacao?: ClassificacaoDaFicha;
   nome: string;
   tipo: TipoFicha;
   descricao: string | null;
@@ -234,6 +242,7 @@ export function dadosGravados(f: {
 }): DadosFicha {
   return {
     nome: f.nome,
+    ...(f.classificacao ? { classificacao: f.classificacao } : {}),
     tipo: f.tipo,
     descricao: f.descricao,
     modoPreparo: f.modoPreparo,
@@ -254,7 +263,7 @@ export function dadosGravados(f: {
 }
 
 /** Ficha gravada (com as colunas de validade) → dados do leitor. */
-export const dadosDaFichaGravada = (f: FichaGravada): DadosFicha => dadosGravados({ ...f, validades: validadesDaLinha(f) });
+export const dadosDaFichaGravada = (f: FichaGravada): DadosFicha => dadosGravados({ ...f, validades: validadesDaLinha(f), classificacao: classificacaoDaLinha(f) });
 
 /** Os insumos e pré-preparos que a entrada e a ficha atual citam, travados. */
 export async function cadastroDaEntrada(tx: ClienteDoParceiro, entrada: EntradaDaFicha, atual: Pick<FichaGravada, 'itens'> | null) {
@@ -467,7 +476,8 @@ async function sincronizarInsumoProduzido(
 
 export interface Gravacao {
   /** Ficha nova (null) ou a versão lida da existente. */
-  atual: Pick<FichaGravada, 'id' | 'atualizadoEm' | 'fotoArquivo' | 'insumoProduzidoId'> | null;
+  atual: Pick<FichaGravada, 'id' | 'atualizadoEm' | 'fotoArquivo' | 'insumoProduzidoId' | 'secaoId' | 'subsecaoId'> | null;
+  classificacao?: unknown;
   dados: DadosFicha;
   doCadastro: ReadonlyMap<string, InsumoDaFicha>;
   preparos: ReadonlyMap<string, PreparoDaFicha>;
@@ -486,7 +496,8 @@ export interface Gravacao {
  * acerta o insumo produzido, se faltar). Devolve os campos que mudaram.
  */
 export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{ id: string; mudou: string[] }> {
-  const d = g.dados;
+  const resolvida = await resolverClassificacao(tx, g.classificacao, g.atual, g.autorNome);
+  const d = { ...g.dados, classificacao: resolvida.classificacao };
   const fotoArquivo = g.foto === 'manter' ? (g.atual?.fotoArquivo ?? null) : (g.foto?.arquivo ?? null);
   const dadosDaFoto =
     g.foto === 'manter' ? {} : { fotoArquivo: g.foto?.arquivo ?? null, fotoMime: g.foto?.mime ?? null, fotoBytes: g.foto?.bytes ?? null };
@@ -503,6 +514,8 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
       data: {
         parceiroId: tx.parceiroId,
         nome: d.nome,
+        secaoId: resolvida.secaoId,
+        subsecaoId: resolvida.subsecaoId,
         tipo: d.tipo,
         rendimentoMilesimos: d.rendimentoMilesimos,
         unidadeRendimento: d.unidadeRendimento,
@@ -543,6 +556,8 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
     where: { id: g.atual.id, atualizadoEm: g.atual.atualizadoEm, ativa: true },
     data: {
       nome: d.nome,
+      secaoId: resolvida.secaoId,
+      subsecaoId: resolvida.subsecaoId,
       tipo: d.tipo,
       rendimentoMilesimos: d.rendimentoMilesimos,
       unidadeRendimento: d.unidadeRendimento,
@@ -631,6 +646,7 @@ export async function cadastrarFicha(
         await conferirEstrutura(tx, lido.dados, null, doCadastro);
         const r = await gravarFicha(tx, {
           atual: null,
+          classificacao: entrada.classificacao,
           dados: lido.dados,
           doCadastro,
           preparos,
@@ -641,6 +657,7 @@ export async function cadastrarFicha(
       }),
     );
   } catch (e) {
+    if (e instanceof ErroDeClassificacao) return { ok: false, erros: e.erros };
     if (e instanceof RecusaDaFicha) return e.resultado;
     if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, nome);
     const fk = erroDeInsumoExcluidoNaFk(e);
@@ -688,6 +705,7 @@ export async function editarFicha(
         await conferirEstrutura(tx, lido.dados, atual, doCadastro);
         const r = await gravarFicha(tx, {
           atual,
+          classificacao: entrada.classificacao,
           dados: lido.dados,
           doCadastro,
           preparos,
@@ -700,6 +718,7 @@ export async function editarFicha(
       }),
     );
   } catch (e) {
+    if (e instanceof ErroDeClassificacao) return { ok: false, erros: e.erros };
     if (e instanceof RecusaDaFicha) return e.resultado;
     if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, nome);
     const fk = erroDeInsumoExcluidoNaFk(e);
@@ -779,6 +798,8 @@ function filtroDoBanco(f: FiltrosDeFicha, incompletos: string[], idsDaBusca: str
   return {
     ...(idsDaBusca || idsDoCmv ? { AND: [idsDaBusca, idsDoCmv].filter((x): x is string[] => x !== null).map((ids) => ({ id: { in: ids } })) } : {}),
     ...(f.tipo ? { tipo: f.tipo } : {}),
+    ...(f.secao ? { secaoId: f.secao === 'sem' ? null : f.secao } : {}),
+    ...(f.secao && f.secao !== 'sem' && f.subsecao ? { subsecaoId: f.subsecao === 'sem' ? null : f.subsecao } : {}),
     ...(f.situacao === 'ativas' ? { ativa: true } : f.situacao === 'desativadas' ? { ativa: false } : {}),
     ...(f.incompleto ? { itens: { some: { OR: [{ insumo: SEM_PRECO_NEM_COMPRA }, { subfichaId: { in: incompletos } }] } } } : {}),
   };
@@ -788,6 +809,7 @@ function filtroDoBanco(f: FiltrosDeFicha, incompletos: string[], idsDaBusca: str
 const versaoDaFoto = (arquivo: string | null) => (arquivo ? arquivo.slice(0, 12) : null);
 
 const SELECAO_DA_LISTA = {
+  ...SELECAO_DA_CLASSIFICACAO,
   id: true,
   nome: true,
   tipo: true,
@@ -802,36 +824,40 @@ const SELECAO_DA_LISTA = {
 } as const;
 
 /**
- * F4: os pratos (dentro dos outros filtros) com aquele status do CMV naquele canal. Conta sobre o conjunto TODO, não só
- * a página: o CMV é calculado na hora (nunca gravado), então não há coluna para o banco filtrar.
- */
-async function idsPeloStatusDoCmv(cliente: ClienteDoParceiro, f: FiltrosDeFicha): Promise<string[]> {
-  if (!f.cmv || f.tipo === 'PRE_PREPARO') return [];
-  const base = await cliente.transacao(async (tx) => {
-    const where = filtroDoBanco(f, f.incompleto ? await preparosIncompletos(tx) : [], await idsDeFichaPelaBusca(tx, f.q.trim().slice(0, 80)));
-    const ids = (await tx.fichaTecnica.findMany({ where: { AND: [where, { tipo: 'PRATO' }] }, select: { id: true } })).map((x) => x.id);
-    if (ids.length === 0) return [];
-    const c = await custosEmCascata(tx, ids);
-    return ids.map((id) => ({ id, tipo: 'PRATO', custo: c.custo(id)! }));
-  });
-  if (base.length === 0) return [];
-  const cmv = await cmvDaLista(cliente, base);
-  const { canal, status } = f.cmv;
-  return base.filter((b) => cmv.get(b.id)?.find((x) => x.canal === canal)?.status === status).map((b) => b.id);
-}
-
-/**
  * Página da lista com o total, custo calculado na hora (nunca gravado), em cascata. O filtro do CMV só vale com
  * `verPrecos` (quem não vê preços não pode descobrir o status pela lista que volta).
  */
 export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<FiltrosDeFicha> = {}, opcoes: { verPrecos?: boolean } = {}) {
-  const f: FiltrosDeFicha = { ...FILTROS_DE_FICHA_PADRAO, ...filtros };
-  if (!opcoes.verPrecos) f.cmv = null;
+  const verPrecos = opcoes.verPrecos === true;
+  const f = filtrosDaFichaPermitidos({ ...FILTROS_DE_FICHA_PADRAO, ...filtros, cmv: filtrosCmvCanonicos(filtros.cmv ?? []) }, verPrecos);
+  if (!f.secao || f.secao === 'sem') f.subsecao = null;
   // Foto enviada e nunca salva (herança d da 1.3): sai também ao abrir a lista, de vez em quando.
   await faxinarPendentesDeVezEmQuando(cliente.parceiroId);
-  const idsDoCmv = f.cmv ? await idsPeloStatusDoCmv(cliente, f) : null;
   return cliente.transacao(async (tx) => {
-    const where = filtroDoBanco(f, f.incompleto ? await preparosIncompletos(tx) : [], await idsDeFichaPelaBusca(tx, f.q.trim().slice(0, 80)), idsDoCmv);
+    let avisoFiltro: string | undefined;
+    if (f.secao && f.secao !== 'sem') {
+      const secao = await tx.secaoFicha.findUnique({ where: { id: f.secao }, select: { id: true } });
+      const filho = f.subsecao && f.subsecao !== 'sem' ? await tx.subsecaoFicha.findFirst({ where: { id: f.subsecao, secaoId: f.secao }, select: { id: true } }) : true;
+      if (!secao || !filho) avisoFiltro = 'A classificação escolhida não está disponível. Ajuste os filtros para continuar.';
+    }
+    const base = filtroDoBanco(f, f.incompleto ? await preparosIncompletos(tx) : [], await idsDeFichaPelaBusca(tx, f.q.trim().slice(0, 80)), avisoFiltro ? [] : null);
+    let mapaCmv: Awaited<ReturnType<typeof cmvDaLista>> | undefined;
+    let cascataCmv: Awaited<ReturnType<typeof custosEmCascata>> | undefined;
+    const correspondencias = new Map<string, FiltroDoCmv[]>();
+    let idsDoCmv: string[] | null = null;
+    if (f.cmv.length) {
+      // Um universo antes da página; OR entre os pares escolhidos, AND com todos os outros filtros.
+      const ids = (await tx.fichaTecnica.findMany({ where: { AND: [base, { tipo: 'PRATO' }] }, select: { id: true } })).map(r => r.id);
+      cascataCmv = await custosEmCascata(tx, ids);
+      mapaCmv = await cmvDaLista(tx, ids.map(id => ({ id, tipo: 'PRATO', custo: cascataCmv!.custo(id)! })));
+      idsDoCmv = ids.filter(id => {
+        const pares = f.cmv.filter(par => mapaCmv!.get(id)?.some(c => c.canal === par.canal && c.status === par.status));
+        if (pares.length) correspondencias.set(id, pares);
+        return pares.length > 0;
+      });
+      if (f.tipo === 'PRE_PREPARO') avisoFiltro = 'A comparação de CMV é dos pratos vendidos. Retire esse filtro para ver pré-preparos.';
+    }
+    const where: Prisma.FichaTecnicaWhereInput = idsDoCmv === null ? base : { AND: [base, { id: { in: idsDoCmv } }] };
     const total = await tx.fichaTecnica.count({ where });
     const paginas = Math.max(1, Math.ceil(total / FICHAS_POR_PAGINA));
     const pagina = Math.min(Math.max(1, Math.trunc(f.pagina) || 1), paginas);
@@ -842,9 +868,10 @@ export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<
       take: FICHAS_POR_PAGINA,
       select: SELECAO_DA_LISTA,
     });
-    const cascata = await custosEmCascata(tx, [], lidas);
+    const cascata = cascataCmv ?? await custosEmCascata(tx, [], lidas);
     const linhas = lidas.map((l) => ({
       id: l.id,
+      classificacao: classificacaoDaLinha(l),
       nome: l.nome,
       tipo: l.tipo,
       descricao: l.descricao,
@@ -858,8 +885,16 @@ export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<
       validades: validadesDaLinha(l),
       consumoImediato: l.consumoImediato,
     }));
-    return { linhas, total, pagina, paginas };
-  });
+    if (verPrecos && !mapaCmv) mapaCmv = await cmvDaLista(tx, linhas);
+    // Nunca enviar mapas do universo inteiro nem apurar CMV para quem não tem precos.ver.
+    const visiveis = new Set(linhas.map(l => l.id));
+    return { linhas, total, pagina, paginas, filtros: { ...f, pagina }, avisoFiltro,
+      ...(verPrecos ? {
+        cmv: new Map([...mapaCmv!].filter(([id]) => visiveis.has(id))),
+        correspondenciasCmv: new Map([...correspondencias].filter(([id]) => visiveis.has(id))),
+      } : {}),
+    };
+  }, { repetivel: true });
 }
 
 export type LinhaDeFicha = Awaited<ReturnType<typeof listarFichas>>['linhas'][number];
@@ -909,12 +944,13 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes:
       },
     });
     if (!f) return null;
-    const historico = await listarHistorico(tx, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 10, verPrecos: opcoes.verPrecos === true });
+    const historico = await listarHistorico(tx, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 10, verPrecos: opcoes.verPrecos === true, verFichas: true });
     const cascata = await custosEmCascata(tx, [], [f]);
     const custo = cascata.custo(id)!;
     const usadaEm = Array.from(new Map(f.usadaComoSub.map((u) => [u.ficha.id, u.ficha])).values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     return {
       id: f.id,
+      classificacao: classificacaoDaLinha(f),
       nome: f.nome,
       tipo: f.tipo,
       descricao: f.descricao,

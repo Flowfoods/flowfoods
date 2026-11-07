@@ -99,6 +99,7 @@ type PropsDoFormEmbalagens = {
   precos?: PrecosDasEmbalagens | null;
   /** Insumos que são itens diretos da receita salva: embalagem repetida no canal ganha um aviso (sem bloquear). */
   naReceita?: readonly string[];
+  de?: string;
 };
 
 function FormEmbalagensBase({
@@ -116,6 +117,7 @@ function FormEmbalagensBase({
   precos,
   gravadas,
   naReceita,
+  de,
   chaveDoRascunho,
   avisos,
 }: PropsDoFormEmbalagens & { chaveDoRascunho: string; avisos: ReactNode; gravadas: readonly LinhaDaEmbalagem[] }) {
@@ -196,6 +198,7 @@ function FormEmbalagensBase({
   return (
     <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="impressao" value={impressao} />
+      {de && <input type="hidden" name="de" value={de} />}
       {avisos}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoErro} />
       <ErroGeral estado={estado} recarregar={aqui} />

@@ -20,8 +20,11 @@ import type { EstadoDasFotos, EstadoImportacao } from '@/components/erp/telas/fi
 import { revalidatePath } from 'next/cache';
 import { mudarFotosDaFicha } from '@/lib/erp/ficha-fotos';
 import { lerImpressaoFinanceira, type ImpressaoFinanceira } from '@/lib/erp/ficha-impressao';
+import { buscarClassificacao } from '@/lib/erp/ficha-secoes';
+import type { EstadoGestaoClassificacao, PedidoBuscaClassificacao, ResultadoBuscaClassificacao } from '@/lib/erp/ficha-secoes-campos';
 import {
   executarImportacao,
+  executarGestaoClassificacao,
   executarPrevia,
   lerEnvioDaFicha,
   lerEnvioDasEmbalagens,
@@ -47,6 +50,24 @@ async function auditarFicha(ctx: Ctx, evento: string, r: ResultadoFicha) {
   if (r.ok) await auditar(ctx, evento, { id: r.id });
 }
 
+export async function acaoBuscarClassificacao(slug: string, pedido: PedidoBuscaClassificacao): Promise<ResultadoBuscaClassificacao> {
+  const ctx = await exigirParceiro(String(slug));
+  const negado = recusaDaAcao(ctx, pedido?.contexto === 'filtro' ? 'fichas.ver' : 'fichas.editar');
+  if (negado) return { ok: false, erro: negado };
+  return buscarClassificacao(ctx.cliente, pedido);
+}
+
+export async function acaoGerirClassificacao(slug: string, anterior: EstadoGestaoClassificacao, form: FormData): Promise<EstadoGestaoClassificacao> {
+  const { ctx, negado, base } = await paraEditar(slug);
+  if (negado) return { vez: (anterior?.vez ?? 0) + 1, ok: false, erros: { geral: negado } };
+  const r = await executarGestaoClassificacao(ctx.cliente, anterior, form, ctx.sessao.autorNome, base);
+  if (r?.ok) {
+    const id = r.alterado?.registro.id ?? r.excluido?.id;
+    if (id) await auditar(ctx, 'erp_ficha_classificacao_alterada', { id, nivel: String(form.get('nivel')), intencao: String(form.get('intencao')) });
+  }
+  return r;
+}
+
 export async function acaoCadastrarFicha(slug: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado, base } = await paraEditar(slug);
   if (negado) return recusado(anterior, negado);
@@ -55,7 +76,7 @@ export async function acaoCadastrarFicha(slug: string, anterior: EstadoCadastro,
   const r = await cadastrarFicha(ctx.cliente, envio.entrada, envio.foto, ctx.sessao.autorNome);
   await auditarFicha(ctx, 'erp_ficha_criada', r);
   const proxima = form.get('continuar') === 'embalagens' && envio.entrada.tipo === 'PRATO' && !recusaDaAcao(ctx, 'precos.ver');
-  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'criada' }, proxima ? 'embalagens' : null);
+  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'criada' }, proxima ? 'embalagens' : null, { de: deSeguroDaFicha(form.get('de'), !recusaDaAcao(ctx, 'precos.ver')) });
 }
 
 export async function acaoEditarFicha(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -66,7 +87,7 @@ export async function acaoEditarFicha(slug: string, id: string, anterior: Estado
   const r = await editarFicha(ctx.cliente, String(id), envio.entrada, envio.foto, ctx.sessao.autorNome);
   await auditarFicha(ctx, 'erp_ficha_alterada', r);
   const proxima = form.get('continuar') === 'embalagens' && envio.entrada.tipo === 'PRATO' && !recusaDaAcao(ctx, 'precos.ver');
-  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'editada', igual: 'igual' }, proxima ? 'embalagens' : null);
+  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'editada', igual: 'igual' }, proxima ? 'embalagens' : null, { de: deSeguroDaFicha(form.get('de'), !recusaDaAcao(ctx, 'precos.ver')) });
 }
 
 export async function acaoSituacaoFicha(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -101,7 +122,7 @@ export async function acaoSalvarEmbalagens(slug: string, id: string, anterior: E
   const r = await salvarEmbalagens(ctx.cliente, String(id), lerEnvioDasEmbalagens(form), ctx.sessao.autorNome);
   if (r.ok) await auditar(ctx, 'erp_ficha_embalagens', { id: r.id });
   const proxima = form.get('continuar') === 'precos' && !recusaDaAcao(ctx, 'fichas.ver');
-  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'embalagens', igual: 'igual' }, proxima ? 'precos' : null);
+  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'embalagens', igual: 'igual' }, proxima ? 'precos' : null, { de: deSeguroDaFicha(form.get('de')) });
 }
 
 /** 1.9: a taxa do iFood do parceiro. */
@@ -123,7 +144,7 @@ export async function acaoSalvarPrecos(slug: string, id: string, anterior: Estad
   if (negado) return recusado(anterior, negado);
   const r = await salvarPrecos(ctx.cliente, String(id), lerEnvioDosPrecos(form), ctx.sessao.autorNome);
   if (r.ok && r.mudou.length) await auditar(ctx, 'erp_ficha_precos', { id: r.id });
-  return concluir(r, anterior, base, { mudou: r.ok && r.custoMudou ? 'precos-custo' : 'precos', igual: 'precos-igual' });
+  return concluir(r, anterior, base, { mudou: r.ok && r.custoMudou ? 'precos-custo' : 'precos', igual: 'precos-igual' }, undefined, undefined, 'insumo', { de: deSeguroDaFicha(form.get('de')), aLista: false });
 }
 
 /** N.2: meta de CMV de cada canal do parceiro. */

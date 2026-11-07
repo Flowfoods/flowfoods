@@ -60,6 +60,7 @@ interface Props {
   /** Só com `precos.editar`, ficha ativa e parceiro livre: o preço vira campo. */
   acao?: AcaoDeCadastro;
   aqui: string;
+  de?: string;
 }
 
 type Embalagem = CamadasDoCanal['embalagens'][number];
@@ -224,6 +225,7 @@ function ComFormulario(props: Props & { acao: AcaoDeCadastro }) {
       <input type="hidden" name="impressao" value={props.dados.impressaoDosPrecos} />
       <input type="hidden" name="custos" value={props.dados.impressaoDosCustos} />
       <input type="hidden" name="ofertas" value="1" />
+      {props.de && <input type="hidden" name="de" value={props.de} />}
       <Conteudo {...props} className="" estado={estado} editavel />
     </form>
   );
