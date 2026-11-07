@@ -1088,7 +1088,8 @@ export async function previaDaNota(
           antes: formatarCusto(antes, ins.unidade),
           depois: formatarCusto(depois, ins.unidade),
           efeito: !vence && daNota.length > 0 ? 'nao-muda' : !antes && depois ? 'primeira' : comparado === null || comparado === 0 ? 'igual' : comparado > 0 ? 'sobe' : 'desce',
-          ...(!vence && daNota.length > 0 && base ? { vale: formatarData(base.entradaEm) } : {}),
+          // O custo de referência é da rede; a data identifica uma nota de uma loja específica.
+          ...(!vence && daNota.length > 0 && base && pode(alcance, 'compras.ver', { lojaId: base.lojaId }) ? { vale: formatarData(base.entradaEm) } : {}),
         });
       }
       custos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -1264,7 +1265,7 @@ export async function opcoesDosFiltrosDeNota(cliente: ClienteDoParceiro, alcance
 }
 
 /** Detalhe da nota (nas lojas do alcance): itens com o custo de cada um, se ela é a que vale no custo de cada insumo, alterações. */
-export async function obterNota(cliente: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>, id: string) {
+export async function obterNota(cliente: ClienteDoParceiro, alcance: Alcance, id: string) {
   return cliente.transacao(async (tx) => {
     if (!ID.test(id)) return null;
     const n = await tx.notaEntrada.findFirst({
@@ -1322,9 +1323,9 @@ export async function obterNota(cliente: ClienteDoParceiro, alcance: Pick<Alcanc
           valorCentavos: i.valorTotalCentavos,
           freteRateadoCentavos: i.freteRateadoCentavos,
           custo: custoDaCompra([{ valorCentavos: i.valorTotalCentavos, freteRateadoCentavos: i.freteRateadoCentavos, quantidadeMilesimos: i.quantidadeMilesimos }]),
-          /** Esta nota é a que dá o custo do insumo agora? Se não, a data da que vale. */
+          /** Esta nota dá o custo agora? A data da que vale só aparece se a pessoa pode consultar sua loja. */
           valeNoCusto: vale?.notaId === n.id,
-          valeOutra: vale && vale.notaId !== n.id ? formatarData(vale.entradaEm) : null,
+          valeOutra: vale && vale.notaId !== n.id && pode(alcance, 'compras.ver', { lojaId: vale.lojaId }) ? formatarData(vale.entradaEm) : null,
         };
       }),
       historico,

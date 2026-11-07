@@ -65,7 +65,7 @@ export function PreviaDoImpacto({ previa: p }: { previa: PreviaDaNota }) {
                 <span className="col-span-2 tabular-nums text-suave">
                   {i.efeito === 'nao-muda' ? (
                     <>
-                      Fica {i.antes}: vale a nota de {i.vale}, mais nova que esta.
+                      Fica {i.antes}: {i.vale ? `vale a nota de ${i.vale}, mais nova que esta.` : 'vale uma compra mais recente.'}
                     </>
                   ) : (
                     <>
