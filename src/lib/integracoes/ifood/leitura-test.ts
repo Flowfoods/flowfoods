@@ -17,6 +17,7 @@
 
 import { lerIdDaLojaIfood, segredoCombinaComAmbiente } from '../core/campos';
 import type { ChamadaIfood, ResultadoIfood } from './http';
+import type { PrazoDeRetomada } from './respostas';
 
 export interface ClienteParaLeitura {
   chamar<T = unknown>(c: ChamadaIfood): Promise<ResultadoIfood<T>>;
@@ -114,6 +115,8 @@ export interface PassoDaLeitura {
   requestId: string | null;
   tentativas: number;
   frase?: string;
+  /** Prazo mínimo remoto, sem promessa de agendamento; preservado no arquivo de evidência. */
+  retomada?: PrazoDeRetomada;
   resposta?: unknown;
   resumo?: ResumoDaPagina;
 }
@@ -138,7 +141,7 @@ export function resumoDaPagina(dados: unknown): ResumoDaPagina | undefined {
 }
 
 const DICA_DO_403 =
-  '403 no Analytics: o token do app de teste não tem o módulo. Confira no Developer se o Analytics está marcado e salvo no app de teste; o token guardado foi descartado e a próxima execução pede outro. Se continuar, abra chamado com o exemplo oficial (request e response sem token).';
+  '403 no Analytics: o iFood recusou o acesso. Confira no Developer a autorização da loja e o módulo Analytics do app de teste. Não houve nova tentativa após a recusa. Se continuar, abra chamado com o exemplo oficial (request e response sem token).';
 
 export async function lerTest(o: { app: AppDaLeitura; cliente: ClienteParaLeitura; dia: string; loja?: string | null; agora: number }): Promise<LeituraTest> {
   const recusa = porQueOAppNaoServe(o.app);
@@ -177,6 +180,7 @@ export async function lerTest(o: { app: AppDaLeitura; cliente: ClienteParaLeitur
       if (resumo) p.resumo = resumo;
     } else {
       p.frase = r.frase;
+      if (r.classificacao.tipo === 'limite' && r.classificacao.prazo) p.retomada = r.classificacao.prazo;
     }
     leitura.passos.push(p);
     return p;

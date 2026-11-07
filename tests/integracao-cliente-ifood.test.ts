@@ -227,16 +227,17 @@ describe('INT-1.3 · as chamadas', () => {
 });
 
 describe('INT-1.3 · leitura das respostas', () => {
-  it('Retry-After em segundos ou data; teto de 5 min; backoff 1, 2, 4… até 30 s', () => {
+  it('Retry-After em segundos ou data preserva o prazo; backoff 1, 2, 4… até 30 s', () => {
     const agora = Date.UTC(2026, 9, 29, 12, 0, 0);
-    expect(lerRetryAfter('2', agora)).toBe(2000);
-    expect(lerRetryAfter(new Date(agora + 5000).toUTCString(), agora)).toBe(5000);
-    expect(lerRetryAfter('99999', agora)).toBe(300_000);
-    expect(lerRetryAfter('lixo', agora)).toBeNull();
+    const prazo = (ms: number) => ({ tipo: 'prazo', prazo: { esperarMs: ms, naoAntesDe: new Date(agora + ms).toISOString() } });
+    expect(lerRetryAfter('2', agora)).toEqual(prazo(2000));
+    expect(lerRetryAfter(new Date(agora + 5000).toUTCString(), agora)).toEqual(prazo(5000));
+    expect(lerRetryAfter('99999', agora)).toEqual(prazo(99_999_000));
+    expect(lerRetryAfter('lixo', agora)).toEqual({ tipo: 'sem-prazo' });
     // Só segundos inteiros ou data HTTP: "1.5" não vira data (antes virava espera zero).
-    expect(lerRetryAfter('1.5', agora)).toBeNull();
-    expect(lerRetryAfter('2026-10-29', agora)).toBeNull();
-    expect(lerRetryAfter('Thursday, 29-Oct-26 12:00:09 GMT', agora)).toBe(9000);
+    expect(lerRetryAfter('1.5', agora)).toEqual({ tipo: 'sem-prazo' });
+    expect(lerRetryAfter('2026-10-29', agora)).toEqual({ tipo: 'sem-prazo' });
+    expect(lerRetryAfter('Thursday, 29-Oct-26 12:00:09 GMT', agora)).toEqual(prazo(9000));
     expect([2, 3, 4, 5, 6, 7, 8].map((n) => esperaDoBackoff(n, () => 1))).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000]);
     expect(esperaDoBackoff(2, () => 0)).toBe(500);
     expect(classificar(204, {}, '', agora)).toEqual({ tipo: 'ok' });

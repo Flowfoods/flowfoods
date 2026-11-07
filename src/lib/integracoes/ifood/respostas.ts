@@ -2,13 +2,20 @@
  * Cliente iFood (INT-1.3, decisão 485) — o que cada resposta quer dizer, puro. Regras do iFood que viram código:
  *  - 401: token vencido ou recusado → um token novo e UMA nova tentativa; de novo 401, para (nunca uma tempestade de tokens);
  *  - 403: a loja não autorizou o app ou o módulo não está no app → NÃO repetir (consultar loja não autorizada é infração);
- *    quem chamou pausa o módulo;
+ *    esta classificação não altera o estado persistido do módulo;
  *  - 400/422: pedido inválido (também é infração) → não repetir; o montador da consulta tem de ser corrigido;
  *  - 404: não encontrado → não é zero nem "sem dado oficial";
- *  - 429: limite → esperar o Retry-After (ou o backoff) e repetir;
+ *  - 429: limite → preservar o Retry-After; só repetir se couber na espera local e no limite de tentativas;
  *  - 5xx, falha de rede e tempo esgotado: repetir com espera crescente, com limite;
  *  - 2xx com erro no corpo: erro de negócio, não sucesso.
  */
+
+/** Prazo mínimo informado pelo provedor, não um agendamento. Só valores representáveis em JSON e Date. */
+export type PrazoDeRetomada = { esperarMs: number; naoAntesDe: string };
+export type LeituraDeRetryAfter =
+  | { tipo: 'sem-prazo' }
+  | { tipo: 'prazo'; prazo: PrazoDeRetomada }
+  | { tipo: 'fora-da-faixa' };
 
 export type Classificacao =
   | { tipo: 'ok' }
@@ -16,7 +23,8 @@ export type Classificacao =
   | { tipo: 'sem-permissao' }
   | { tipo: 'requisicao-invalida' }
   | { tipo: 'nao-encontrado' }
-  | { tipo: 'limite'; esperarMs: number | null }
+  | { tipo: 'limite'; prazo: PrazoDeRetomada | null }
+  | { tipo: 'prazo-invalido' }
   | { tipo: 'indisponivel' }
   | { tipo: 'erro-no-corpo'; codigo: string | null }
   | { tipo: 'inesperado' }
@@ -24,17 +32,32 @@ export type Classificacao =
   | { tipo: 'bloqueada' };
 
 /**
- * Quantos ms o Retry-After pede, ou null se ausente/ilegível. Só os dois formatos do HTTP: segundos inteiros ou data HTTP (em
- * GMT). "1.5" ou texto solto não viram data (antes, viravam espera zero). Nunca negativo; teto de 5 minutos.
+ * Distingue ausência/sintaxe inválida de um prazo reconhecido que não cabe na representação. Só segundos inteiros ou data
+ * HTTP (GMT); "1.5" e texto solto não viram data. Nunca encurta o prazo para caber no timer ou na espera local do cliente.
  */
-export function lerRetryAfter(valor: string | null | undefined, agoraMs: number): number | null {
-  if (!valor) return null;
+export function lerRetryAfter(valor: string | null | undefined, agoraMs: number): LeituraDeRetryAfter {
+  if (!valor) return { tipo: 'sem-prazo' };
   const s = valor.trim();
-  if (/^\d+$/.test(s)) return Math.min(Number(s) * 1000, 300_000);
-  if (!/^[A-Za-z]{3,9},? .* GMT$|^[A-Za-z]{3} [A-Za-z]{3} +\d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/.test(s)) return null;
-  const data = Date.parse(s);
-  if (Number.isNaN(data)) return null;
-  return Math.min(Math.max(data - agoraMs, 0), 300_000);
+  let esperarMs: number;
+  if (/^\d+$/.test(s)) {
+    const segundos = Number(s);
+    if (!Number.isSafeInteger(segundos)) return { tipo: 'fora-da-faixa' };
+    esperarMs = segundos * 1000;
+  } else {
+    if (!/^[A-Za-z]{3,9},? .* GMT$|^[A-Za-z]{3} [A-Za-z]{3} +\d{1,2} \d{2}:\d{2}:\d{2} \d{4,}$/.test(s)) return { tipo: 'sem-prazo' };
+    // Date.parse devolve NaN tanto para texto inválido quanto para ano além do domínio de Date. O segundo não pode cair
+    // no backoff curto de um header ausente. Preserva os formatos HTTP antigos já aceitos (incluindo ano de dois dígitos).
+    const anoTexto = /[- ](\d+) \d{2}:\d{2}:\d{2} GMT$/.exec(s)?.[1] ?? / \d{2}:\d{2}:\d{2} (\d+)$/.exec(s)?.[1];
+    const ano = anoTexto === undefined ? null : Number(anoTexto);
+    if (ano !== null && (!Number.isSafeInteger(ano) || ano > 275_760)) return { tipo: 'fora-da-faixa' };
+    const data = Date.parse(s);
+    if (Number.isNaN(data)) return { tipo: ano === 275_760 ? 'fora-da-faixa' : 'sem-prazo' };
+    esperarMs = Math.max(data - agoraMs, 0);
+  }
+  const retomarEm = agoraMs + esperarMs;
+  if (!Number.isSafeInteger(agoraMs) || !Number.isSafeInteger(esperarMs) || !Number.isSafeInteger(retomarEm)
+    || Math.abs(agoraMs) > 8_640_000_000_000_000 || Math.abs(retomarEm) > 8_640_000_000_000_000) return { tipo: 'fora-da-faixa' };
+  return { tipo: 'prazo', prazo: { esperarMs, naoAntesDe: new Date(retomarEm).toISOString() } };
 }
 
 /** O corpo JSON traz um objeto `error` (formato de erro do iFood)? Devolve o código, se houver. */
@@ -61,7 +84,10 @@ export function classificar(status: number, cabecalhos: Readonly<Record<string, 
   if (status === 403) return { tipo: 'sem-permissao' };
   if (status === 400 || status === 422) return { tipo: 'requisicao-invalida' };
   if (status === 404) return { tipo: 'nao-encontrado' };
-  if (status === 429) return { tipo: 'limite', esperarMs: lerRetryAfter(cabecalhos['retry-after'], agoraMs) };
+  if (status === 429) {
+    const lido = lerRetryAfter(cabecalhos['retry-after'], agoraMs);
+    return lido.tipo === 'fora-da-faixa' ? { tipo: 'prazo-invalido' } : { tipo: 'limite', prazo: lido.tipo === 'prazo' ? lido.prazo : null };
+  }
   if (status >= 500 && status < 600) return { tipo: 'indisponivel' };
   return { tipo: 'inesperado' };
 }
@@ -81,11 +107,12 @@ export function esperaDoBackoff(tentativa: number, aleatorio: () => number = Mat
 export const FRASE_DA_CLASSIFICACAO: Record<Classificacao['tipo'], string> = {
   ok: 'Leitura feita.',
   'nao-autenticado': 'O iFood recusou a autenticação do app (credencial ou token). Confira o segredo no cofre.',
-  'sem-permissao': 'O iFood negou acesso: a loja não autorizou o app ou o módulo não está liberado nele. O módulo foi pausado.',
+  'sem-permissao': 'O iFood negou acesso. Confira a autorização da loja e os módulos liberados para o app. Não houve nova tentativa após a recusa.',
   'requisicao-invalida': 'O iFood recusou o pedido como inválido. Nada foi repetido; o pedido precisa ser corrigido.',
   'nao-encontrado': 'O iFood não encontrou o que foi pedido. Isso não é zero.',
-  limite: 'Limite de chamadas do iFood atingido; a leitura espera e tenta de novo.',
-  indisponivel: 'O iFood não respondeu como devia (fora do ar ou lento); a leitura tenta de novo mais tarde.',
+  limite: 'Limite de chamadas do iFood atingido. Esta leitura terminou; nenhuma nova tentativa foi agendada.',
+  'prazo-invalido': 'O iFood informou um prazo de retomada fora da faixa representável. Esta chamada terminou sem nova tentativa; confira a resposta antes de tentar novamente.',
+  indisponivel: 'O iFood não respondeu como devia (fora do ar ou lento). Esta leitura terminou; nenhuma nova tentativa foi agendada.',
   'erro-no-corpo': 'O iFood respondeu com erro no conteúdo. A leitura não foi aceita.',
   inesperado: 'Resposta inesperada do iFood. A leitura não foi aceita.',
   bloqueada: 'Chamada não enviada: a integração está desligada ou o app de produção ainda não foi homologado.',

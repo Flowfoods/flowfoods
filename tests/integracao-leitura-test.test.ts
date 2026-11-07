@@ -115,7 +115,8 @@ describe('INT-1.4 · a leitura TEST', () => {
     const l = await lerTest({ app: APP, cliente: m.cliente, dia: '2026-10-28', agora: AGORA });
     expect(l.ok).toBe(false);
     expect(l.passos.map((p) => [p.nome, p.status])).toEqual([['lojas', 200], ['analytics-minimo', 403]]);
-    expect(l.conclusao).toMatch(/403 no Analytics: o token do app de teste não tem o módulo/);
+    expect(l.conclusao).toMatch(/403 no Analytics: o iFood recusou o acesso/);
+    expect(l.conclusao).not.toMatch(/pausad|token guardado foi descartado/);
     expect(m.apis()).toHaveLength(2);
   });
 
