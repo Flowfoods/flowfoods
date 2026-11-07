@@ -614,6 +614,10 @@ model ParceiroFlow {
   // INT-1.1: a Central de Integrações (conexões e módulos por conexão) e a liberação de módulos por parceiro.
   erpIntegracaoConexoes       IntegracaoConexao[]
   erpIntegracaoConexaoModulos IntegracaoConexaoModulo[]
+  erpIntegracaoExecucoes      IntegracaoExecucao[]
+  erpIntegracaoPayloads       IntegracaoPayload[]
+  erpIntegracaoSnapshots      IntegracaoSnapshot[]
+  erpKpisIfoodDia             KpiIfoodDia[]
   erpLiberacoesDeModulo       LiberacaoDeModulo[]
 
   // Acesso das pessoas (0.3): FORA do tenant, só por `src/lib/erp/credenciais.ts`
@@ -1331,15 +1335,15 @@ enum FichaTipo {
 
 // 3A: taxonomia própria e opcional da ficha; nomes únicos também entre arquivadas.
 model SecaoFicha {
-  id           String       @id @default(cuid())
+  id           String          @id @default(cuid())
   parceiroId   String
-  parceiro     ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  parceiro     ParceiroFlow    @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
   nome         String
   // O gatilho calcula a chave normalizada, inclusive para SQL direto.
-  nomeChave    String       @default("")
-  ativa        Boolean      @default(true)
-  criadoEm     DateTime     @default(now())
-  atualizadoEm DateTime     @updatedAt
+  nomeChave    String          @default("")
+  ativa        Boolean         @default(true)
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
   subsecoes    SubsecaoFicha[]
   fichas       FichaTecnica[]
 
@@ -1348,16 +1352,16 @@ model SecaoFicha {
 }
 
 model SubsecaoFicha {
-  id           String       @id @default(cuid())
+  id           String         @id @default(cuid())
   parceiroId   String
-  parceiro     ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  parceiro     ParceiroFlow   @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
   secaoId      String
-  secao        SecaoFicha   @relation(fields: [parceiroId, secaoId], references: [parceiroId, id], onDelete: Restrict, onUpdate: Restrict)
+  secao        SecaoFicha     @relation(fields: [parceiroId, secaoId], references: [parceiroId, id], onDelete: Restrict, onUpdate: Restrict)
   nome         String
-  nomeChave    String       @default("")
-  ativa        Boolean      @default(true)
-  criadoEm     DateTime     @default(now())
-  atualizadoEm DateTime     @updatedAt
+  nomeChave    String         @default("")
+  ativa        Boolean        @default(true)
+  criadoEm     DateTime       @default(now())
+  atualizadoEm DateTime       @updatedAt
   fichas       FichaTecnica[]
 
   @@unique([parceiroId, id])
@@ -1366,16 +1370,16 @@ model SubsecaoFicha {
 }
 
 model FichaTecnica {
-  id                     String       @id @default(cuid())
+  id                     String         @id @default(cuid())
   parceiroId             String
-  parceiro               ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  parceiro               ParceiroFlow   @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
   nome                   String
   // 3C: identidade durável da criação moderna, vinculada à pessoa no servidor.
   chaveEnvio             String?
   hashEnvio              String?
   tipo                   FichaTipo
   secaoId                String?
-  secao                  SecaoFicha? @relation(fields: [parceiroId, secaoId], references: [parceiroId, id], onDelete: Restrict, onUpdate: Restrict)
+  secao                  SecaoFicha?    @relation(fields: [parceiroId, secaoId], references: [parceiroId, id], onDelete: Restrict, onUpdate: Restrict)
   subsecaoId             String?
   subsecao               SubsecaoFicha? @relation(fields: [parceiroId, secaoId, subsecaoId], references: [parceiroId, secaoId, id], onDelete: Restrict, onUpdate: Restrict)
   // Quanto a receita rende, na unidade de rendimento (PRATO: 1 un = 1000).
@@ -1383,14 +1387,14 @@ model FichaTecnica {
   unidadeRendimento      UnidadeBase
   // PRE_PREPARO que vai para o estoque: o insumo que ele produz (1:1).
   insumoProduzidoId      String?
-  insumoProduzido        Insumo?      @relation("FichaProduzInsumo", fields: [parceiroId, insumoProduzidoId], references: [parceiroId, id], onDelete: Restrict)
+  insumoProduzido        Insumo?        @relation("FichaProduzInsumo", fields: [parceiroId, insumoProduzidoId], references: [parceiroId, id], onDelete: Restrict)
   modoPreparo            String?
   // N.4: o preparo em etapas numeradas (a ordem é a da lista). O texto antigo acima fica guardado como "texto anterior".
-  passosPreparo          String[]     @default([])
-  ativa                  Boolean      @default(true)
-  origem                 OrigemDado   @default(MANUAL)
-  criadoEm               DateTime     @default(now())
-  atualizadoEm           DateTime     @updatedAt
+  passosPreparo          String[]       @default([])
+  ativa                  Boolean        @default(true)
+  origem                 OrigemDado     @default(MANUAL)
+  criadoEm               DateTime       @default(now())
+  atualizadoEm           DateTime       @updatedAt
   // 1.2: o que é, numa olhada (até 280), e a foto. Da foto, só o nome do
   // arquivo (32 hex aleatórios + extensão; CHECK no banco), o tipo conferido
   // pelos bytes e o tamanho. O arquivo mora em
@@ -1401,7 +1405,7 @@ model FichaTecnica {
   fotoBytes              Int?
   // F4: fotos de apoio, na ordem: [{ arquivo, mime, bytes, legenda }], até 8 (CHECK). A principal continua em
   // fotoArquivo; trocar a principal passa a antiga para cá (nada é apagado por efeito colateral).
-  fotosApoio             Json         @default("[]")
+  fotosApoio             Json           @default("[]")
   // 1.4: validade por conservação, o mesmo modelo do Insumo. `conservacao` é a
   // principal (null = validade não informada); cada coluna é a validade em
   // MINUTOS naquela conservação, null = o item não fica nela. CHECKs no banco:
@@ -1413,7 +1417,7 @@ model FichaTecnica {
   validadeCongeladoMin   Int?
   // F4: sai da cozinha para o cliente sem ser guardado. Não é conservação nem prazo; só convive com a validade não
   // informada (CHECK no banco).
-  consumoImediato        Boolean      @default(false)
+  consumoImediato        Boolean        @default(false)
 
   itens          FichaItem[]         @relation("FichaItens")
   usadaComoSub   FichaItem[]         @relation("FichaSubficha")
@@ -3034,9 +3038,126 @@ model IntegracaoConexaoModulo {
   criadoPorNome  String
   atualizadoEm   DateTime                   @updatedAt
 
+  execucoes IntegracaoExecucao[]
+
   @@unique([parceiroId, id])
   @@unique([parceiroId, conexaoId, modulo])
   @@index([parceiroId, appId])
+}
+
+// INT-1.6: controle global do serviço, sem segredo nem relação navegável para tenant.
+// A chave de ambiente é teto; a pausa persistida não exige redeploy.
+model IntegracaoControle {
+  id               String    @id
+  pausada          Boolean   @default(false)
+  donoAtual        String?
+  proximaChamadaEm DateTime? @db.Timestamptz(3)
+  bloqueadaAte     DateTime? @db.Timestamptz(3)
+  atualizadoEm     DateTime  @updatedAt @db.Timestamptz(3)
+}
+
+// D-1 e revisão do mesmo dia disputam a MESMA janela. Geração distingue cada tentativa.
+model IntegracaoExecucao {
+  id                 String                  @id @default(cuid())
+  parceiroId         String
+  parceiro           ParceiroFlow            @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  moduloId           String
+  modulo             IntegracaoConexaoModulo @relation(fields: [parceiroId, moduloId], references: [parceiroId, id], onDelete: Restrict)
+  dia                DateTime                @db.Date
+  perfil             String                  @default("diario")
+  tipo               String
+  ciclo              String
+  prioridade         Int
+  estado             String                  @default("PLANEJADA")
+  fuso               String                  @default("America/Sao_Paulo")
+  unidade            String                  @default("REAL")
+  geracao            Int                     @default(0)
+  dono               String?
+  leaseAte           DateTime?               @db.Timestamptz(3)
+  naoAntesDe         DateTime                @default(now()) @db.Timestamptz(3)
+  iniciadaEm         DateTime?               @db.Timestamptz(3)
+  concluidaEm        DateTime?               @db.Timestamptz(3)
+  ultimaPublicacaoEm DateTime?               @db.Timestamptz(3)
+  ultimoHash         String?
+  ultimoErro         String?
+  ultimoHttp         Int?
+  ultimoRequestId    String?
+  criadoEm           DateTime                @default(now()) @db.Timestamptz(3)
+  atualizadoEm       DateTime                @updatedAt @db.Timestamptz(3)
+  payloads           IntegracaoPayload[]
+  snapshots          IntegracaoSnapshot[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, moduloId, dia, perfil])
+  @@index([parceiroId, estado, naoAntesDe, prioridade])
+}
+
+// Corpo UTF-8 original recebido do transporte, sem headers. Imutável por geração/página.
+model IntegracaoPayload {
+  id            String             @id @default(cuid())
+  parceiroId    String
+  parceiro      ParceiroFlow       @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  execucaoId    String
+  execucao      IntegracaoExecucao @relation(fields: [parceiroId, execucaoId], references: [parceiroId, id], onDelete: Restrict)
+  geracao       Int
+  pagina        Int
+  corpoOriginal String
+  sha256        String
+  resposta      Json
+  http          Int
+  requestId     String?
+  recebidoEm    DateTime           @default(now()) @db.Timestamptz(3)
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, execucaoId, geracao, pagina])
+}
+
+// Versão imutável, inclusive vazio oficial. PENDENTE_PERIODO não substitui o último PUBLICADO.
+model IntegracaoSnapshot {
+  id               String             @id @default(cuid())
+  parceiroId       String
+  parceiro         ParceiroFlow       @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  execucaoId       String
+  execucao         IntegracaoExecucao @relation(fields: [parceiroId, execucaoId], references: [parceiroId, id], onDelete: Restrict)
+  geracao          Int
+  situacao         String
+  vazioOficial     Boolean
+  hash             String
+  pedidos          BigInt
+  numeroGrupos     Int
+  transacaoCriacao BigInt             @default(dbgenerated("txid_current()"))
+  origem           String             @default("IFOOD_ANALYTICS_V1")
+  criadoEm         DateTime           @default(now()) @db.Timestamptz(3)
+  linhas           KpiIfoodDia[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, execucaoId, geracao])
+  @@index([parceiroId, execucaoId, situacao, geracao])
+}
+
+// Centavos inteiros de 64 bits limitados à faixa segura; null e negativos são preservados.
+// chaveGrupo = SHA-256 da tupla JSON das quatro dimensões, incluindo nulos.
+model KpiIfoodDia {
+  id                             String             @id @default(cuid())
+  parceiroId                     String
+  parceiro                       ParceiroFlow       @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  snapshotId                     String
+  snapshot                       IntegracaoSnapshot @relation(fields: [parceiroId, snapshotId], references: [parceiroId, id], onDelete: Restrict)
+  chaveGrupo                     String
+  orderStatus                    String?
+  salesChannel                   String?
+  deliveredBy                    String?
+  category                       String?
+  pedidos                        BigInt
+  gmv                            BigInt?
+  gmvWithoutDelivery             BigInt?
+  netDeliveryFee                 BigInt?
+  paymentTotalValue              BigInt?
+  benefitByTypePartnerTotalValue BigInt?
+  refundedTotalValue             BigInt?
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, snapshotId, chaveGrupo])
 }
 
 // Liberação de um módulo do ERP para um parceiro (decisão de Rodolfo de 25/10/2026: "cada módulo liberado individualmente").

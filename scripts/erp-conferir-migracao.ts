@@ -222,6 +222,157 @@ export async function conferirClassificacaoDeFichas(db: Pick<PrismaClient, '$que
   return pendencias;
 }
 
+export const TABELAS_DO_PIPELINE_INTEGRACAO = ['IntegracaoExecucao', 'IntegracaoPayload', 'IntegracaoSnapshot', 'KpiIfoodDia'] as const;
+export const CHECKS_DO_PIPELINE_INTEGRACAO = [
+  ['IntegracaoControle', 'IntegracaoControle_identidade'], ['IntegracaoControle', 'IntegracaoControle_dono_uuid'],
+  ['IntegracaoControle', 'IntegracaoControle_prazo_finito'],
+  ['IntegracaoExecucao', 'IntegracaoExecucao_estado'], ['IntegracaoExecucao', 'IntegracaoExecucao_perfil_tipo'],
+  ['IntegracaoExecucao', 'IntegracaoExecucao_lease'], ['IntegracaoExecucao', 'IntegracaoExecucao_faixas'],
+  ['IntegracaoPayload', 'IntegracaoPayload_corpo'], ['IntegracaoPayload', 'IntegracaoPayload_identidade'],
+  ['IntegracaoSnapshot', 'IntegracaoSnapshot_estado'], ['IntegracaoSnapshot', 'IntegracaoSnapshot_totais'],
+  ['KpiIfoodDia', 'KpiIfoodDia_grupo'], ['KpiIfoodDia', 'KpiIfoodDia_valores'],
+] as const;
+
+/** INT-1.6: somente catálogo; não depende de enxergar linhas de tenant sob FORCE RLS. */
+export async function conferirPipelineIntegracao(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
+  const pendencias: string[] = [];
+  const tabelas = [...TABELAS_DO_PIPELINE_INTEGRACAO, 'IntegracaoControle'];
+  const marcas = await db.$queryRaw<{ n: number; temPrisma: boolean }[]>`
+    SELECT (SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname=current_schema() AND c.relname=ANY(${tabelas}) AND c.relkind='r') AS n,
+      to_regclass('_prisma_migrations') IS NOT NULL AS "temPrisma"`;
+  let aplicada = (marcas[0]?.n ?? 0) > 0;
+  if (!aplicada && marcas[0]?.temPrisma) {
+    const r = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "_prisma_migrations" WHERE migration_name='20261123000000_erp_integracao_pipeline' AND rolled_back_at IS NULL`;
+    aplicada = (r[0]?.n ?? 0) > 0;
+  }
+  if (!aplicada) return pendencias;
+  const colunas = await db.$queryRaw<{ tabela: string; nome: string; tipo: string; precisao: number | null; nula: string; padrao: string | null }[]>`
+    SELECT table_name AS tabela,column_name AS nome,data_type AS tipo,datetime_precision AS precisao,is_nullable AS nula,column_default AS padrao FROM information_schema.columns
+    WHERE table_schema=current_schema() AND table_name=ANY(${tabelas})`;
+  const prazoGlobal = colunas.filter(c => c.tabela === 'IntegracaoControle' && c.nome === 'bloqueadaAte');
+  if (prazoGlobal.length !== 1 || prazoGlobal[0].tipo !== 'timestamp with time zone' || prazoGlobal[0].nula !== 'YES' || prazoGlobal[0].padrao !== null) pendencias.push('INT-1.6: IntegracaoControle.bloqueadaAte deve ser timestamptz nullable sem default.');
+  const instantes: [string, string[]][] = [
+    ['IntegracaoControle', ['proximaChamadaEm', 'bloqueadaAte', 'atualizadoEm']],
+    ['IntegracaoExecucao', ['leaseAte', 'naoAntesDe', 'iniciadaEm', 'concluidaEm', 'ultimaPublicacaoEm', 'criadoEm', 'atualizadoEm']],
+    ['IntegracaoPayload', ['recebidoEm']], ['IntegracaoSnapshot', ['criadoEm']],
+  ];
+  for (const [tabela, campos] of instantes) for (const nome of campos) {
+    if (!colunas.some(c => c.tabela === tabela && c.nome === nome && c.tipo === 'timestamp with time zone' && c.precisao === 3)) pendencias.push(`INT-1.6: ${tabela}.${nome} deve preservar o instante como timestamptz(3).`);
+  }
+  if (!colunas.some(c => c.tabela === 'IntegracaoExecucao' && c.nome === 'dia' && c.tipo === 'date')) pendencias.push('INT-1.6: IntegracaoExecucao.dia deve continuar como date civil.');
+  const meta = await db.$queryRaw<{ nome: string; rls: boolean; forcada: boolean; leitura: boolean; inclusao: boolean; atualizacao: boolean; proibidos: boolean }[]>`
+    SELECT c.relname AS nome,c.relrowsecurity AS rls,c.relforcerowsecurity AS forcada,
+      coalesce(has_table_privilege(r.oid,c.oid,'SELECT'),false) AS leitura,
+      coalesce(has_table_privilege(r.oid,c.oid,'INSERT'),false) AS inclusao,
+      coalesce(has_table_privilege(r.oid,c.oid,'UPDATE'),false) AS atualizacao,
+      coalesce(has_table_privilege(r.oid,c.oid,'DELETE') OR has_table_privilege(r.oid,c.oid,'TRUNCATE')
+        OR has_table_privilege(r.oid,c.oid,'REFERENCES') OR has_table_privilege(r.oid,c.oid,'TRIGGER'),false) AS proibidos
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_roles r ON r.rolname='erp_tenant'
+    WHERE n.nspname=current_schema() AND c.relname=ANY(${[...tabelas, 'Loja']}) AND c.relkind='r'`;
+  const policies = await db.$queryRaw<{ tabela: string; nome: string; comando: string; permissiva: boolean; papel: boolean; usando: string | null; gravando: string | null }[]>`
+    SELECT c.relname AS tabela,p.polname AS nome,p.polcmd::text AS comando,p.polpermissive AS permissiva,
+      p.polroles=ARRAY[(SELECT oid FROM pg_roles WHERE rolname='erp_tenant')] AS papel,
+      pg_get_expr(p.polqual,p.polrelid) AS usando,pg_get_expr(p.polwithcheck,p.polrelid) AS gravando
+    FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname=current_schema() AND c.relname=ANY(${tabelas})`;
+  const normalizar = (s: string | null) => (s ?? '').replace(/"([a-z_][a-z0-9_]*)"/g, '$1').replace(/::text|\s+|\(|\)/g, '').toLowerCase();
+  const regra = normalizar('"parceiroId" = NULLIF(current_setting(\'app.parceiro_id\'::text, true), \'\'::text)');
+  const rls = meta.find(t => t.nome === 'Loja')?.rls ?? false;
+  for (const tabela of tabelas) {
+    const t = meta.find(x => x.nome === tabela);
+    if (!t) { pendencias.push(`INT-1.6: tabela ${tabela} NÃO existe.`); continue; }
+    if (tabela === 'IntegracaoControle') {
+      if (t.leitura || t.inclusao || t.atualizacao || t.proibidos) pendencias.push('INT-1.6: IntegracaoControle deve permanecer global, sem privilégios de erp_tenant.');
+      continue;
+    }
+    if (t.proibidos || (tabela !== 'IntegracaoExecucao' && t.atualizacao)) pendencias.push(`INT-1.6: privilégios de alteração indevidos em ${tabela}.`);
+    if (rls || t.rls) {
+      if (!(t.rls && t.forcada && t.leitura && t.inclusao && (tabela !== 'IntegracaoExecucao' || t.atualizacao))) pendencias.push(`INT-1.6: ${tabela} precisa de RLS forçada e privilégios limitados ao seu contrato.`);
+      const ps = policies.filter(p => p.tabela === tabela);
+      if (ps.length !== 1 || !ps.some(p => p.nome === `${tabela}_do_parceiro` && p.comando === '*' && p.permissiva && p.papel && normalizar(p.usando) === regra && normalizar(p.gravando) === regra)) pendencias.push(`INT-1.6: policy ${tabela}_do_parceiro ausente ou incompatível com o tenant.`);
+    }
+  }
+  const constraints = await db.$queryRaw<{ tabela: string; nome: string; tipo: string; validado: boolean; destino: string | null; mesmoSchema: boolean; delete: string; update: string; de: string[]; para: string[] }[]>`
+    SELECT t.relname AS tabela,c.conname AS nome,c.contype::text AS tipo,c.convalidated AS validado,
+      ref.relname AS destino,ref.relnamespace=t.relnamespace AS "mesmoSchema",c.confdeltype::text AS delete,c.confupdtype::text AS update,
+      ARRAY(SELECT a.attname FROM unnest(c.conkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.num ORDER BY k.ord) AS de,
+      ARRAY(SELECT a.attname FROM unnest(c.confkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.num ORDER BY k.ord) AS para
+    FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace LEFT JOIN pg_class ref ON ref.oid=c.confrelid
+    WHERE n.nspname=current_schema() AND t.relname=ANY(${tabelas})`;
+  for (const [tabela, nome] of CHECKS_DO_PIPELINE_INTEGRACAO) {
+    if (!constraints.some(c => c.tabela === tabela && c.nome === nome && c.tipo === 'c' && c.validado)) pendencias.push(`INT-1.6: CHECK ${nome} ausente ou NOT VALID.`);
+  }
+  for (const tabela of tabelas) {
+    if (!constraints.some(c => c.tabela === tabela && c.tipo === 'p' && c.validado && JSON.stringify(c.de) === '["id"]')) pendencias.push(`INT-1.6: chave primária de ${tabela} ausente ou incompatível.`);
+  }
+  const fks: [string, string, string[], string[]][] = TABELAS_DO_PIPELINE_INTEGRACAO.map(t => [t, 'ParceiroFlow', ['parceiroId'], ['id']]);
+  fks.push(['IntegracaoExecucao', 'IntegracaoConexaoModulo', ['parceiroId', 'moduloId'], ['parceiroId', 'id']],
+    ['IntegracaoPayload', 'IntegracaoExecucao', ['parceiroId', 'execucaoId'], ['parceiroId', 'id']],
+    ['IntegracaoSnapshot', 'IntegracaoExecucao', ['parceiroId', 'execucaoId'], ['parceiroId', 'id']],
+    ['KpiIfoodDia', 'IntegracaoSnapshot', ['parceiroId', 'snapshotId'], ['parceiroId', 'id']]);
+  for (const [tabela, destino, de, para] of fks) {
+    const nome = `${tabela}_${de.join('_')}_fkey`;
+    if (!constraints.some(c => c.tabela === tabela && c.nome === nome && c.tipo === 'f' && c.validado && c.destino === destino && c.mesmoSchema && c.delete === 'r' && c.update === 'c' && JSON.stringify(c.de) === JSON.stringify(de) && JSON.stringify(c.para) === JSON.stringify(para))) pendencias.push(`INT-1.6: FK ${nome} ausente ou com composição/RESTRICT incorretos.`);
+  }
+  const indices = await db.$queryRaw<{ tabela: string; nome: string; valido: boolean; pronto: boolean; unico: boolean; nulosIguais: boolean; parcial: boolean; expressao: boolean; colunas: string[] }[]>`
+    SELECT t.relname AS tabela,c.relname AS nome,i.indisvalid AS valido,i.indisready AS pronto,i.indisunique AS unico,i.indnullsnotdistinct AS "nulosIguais",
+      i.indpred IS NOT NULL AS parcial,i.indexprs IS NOT NULL AS expressao,
+      ARRAY(SELECT a.attname FROM unnest(i.indkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.num ORDER BY k.ord) AS colunas
+    FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid JOIN pg_class t ON t.oid=i.indrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+    WHERE n.nspname=current_schema() AND t.relname=ANY(${tabelas})`;
+  const esperados: [string, string[], boolean][] = TABELAS_DO_PIPELINE_INTEGRACAO.map(t => [t, ['parceiroId', 'id'], true]);
+  esperados.push(['IntegracaoExecucao', ['parceiroId', 'moduloId', 'dia', 'perfil'], true],
+    ['IntegracaoExecucao', ['parceiroId', 'estado', 'naoAntesDe', 'prioridade'], false],
+    ['IntegracaoPayload', ['parceiroId', 'execucaoId', 'geracao', 'pagina'], true],
+    ['IntegracaoSnapshot', ['parceiroId', 'execucaoId', 'geracao'], true],
+    ['IntegracaoSnapshot', ['parceiroId', 'execucaoId', 'situacao', 'geracao'], false],
+    ['KpiIfoodDia', ['parceiroId', 'snapshotId', 'chaveGrupo'], true]);
+  for (const [tabela, colunas, unico] of esperados) {
+    const nome = `${tabela}_${colunas.join('_')}_${unico ? 'key' : 'idx'}`;
+    if (!indices.some(i => i.nome === nome && i.tabela === tabela && i.valido && i.pronto && i.unico === unico && !i.parcial && !i.expressao && JSON.stringify(i.colunas) === JSON.stringify(colunas))) pendencias.push(`INT-1.6: índice ${nome} ausente ou incompatível.`);
+  }
+  if (!indices.some(i => i.nome === 'KpiIfoodDia_grao_semantico_key' && i.tabela === 'KpiIfoodDia' && i.valido && i.pronto && i.unico && i.nulosIguais && !i.parcial && !i.expressao && JSON.stringify(i.colunas) === '["parceiroId","snapshotId","orderStatus","salesChannel","deliveredBy","category"]')) pendencias.push('INT-1.6: índice KpiIfoodDia_grao_semantico_key sem o grão completo e NULLS NOT DISTINCT.');
+  const gatilhos = await db.$queryRaw<{ tabela: string; nome: string; funcao: string; mesmoSchema: boolean; ligado: string; tipo: number; adiavel: boolean; adiado: boolean }[]>`
+    SELECT c.relname AS tabela,t.tgname AS nome,p.proname AS funcao,p.pronamespace=c.relnamespace AS "mesmoSchema",t.tgenabled::text AS ligado,
+      t.tgtype::int AS tipo,t.tgdeferrable AS adiavel,t.tginitdeferred AS adiado
+    FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid
+    WHERE n.nspname=current_schema() AND NOT t.tgisinternal AND c.relname=ANY(${tabelas})`;
+  const triggers: [string, string, string, number, boolean][] = TABELAS_DO_PIPELINE_INTEGRACAO.map(t => [t, `${t}_parceiro_imutavel`, 'erp_parceiro_imutavel', 19, false]);
+  triggers.push(['IntegracaoExecucao', 'IntegracaoExecucao_identidade_imutavel', 'erp_integracao_execucao_imutavel', 19, false],
+    ['IntegracaoPayload', 'IntegracaoPayload_confere', 'erp_integracao_payload_confere', 7, false],
+    ['IntegracaoSnapshot', 'IntegracaoSnapshot_confere', 'erp_integracao_snapshot_confere', 7, false],
+    ['KpiIfoodDia', 'KpiIfoodDia_confere', 'erp_integracao_kpi_confere', 7, false],
+    ['IntegracaoSnapshot', 'IntegracaoSnapshot_completude', 'erp_integracao_snapshot_totais', 5, true]);
+  for (const t of ['IntegracaoPayload', 'IntegracaoSnapshot', 'KpiIfoodDia']) {
+    triggers.push([t, `${t}_imutavel`, 'erp_integracao_so_inclusao', 27, false], [t, `${t}_sem_truncate`, 'erp_integracao_so_inclusao', 34, false]);
+  }
+  for (const [tabela, nome, funcao, tipo, adiado] of triggers) {
+    if (!gatilhos.some(t => t.tabela === tabela && t.nome === nome && t.funcao === funcao && t.mesmoSchema && ['O', 'A'].includes(t.ligado) && t.tipo === tipo && t.adiavel === adiado && t.adiado === adiado)) pendencias.push(`INT-1.6: gatilho ${nome} ausente, desligado ou com função/eventos/adiamento incorretos.`);
+  }
+  const nomesFuncoes = ['erp_integracao_posse_viva', 'erp_integracao_exigir_acesso', 'erp_integracao_fence', 'erp_integracao_adiar', 'erp_integracao_execucao_imutavel', 'erp_integracao_so_inclusao', 'erp_integracao_payload_confere', 'erp_integracao_snapshot_confere', 'erp_integracao_kpi_confere', 'erp_integracao_snapshot_totais'];
+  const funcoes = await db.$queryRaw<{ nome: string; argumentos: string; retorno: string; definer: boolean; padroes: number; config: string[] | null; caminho: string; publica: boolean; tenant: boolean }[]>`
+    SELECT p.proname AS nome,oidvectortypes(p.proargtypes) AS argumentos,format_type(p.prorettype,NULL) AS retorno,p.prosecdef AS definer,p.pronargdefaults::int AS padroes,
+      p.proconfig AS config,format('search_path=%I, pg_temp',n.nspname) AS caminho,
+      EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0 AND a.privilege_type='EXECUTE') AS publica,
+      coalesce(has_function_privilege(r.oid,p.oid,'EXECUTE'),false) AS tenant
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace LEFT JOIN pg_roles r ON r.rolname='erp_tenant'
+    WHERE n.nspname=current_schema() AND p.proname=ANY(${nomesFuncoes})`;
+  const papel = await db.$queryRaw<{ existe: boolean }[]>`SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='erp_tenant') AS existe`;
+  for (const nome of nomesFuncoes) {
+    const acesso = nome === 'erp_integracao_exigir_acesso';
+    const fence = nome === 'erp_integracao_fence';
+    const posse = nome === 'erp_integracao_posse_viva';
+    const adiar = nome === 'erp_integracao_adiar';
+    const argumentos = acesso ? 'text, text, text, boolean' : fence ? 'text, text, integer, text' : posse ? 'text' : adiar ? 'text, text, integer, text, timestamp with time zone, boolean' : '';
+    const fs = funcoes.filter(f => f.nome === nome);
+    const f = fs[0];
+    const definer = !['erp_integracao_execucao_imutavel', 'erp_integracao_so_inclusao'].includes(nome);
+    if (fs.length !== 1 || !f || f.argumentos !== argumentos || f.retorno !== (acesso || fence || posse || adiar ? 'boolean' : 'trigger') || f.definer !== definer || f.padroes !== (acesso ? 2 : 0) || !f.config?.includes(f.caminho) || f.publica || f.tenant !== (!!papel[0]?.existe && (acesso || fence || adiar))) pendencias.push(`INT-1.6: função ${nome} com assinatura, segurança, search_path ou EXECUTE incorretos.`);
+  }
+  return pendencias;
+}
+
 /** Os CHECKs que a 2.2a acrescentou em tabelas que já existiam (a tabela nova tem os dela de nascença). */
 export const CHECKS_DA_2_2A = [
   ['DreLinha', 'DreLinha_nome_curto'],
@@ -941,6 +1092,7 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
   pendencias.push(...await conferirClassificacaoDeFichas(db));
   pendencias.push(...await conferirFaixasDeCmv(db));
   pendencias.push(...await conferirEnvioDaFicha(db));
+  pendencias.push(...await conferirPipelineIntegracao(db));
   return pendencias;
 }
 

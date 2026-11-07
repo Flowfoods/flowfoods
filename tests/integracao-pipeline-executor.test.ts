@@ -1,0 +1,173 @@
+/** Executor real + cliente HTTP real; somente repositório e transporte em memória, nenhum banco/rede. */
+import { describe, expect, it, vi } from 'vitest';
+import { armazemEmMemoria, ServicoDeToken, type AppParaToken } from '@/lib/integracoes/ifood/auth';
+import { METRICAS_DIARIAS } from '@/lib/integracoes/ifood/analytics';
+import { executarTarefaAnalytics, type RepositorioDoExecutorAnalytics } from '@/lib/integracoes/ifood/pipeline-executor';
+import { ErroPipelineAnalytics, LIMITE_BYTES_JANELA, type TarefaAnalytics } from '@/lib/integracoes/ifood/pipeline-tipos';
+import { Limitador } from '@/lib/integracoes/ifood/limitador';
+import { FalhaDeRede, type PedidoHttp, type RespostaHttp } from '@/lib/integracoes/ifood/transporte';
+
+const AGORA = Date.parse('2026-11-07T12:00:00.000Z');
+const ENV = { INTEGRACAO_IFOOD_ATIVA: 'true', INTEGRACAO_CHAVE_CIFRAGEM: 'b'.repeat(64), IFOOD_TEST_CLIENT_SECRET: 'segredo-ficticio-executor' };
+const APP: AppParaToken = { id: 'app-local', clientId: 'cliente-local', ambiente: 'TEST', nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET', homologacao: 'NAO_SE_APLICA' };
+const tarefa = (): TarefaAnalytics => ({
+  id: 'job-local', parceiroId: 'parceiro-homologacao', moduloId: 'modulo-local', appId: APP.id, lojaId: 'loja-local',
+  geracao: 1, dono: 'posse-local', perfil: 'diario', tipo: 'D1',
+  identidade: { ambiente: 'TEST', merchantId: '11111111-2222-4333-8444-555555555555', dia: '2026-11-06', perfil: 'diario' },
+  fuso: 'America/Sao_Paulo', unidade: { moeda: 'BRL', unidade: 'REAL' },
+});
+const grupo = (id: string) => ({
+  groupByKey: { value: { orderStatus: id, salesChannel: 'NOVO', deliveredBy: null, category: null }, count: 7 },
+  ...Object.fromEntries(METRICAS_DIARIAS.map(nome => [nome, { sum: 1.99 }])),
+});
+function pagina(n = 1, total = 1, id = `grupo-${n}`, size = 1) {
+  return { data: total === 0 ? [] : [grupo(id)], currentPage: n, size, totalItems: total, totalPages: total === 0 ? 0 : Math.ceil(total / size) };
+}
+const json = (dados: unknown, status = 200, cabecalhos: Record<string, string> = {}): RespostaHttp => ({ status, cabecalhos: { 'x-request-id': 'id-sintetico', ...cabecalhos }, corpo: JSON.stringify(dados) });
+function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())]) {
+  const eventos: string[] = [], pedidos: PedidoHttp[] = [], sonos: number[] = [];
+  const repositorio: RepositorioDoExecutorAnalytics = {
+    renovar: vi.fn(async () => { eventos.push('renovar'); }),
+    salvarPagina: vi.fn(async (_t, p) => { eventos.push(`pagina:${p.pagina}`); }),
+    publicar: vi.fn(async () => { eventos.push('publicar'); return 'publicada' as const; }),
+    verificarAcesso: vi.fn(async () => { eventos.push('acesso'); }),
+    falhar: vi.fn(async () => { eventos.push('falhar'); }),
+  };
+  const transporte = vi.fn(async (p: PedidoHttp): Promise<RespostaHttp> => {
+    if (p.url.endsWith('/oauth/token')) return json({ accessToken: 'token-ficticio-executor', expiresIn: 3600 });
+    pedidos.push(p); eventos.push('http');
+    const r = roteiro.shift();
+    if (!r) throw new Error('Nenhuma chamada adicional autorizada no transporte de teste.');
+    if (r instanceof Error) throw r;
+    return r;
+  });
+  const dormir = async (ms: number) => { sonos.push(ms); };
+  const limitador = new Limitador(() => AGORA, dormir);
+  const tokens = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte, limitador, env: ENV, relogio: () => AGORA });
+  const http = { app: APP, tokens, limitador, transporte, env: ENV, relogio: () => AGORA, dormir, maxTentativas: 6, esperaMaximaMs: 999_999 };
+  return { repositorio, http, eventos, pedidos, sonos, transporte };
+}
+
+describe('executor Analytics: cobertura e recibos', () => {
+  it('guarda bytes originais em ordem e só publica depois da última página; identidade TEST não é convertida', async () => {
+    const original = `  ${JSON.stringify(pagina(1, 2))}\n`;
+    const m = montar([{ ...json(null), corpo: original }, json(pagina(2, 2))]);
+    const t = tarefa();
+    expect(await executarTarefaAnalytics(t, m)).toEqual({ estado: 'publicada', paginas: 2 });
+    expect(m.eventos).toEqual(['renovar', 'renovar', 'http', 'pagina:1', 'renovar', 'renovar', 'http', 'pagina:2', 'publicar']);
+    expect(m.repositorio.salvarPagina).toHaveBeenNthCalledWith(1, t, { pagina: 1, corpoOriginal: original, http: 200, requestId: 'id-sintetico' });
+    expect(m.repositorio.publicar).toHaveBeenCalledExactlyOnceWith(t);
+    expect(t.identidade.ambiente).toBe('TEST'); expect(m.sonos).toEqual([]);
+    expect(m.pedidos.map(p => JSON.parse(p.corpo!).page)).toEqual([1, 2]);
+    expect(m.pedidos.every(p => p.metodo === 'POST' && p.cabecalhos['x-request-homologation'] === 'true')).toBe(true);
+  });
+
+  it('vazio oficial é publicado; vazio truncado é falha, nunca receita zero', async () => {
+    const m = montar([json(pagina(1, 0))]);
+    vi.mocked(m.repositorio.publicar).mockResolvedValue('vazia');
+    expect(await executarTarefaAnalytics(tarefa(), m)).toEqual({ estado: 'vazia', paginas: 1 });
+    const ruim = montar([json({ ...pagina(1, 2), data: [] })]);
+    expect(await executarTarefaAnalytics(tarefa(), ruim)).toEqual({ estado: 'falhou', paginas: 1 });
+    expect(ruim.repositorio.publicar).not.toHaveBeenCalled(); expect(ruim.repositorio.salvarPagina).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['página diferente', pagina(3, 3)],
+    ['totais mudaram', pagina(2, 3)],
+    ['grupo repetido', pagina(2, 2, 'grupo-1')],
+    ['faltou métrica', { ...pagina(2, 2), data: [{ groupByKey: grupo('novo').groupByKey }] }],
+    ['tamanho mudou', { ...pagina(2, 2), size: 2 }],
+  ])('recusa %s após prefixo válido e não publica', async (_nome, segunda) => {
+    const m = montar([json(pagina(1, 2)), json(segunda)]);
+    expect(await executarTarefaAnalytics(tarefa(), m)).toEqual({ estado: 'falhou', paginas: 2 });
+    expect(m.repositorio.salvarPagina).toHaveBeenCalledTimes(2); expect(m.repositorio.publicar).not.toHaveBeenCalled();
+    expect(m.repositorio.falhar).toHaveBeenCalledWith(expect.anything(), { codigo: 'contrato', http: 200, requestId: 'id-sintetico' });
+  });
+
+  it('recibo incompatível fica preservado; grupo/tamanho fora do teto não publica nem pede próxima página', async () => {
+    for (const resposta of [{ ...pagina(), totalItems: 50_001 }, { ...pagina(), size: 501 }]) {
+      const m = montar([json(resposta)]);
+      expect((await executarTarefaAnalytics(tarefa(), m)).estado).toBe('falhou');
+      expect(m.repositorio.salvarPagina).toHaveBeenCalledOnce(); expect(m.pedidos).toHaveLength(1);
+    }
+  });
+
+  it('teto de bytes é cumulativo em UTF-8, sem truncar nem publicar prefixo', async () => {
+    const grande = (n: number) => json({ ...pagina(n, 18), extensao: 'ç'.repeat(Math.floor(LIMITE_BYTES_JANELA / 34) - 1000) });
+    const m = montar(Array.from({ length: 18 }, (_, i) => grande(i + 1)));
+    expect(await executarTarefaAnalytics(tarefa(), m)).toEqual({ estado: 'falhou', paginas: 17 });
+    expect(m.repositorio.falhar).toHaveBeenCalledWith(expect.anything(), { codigo: 'limite-local', http: 200, requestId: 'id-sintetico' });
+    expect(m.repositorio.publicar).not.toHaveBeenCalled();
+  });
+
+  it('corpo acima de 2 MiB não é persistido, truncado nem publicado', async () => {
+    const m = montar([json({ ...pagina(), extensao: 'ç'.repeat(1024 * 1024) })]);
+    expect(await executarTarefaAnalytics(tarefa(), m)).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(m.repositorio.salvarPagina).not.toHaveBeenCalled(); expect(m.repositorio.publicar).not.toHaveBeenCalled();
+    expect(m.repositorio.falhar).toHaveBeenCalledWith(expect.anything(), { codigo: 'limite-local', http: 200, requestId: 'id-sintetico' });
+  });
+
+  it.each(['sem-mudanca', 'pendente-periodo'] as const)('preserva decisão atômica %s do repositório', async estado => {
+    const m = montar(); vi.mocked(m.repositorio.publicar).mockResolvedValue(estado);
+    expect(await executarTarefaAnalytics(tarefa(), m)).toEqual({ estado, paginas: 1 });
+  });
+});
+
+describe('executor Analytics: recusa e retomada duráveis', () => {
+  it.each([
+    [json({}, 403), { codigo: 'sem-permissao', http: 403, requestId: 'id-sintetico' }],
+    [json({}, 429, { 'retry-after': '600' }), { codigo: 'limite', http: 429, requestId: 'id-sintetico', naoAntesDe: '2026-11-07T12:10:00.000Z' }],
+    [json({}, 503), { codigo: 'indisponivel', http: 503, requestId: 'id-sintetico' }],
+    [new FalhaDeRede('rede'), { codigo: 'indisponivel', http: null, requestId: null }],
+    [json({ error: { code: 'erro-sintetico' } }), { codigo: 'erro-no-corpo', http: 200, requestId: 'id-sintetico' }],
+  ])('persiste a falha uma vez antes de retornar; sem repetição/sono %#', async (resposta, falha) => {
+    const m = montar([resposta as RespostaHttp | Error]);
+    expect(await executarTarefaAnalytics(tarefa(), m)).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(m.repositorio.falhar).toHaveBeenCalledExactlyOnceWith(expect.anything(), falha);
+    expect(m.pedidos).toHaveLength(1); expect(m.sonos).toEqual([]);
+    expect(m.repositorio.publicar).not.toHaveBeenCalled(); expect(m.repositorio.salvarPagina).not.toHaveBeenCalled();
+  });
+
+  it('perda de posse durante token/espera recusa a emissão, sem suposta persistência', async () => {
+    const m = montar(), erro = new ErroPipelineAnalytics('POSSE', 'perdida');
+    vi.mocked(m.repositorio.renovar).mockResolvedValueOnce().mockRejectedValueOnce(erro);
+    await expect(executarTarefaAnalytics(tarefa(), m)).rejects.toBe(erro);
+    expect(m.pedidos).toEqual([]); expect(m.repositorio.falhar).not.toHaveBeenCalled();
+  });
+
+  it('401 conserva uma renovação canônica e verifica acesso de novo antes da segunda emissão', async () => {
+    const m = montar([json({}, 401), json(pagina())]);
+    expect((await executarTarefaAnalytics(tarefa(), m)).estado).toBe('publicada');
+    expect(m.pedidos).toHaveLength(2);
+    expect(m.eventos).toEqual(['renovar', 'renovar', 'http', 'renovar', 'http', 'pagina:1', 'publicar']);
+  });
+
+  it('não declara falha gravada se falhar() perde posse nem sucesso se publicação falha', async () => {
+    const erro = new ErroPipelineAnalytics('POSSE', 'perdida');
+    const m = montar([json({}, 403)]); vi.mocked(m.repositorio.falhar).mockRejectedValue(erro);
+    await expect(executarTarefaAnalytics(tarefa(), m)).rejects.toBe(erro);
+    expect(m.repositorio.falhar).toHaveBeenCalledTimes(1);
+    const outro = montar(); vi.mocked(outro.repositorio.publicar).mockRejectedValue(erro);
+    await expect(executarTarefaAnalytics(tarefa(), outro)).rejects.toBe(erro);
+    expect(outro.repositorio.falhar).not.toHaveBeenCalled();
+  });
+
+  it('identidade de outro app é recusada antes de token ou rede', async () => {
+    const m = montar(), t = tarefa(); t.appId = 'outro-app';
+    expect((await executarTarefaAnalytics(t, m)).estado).toBe('falhou'); expect(m.transporte).not.toHaveBeenCalled();
+  });
+});
+
+describe('acesso não equivale a snapshot diário', () => {
+  const acesso = () => { const t = tarefa(); t.perfil = 'acesso'; t.tipo = 'ACESSO'; t.identidade.perfil = 'homologacao'; return t; };
+  it('aceita objeto de terms sem groupBy, registra uma evidência e nunca publica', async () => {
+    const m = montar([json({ terms: { orderStatus: [{ value: 'NOVO', count: 7 }] }, gmv: { sum: 123 } })]);
+    expect(await executarTarefaAnalytics(acesso(), m)).toEqual({ estado: 'acesso-verificado', paginas: 1 });
+    expect(m.repositorio.verificarAcesso).toHaveBeenCalledOnce(); expect(m.repositorio.publicar).not.toHaveBeenCalled();
+    expect(JSON.parse(m.pedidos[0].corpo!).agg).toEqual({ metrics: { gmv: ['sum'] }, terms: { orderStatus: ['count'] } });
+  });
+  it.each([json(null), json([]), json({}, 204), json({ error: true })])('resposta de acesso inválida não confirma nem publica %#', async r => {
+    const m = montar([r]); expect((await executarTarefaAnalytics(acesso(), m)).estado).toBe('falhou');
+    expect(m.repositorio.verificarAcesso).not.toHaveBeenCalled(); expect(m.repositorio.publicar).not.toHaveBeenCalled();
+  });
+});

@@ -28,10 +28,12 @@ export interface ChamadaIfood {
   corpo?: unknown;
   /** POST de leitura que o contrato diz ser repetível (ex.: a consulta do Analytics): pode repetir em falha de rede ou 5xx. */
   idempotente?: boolean;
+  /** Uso interno opt-in: devolve os bytes textuais recebidos para hashing/recibo, apenas em sucesso JSON válido. */
+  preservarCorpo?: boolean;
 }
 
 export type ResultadoIfood<T> =
-  | { ok: true; status: number; dados: T; requestId: string | null; tentativas: number }
+  | { ok: true; status: number; dados: T; requestId: string | null; tentativas: number; corpoOriginal?: string }
   | { ok: false; status: number | null; classificacao: Classificacao; frase: string; requestId: string | null; tentativas: number };
 
 export interface RegistroDeChamada {
@@ -102,7 +104,7 @@ export function criarClienteIfood(o: OpcoesDoCliente) {
         token = await o.tokens.token(o.app);
       } catch (e) {
         if (e instanceof ErroDeAutenticacao) {
-          return { ok: false, status: null, classificacao: { tipo: 'nao-autenticado' }, frase: e.message, requestId: null, tentativas: tentativa };
+          return { ok: false, status: e.status ?? null, classificacao: e.classificacaoRetomada ?? { tipo: 'nao-autenticado' }, frase: e.message, requestId: e.requestId ?? null, tentativas: tentativa };
         }
         throw e;
       }
@@ -142,7 +144,7 @@ export function criarClienteIfood(o: OpcoesDoCliente) {
         } catch {
           return { ok: false, status: r.status, classificacao: { tipo: 'inesperado' }, frase: 'O iFood respondeu num formato inesperado.', requestId, tentativas: tentativa };
         }
-        return { ok: true, status: r.status, dados, requestId, tentativas: tentativa };
+        return { ok: true, status: r.status, dados, requestId, tentativas: tentativa, ...(c.preservarCorpo === true ? { corpoOriginal: r.corpo } : {}) };
       }
       ultimo = { status: r.status, classificacao: cl, requestId };
       if (cl.tipo === 'nao-autenticado' && !renovouToken) {

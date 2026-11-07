@@ -65,6 +65,10 @@ export const MODELOS_DE_TENANT = [
   // INT-1.1: a Central de Integrações (a loja do provedor ligada à Loja e o estado de cada módulo) e a liberação de módulos.
   'integracaoConexao',
   'integracaoConexaoModulo',
+  'integracaoExecucao',
+  'integracaoPayload',
+  'integracaoSnapshot',
+  'kpiIfoodDia',
   'liberacaoDeModulo',
 ] as const;
 
@@ -127,6 +131,10 @@ export const RELACOES_DE_TENANT = [
   'erpHistoricoAlteracoes',
   'erpIntegracaoConexoes',
   'erpIntegracaoConexaoModulos',
+  'erpIntegracaoExecucoes',
+  'erpIntegracaoPayloads',
+  'erpIntegracaoSnapshots',
+  'erpKpisIfoodDia',
   'erpLiberacoesDeModulo',
 ] as const;
 
