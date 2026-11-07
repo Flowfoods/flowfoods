@@ -618,6 +618,8 @@ model ParceiroFlow {
   erpIntegracaoPayloads       IntegracaoPayload[]
   erpIntegracaoSnapshots      IntegracaoSnapshot[]
   erpKpisIfoodDia             KpiIfoodDia[]
+  erpIntegracaoFaturamentoDias IntegracaoFaturamentoDia[]
+  erpIntegracaoFaturamentoFontes IntegracaoFaturamentoFonte[]
   erpLiberacoesDeModulo       LiberacaoDeModulo[]
 
   // Acesso das pessoas (0.3): FORA do tenant, só por `src/lib/erp/credenciais.ts`
@@ -716,6 +718,7 @@ model Loja {
   lotesDeInsumo        LoteDeInsumo[]
   aberturasDeLote      AberturaDeLote[]
   faturamentos         FaturamentoLancamento[]
+  integracaoFaturamentoDias IntegracaoFaturamentoDia[]
   despesas             Despesa[]
   fotografiasDoDre     DreFotografiaLinha[]
   categoriasNaLoja     CategoriaNaLoja[]
@@ -740,6 +743,7 @@ model Marca {
 
   produtos             ProdutoVenda[]
   faturamentos         FaturamentoLancamento[]
+  fontesFaturamento IntegracaoFaturamentoFonte[]
   // INT-1.1: a loja do iFood é de uma marca (decisão 5 do plano da integração).
   conexoesDeIntegracao IntegracaoConexao[]
 
@@ -2220,6 +2224,7 @@ model FaturamentoLancamento {
   atualizadoPorNome String       @default("")
   criadoEm          DateTime     @default(now())
   atualizadoEm      DateTime     @updatedAt
+  fontesAnalytics   IntegracaoFaturamentoFonte[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, chaveIdempotencia])
@@ -3011,6 +3016,7 @@ model IntegracaoConexao {
   desligadaPorNome   String?
 
   modulos IntegracaoConexaoModulo[]
+  fontesFaturamento IntegracaoFaturamentoFonte[]
 
   @@unique([parceiroId, id])
   @@index([parceiroId, lojaId])
@@ -3041,6 +3047,7 @@ model IntegracaoConexaoModulo {
   atualizadoEm   DateTime                   @updatedAt
 
   execucoes IntegracaoExecucao[]
+  fontesFaturamento IntegracaoFaturamentoFonte[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, conexaoId, modulo])
@@ -3131,6 +3138,7 @@ model IntegracaoSnapshot {
   origem           String             @default("IFOOD_ANALYTICS_V1")
   criadoEm         DateTime           @default(now()) @db.Timestamptz(3)
   linhas           KpiIfoodDia[]
+  fontesFaturamento IntegracaoFaturamentoFonte[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, execucaoId, geracao])
@@ -3160,6 +3168,66 @@ model KpiIfoodDia {
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, snapshotId, chaveGrupo])
+}
+
+// INT-1.7B: recibo da aplicação financeira. O tenant só lê o cabeçalho;
+// helpers SQL preparam/concluem a mesma TX sob a posse global já existente.
+model IntegracaoFaturamentoDia {
+  id                    String       @id @default(cuid())
+  parceiroId            String
+  parceiro              ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId                String
+  loja                  Loja         @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict, map: "IFFDia_loja_fkey")
+  dia                   DateTime     @db.Date
+  canal                 CanalVenda   @default(IFOOD)
+  fonte                 String       @default("ifood-analytics")
+  estado                String       @default("PENDENTE")
+  motivo                String?
+  revisaoSolicitada      BigInt       @default(1)
+  revisaoConferida       BigInt       @default(0)
+  solicitadaEm          DateTime     @default(now()) @db.Timestamptz(3)
+  conferidaEm           DateTime?    @db.Timestamptz(3)
+  hashAplicado          String?
+  versaoMapaAplicada    Int?
+  aplicadoEm            DateTime?    @db.Timestamptz(3)
+  transacaoAplicacao    BigInt?
+  donoAplicacao         String?
+  criadoEm              DateTime     @default(now()) @db.Timestamptz(3)
+  atualizadoEm          DateTime     @updatedAt @db.Timestamptz(3)
+  fontes                IntegracaoFaturamentoFonte[]
+
+  @@unique([parceiroId, id], map: "IFFDia_tenant_key")
+  @@unique([parceiroId, id, dia], map: "IFFDia_tenant_dia_key")
+  @@unique([parceiroId, lojaId, canal, dia, fonte], map: "IFFDia_grao_key")
+  @@index([parceiroId, estado, conferidaEm, id], map: "IFFDia_pendentes_idx")
+}
+
+// Uma fonte comercial por merchant/dia; religar não cria receita adicional.
+// Apenas o snapshot pode avançar: vínculo aplicado e lançamento são imutáveis.
+model IntegracaoFaturamentoFonte {
+  id                String                    @id @default(cuid())
+  parceiroId        String
+  parceiro          ParceiroFlow              @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  reciboId          String
+  dia               DateTime                  @db.Date
+  recibo            IntegracaoFaturamentoDia   @relation(fields: [parceiroId, reciboId, dia], references: [parceiroId, id, dia], onDelete: Restrict, map: "IFFFonte_recibo_fkey")
+  merchantId        String
+  conexaoId         String
+  conexao           IntegracaoConexao         @relation(fields: [parceiroId, conexaoId], references: [parceiroId, id], onDelete: Restrict, map: "IFFFonte_conexao_fkey")
+  moduloId          String
+  modulo            IntegracaoConexaoModulo   @relation(fields: [parceiroId, moduloId], references: [parceiroId, id], onDelete: Restrict, map: "IFFFonte_modulo_fkey")
+  snapshotId        String
+  snapshot          IntegracaoSnapshot        @relation(fields: [parceiroId, snapshotId], references: [parceiroId, id], onDelete: Restrict, map: "IFFFonte_snapshot_fkey")
+  lancamentoId      String
+  lancamento        FaturamentoLancamento     @relation(fields: [parceiroId, lancamentoId], references: [parceiroId, id], onDelete: Restrict, map: "IFFFonte_lancamento_fkey")
+  marcaAplicadaId   String?
+  marcaAplicada     Marca?                    @relation(fields: [parceiroId, marcaAplicadaId], references: [parceiroId, id], onDelete: Restrict, map: "IFFFonte_marca_fkey")
+  atualizadoEm      DateTime                  @updatedAt @db.Timestamptz(3)
+
+  @@unique([parceiroId, id], map: "IFFFonte_tenant_key")
+  @@unique([parceiroId, reciboId, merchantId], map: "IFFFonte_recibo_merchant_key")
+  @@unique([parceiroId, merchantId, dia], map: "IFFFonte_merchant_dia_key")
+  @@unique([parceiroId, lancamentoId], map: "IFFFonte_lancamento_key")
 }
 
 // Liberação de um módulo do ERP para um parceiro (decisão de Rodolfo de 25/10/2026: "cada módulo liberado individualmente").

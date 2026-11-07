@@ -382,4 +382,17 @@ describe('2.1 · histórico', () => {
     const m = descreverMudancas(null, depois as never);
     expect(m.map((x) => x.campo)).toEqual(['faturamento', 'pedidos', 'clientes', 'origem']);
   });
+  it('nova leitura integrada com valores iguais aparece sem expor a referência técnica', () => {
+    const a = { faturamentoCentavos: 2399, pedidos: 5, clientes: null, origemRef: 'ifood-analytics:leitura-antiga' };
+    const d = { ...a, origemRef: 'ifood-analytics:leitura-nova' };
+    expect(descreverMudancas(a, d, 'FaturamentoLancamento')).toEqual([
+      { campo: 'leitura do iFood', antes: 'anterior', depois: 'atualizada' },
+    ]);
+    expect(descreverMudancas(d, d, 'FaturamentoLancamento')).toEqual([]);
+    expect(descreverMudancas(null, { origemRef: d.origemRef }, 'FaturamentoLancamento')).toEqual([
+      { campo: 'leitura do iFood', antes: null, depois: 'registrada' },
+    ]);
+    // O contrato de outras fontes não é renomeado como iFood.
+    expect(descreverMudancas(null, { origemRef: 'pdv:leitura' }, 'FaturamentoLancamento')[0].depois).toBe('pdv:leitura');
+  });
 });
