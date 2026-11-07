@@ -271,17 +271,22 @@ describe.skipIf(!URL_TESTE)('INT-1.1 · fundação da Central de Integrações (
       // De outros parceiros, nada; e o A enxerga os dele (o zero acima não é tabela vazia).
       const doA = await a.transacao(async (tx) => tx.sql<{ l: number }>`SELECT count(*)::int AS l FROM "LiberacaoDeModulo"`);
       expect(doA[0].l).toBe(1);
-      // Nem grava em nome do outro (WITH CHECK da política), nas três tabelas (decisão 488). O módulo usa uma conexão de verdade
-      // do A (o gatilho passa; quem recusa é a política).
+      // Nem grava em nome do outro, nas três tabelas (decisão 488). Na conexão, a guarda de cobertura recusa antes do RLS.
+      // Nas outras duas tabelas, o WITH CHECK da política recusa; o módulo usa uma conexão de verdade do A.
       const doA2 = await ligarConexao(a, ligacao(lojaA, uuid()), AUTOR);
       if (!doA2.ok) throw new Error('sem conexão do A');
-      for (const [sql, valores] of [
-        [`INSERT INTO "IntegracaoConexao"(id,"parceiroId","lojaId",provedor,ambiente,"idExterno","nomeExterno","criadoPorNome","atualizadoEm") VALUES ($1,$2,$3,'IFOOD','PRODUCAO',$4,'x','x',now())`, [`x1-${sufixo}`, ids[0], lojaA, uuid()]],
-        [`INSERT INTO "IntegracaoConexaoModulo"(id,"parceiroId","conexaoId","appId",modulo,"criadoPorNome","atualizadoEm") VALUES ($1,$2,$3,$4,'ANALYTICS','x',now())`, [`x2-${sufixo}`, ids[0], doA2.id, appBi]],
-        [`INSERT INTO "LiberacaoDeModulo"(id,"parceiroId",modulo,liberado,"mudadoPorNome") VALUES ($1,$2,'outro-modulo',true,'x')`, [`x3-${sufixo}`, ids[0]]],
+      for (const [sql, valores, recusa] of [
+        [`INSERT INTO "IntegracaoConexao"(id,"parceiroId","lojaId",provedor,ambiente,"idExterno","nomeExterno","criadoPorNome","atualizadoEm") VALUES ($1,$2,$3,'IFOOD','PRODUCAO',$4,'x','x',now())`, [`x1-${sufixo}`, ids[0], lojaA, uuid()], /Contexto de cobertura inválido\./],
+        [`INSERT INTO "IntegracaoConexaoModulo"(id,"parceiroId","conexaoId","appId",modulo,"criadoPorNome","atualizadoEm") VALUES ($1,$2,$3,$4,'ANALYTICS','x',now())`, [`x2-${sufixo}`, ids[0], doA2.id, appBi], /row-level security/],
+        [`INSERT INTO "LiberacaoDeModulo"(id,"parceiroId",modulo,liberado,"mudadoPorNome") VALUES ($1,$2,'outro-modulo',true,'x')`, [`x3-${sufixo}`, ids[0]], /row-level security/],
       ] as const) {
-        await expect(comoTenant(ids[1], async (tx) => void (await tx.exec(sql, ...valores))), sql.slice(12, 40)).rejects.toThrow(/row-level security/);
+        await expect(comoTenant(ids[1], async (tx) => void (await tx.exec(sql, ...valores))), sql.slice(12, 40)).rejects.toThrow(recusa);
       }
+      expect(await Promise.all([
+        db.integracaoConexao.count({ where: { id: `x1-${sufixo}` } }),
+        db.integracaoConexaoModulo.count({ where: { id: `x2-${sufixo}` } }),
+        db.liberacaoDeModulo.count({ where: { id: `x3-${sufixo}` } }),
+      ])).toEqual([0, 0, 0]);
     }
     const papel = await db.$queryRaw<{ existe: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_tenant') AS existe`;
     if (papel[0].existe) {
