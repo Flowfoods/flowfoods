@@ -3,8 +3,7 @@
  *  - nada sai com a chave geral desligada nem para app de produção sem homologação (`porQueNaoChamar`);
  *  - token do app pelo serviço coordenado (`auth.ts`), nunca um por chamada;
  *  - limitador por família de rota; espera crescente com sorteio; Retry-After respeitado;
- *  - 401 → descarta só o token que levou o 401, pega outro e tenta UMA vez; 403 e 400 → não repete (quem chamou pausa o módulo
- *    ou corrige o pedido);
+ *  - 401 → descarta só o token que levou o 401, pega outro e tenta UMA vez; 403 e 400 → não repete (sem alterar módulo aqui);
  *  - falha de rede ou 5xx só se repete em leitura (GET, ou POST de leitura marcado `idempotente`): escrita que pode ter
  *    chegado ao iFood não é reenviada às cegas; 429 se repete sempre (o iFood não processou);
  *  - cabeçalho de homologação só no TEST, decidido pelo ambiente do app (`core/ambiente.ts`) e conferido antes de enviar;
@@ -58,6 +57,9 @@ export interface OpcoesDoCliente {
   aleatorio?: () => number;
   registrar?: (r: RegistroDeChamada) => void;
   maxTentativas?: number;
+  /** Teto de CADA espera entre tentativas, não do tempo total da chamada. Prazo maior encerra sem antecipar nem agendar. */
+  esperaMaximaMs?: number;
+  /** Timeout de uma tentativa do transporte; independente de esperaMaximaMs. */
   tempoMaximoMs?: number;
 }
 
@@ -76,6 +78,8 @@ export function criarClienteIfood(o: OpcoesDoCliente) {
   const relogio = o.relogio ?? Date.now;
   const dormir = o.dormir ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const max = Math.min(Math.max(o.maxTentativas ?? 4, 1), 6);
+  const esperaMaxima = o.esperaMaximaMs ?? 300_000;
+  if (!Number.isSafeInteger(esperaMaxima) || esperaMaxima < 0 || esperaMaxima > 2_147_483_647) throw new RangeError('Limite de espera inválido: use milissegundos inteiros entre 0 e 2147483647.');
 
   async function chamar<T = unknown>(c: ChamadaIfood): Promise<ResultadoIfood<T>> {
     if (!CAMINHO.test(c.caminho) || c.caminho.includes('//') || c.caminho.includes('..')) throw new Error('Caminho de chamada inválido.');
@@ -121,7 +125,11 @@ export function criarClienteIfood(o: OpcoesDoCliente) {
           return { ok: false, status: null, classificacao: { tipo: 'indisponivel' }, frase: 'Falha de rede num pedido que não se repete sozinho: ele pode ter chegado ao iFood. Confira antes de enviar de novo.', requestId: null, tentativas: tentativa };
         }
         ultimo = { status: null, classificacao: { tipo: 'indisponivel' }, requestId: null };
-        if (tentativa < max) await dormir(esperaDoBackoff(tentativa + 1, o.aleatorio));
+        if (tentativa < max) {
+          const espera = esperaDoBackoff(tentativa + 1, o.aleatorio);
+          if (espera > esperaMaxima) break;
+          await dormir(espera);
+        }
         continue;
       }
       const requestId = r.cabecalhos['x-request-id'] ?? r.cabecalhos['x-trace-id'] ?? null;
@@ -152,10 +160,13 @@ export function criarClienteIfood(o: OpcoesDoCliente) {
       }
       if (!repetivel(cl) || tentativa === max) break;
       if (cl.tipo === 'indisponivel' && !repeteSeFalhar) break;
-      const espera = cl.tipo === 'limite' && cl.esperarMs !== null ? cl.esperarMs : esperaDoBackoff(tentativa + 1, o.aleatorio);
+      const espera = cl.tipo === 'limite' && cl.prazo !== null ? cl.prazo.esperarMs : esperaDoBackoff(tentativa + 1, o.aleatorio);
+      if (espera > esperaMaxima) break;
       await dormir(espera);
     }
-    return { ok: false, status: ultimo.status, classificacao: ultimo.classificacao, frase: FRASE_DA_CLASSIFICACAO[ultimo.classificacao.tipo], requestId: ultimo.requestId, tentativas: feitas };
+    const prazo = ultimo.classificacao.tipo === 'limite' ? ultimo.classificacao.prazo : null;
+    const frase = FRASE_DA_CLASSIFICACAO[ultimo.classificacao.tipo] + (prazo ? ` Não tente novamente antes de ${prazo.naoAntesDe}.` : '');
+    return { ok: false, status: ultimo.status, classificacao: ultimo.classificacao, frase, requestId: ultimo.requestId, tentativas: feitas };
   }
 
   return { chamar, app: o.app };

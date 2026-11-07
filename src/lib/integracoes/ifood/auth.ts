@@ -23,7 +23,7 @@
 import { segredoCombinaComAmbiente } from '../core/campos';
 import { baseDaApiIfood, chaveDeCifragem, cifrar, decifrar, ErroDeCofre, integracaoIfoodAtiva, lerSegredo } from '../core/cofre';
 import type { Limitador } from './limitador';
-import { classificar, esperaDoBackoff, lerRetryAfter } from './respostas';
+import { classificar, esperaDoBackoff, FRASE_DA_CLASSIFICACAO } from './respostas';
 import { FalhaDeRede, type Transporte } from './transporte';
 
 export type EstadoDeHomologacao = 'NAO_SE_APLICA' | 'PENDENTE' | 'EM_ANDAMENTO' | 'HOMOLOGADO' | 'RECUSADO';
@@ -231,8 +231,9 @@ export class ServicoDeToken {
       if (c.tipo === 'nao-autenticado' || c.tipo === 'requisicao-invalida' || c.tipo === 'sem-permissao') {
         throw new ErroDeAutenticacao(`O iFood recusou a credencial do app (HTTP ${r.status}). Confira o Client ID do app e o segredo em ${app.nomeDoSegredo}; nada foi repetido.`);
       }
+      if (c.tipo === 'prazo-invalido') throw new ErroDeAutenticacao(FRASE_DA_CLASSIFICACAO[c.tipo]);
       if ((c.tipo === 'limite' || c.tipo === 'indisponivel') && tentativa < TENTATIVAS_DO_TOKEN) {
-        const pedida = c.tipo === 'limite' ? lerRetryAfter(r.cabecalhos['retry-after'], this.relogio()) : null;
+        const pedida = c.tipo === 'limite' ? c.prazo?.esperarMs ?? null : null;
         const espera = pedida ?? esperaDoBackoff(tentativa + 1, this.o.aleatorio);
         await this.esperarDentroDoPrazo(
           espera,
