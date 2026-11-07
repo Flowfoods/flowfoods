@@ -61,7 +61,7 @@ jobs:
       - name: Portão de conteúdo
         run: npm run gate
       - name: Tipos
-        run: npx tsc --noEmit
+        run: npm run typecheck
       # Os testes de migration usam o `psql` do runner; sem ele, seriam pulados
       # e o portão ficaria verde. Se um dia sumir da imagem, falha aqui.
       - name: psql disponível
