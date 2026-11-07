@@ -27,11 +27,15 @@ describe('3C · rascunho e atalho no formulário real',()=>{
  it('restaura versões antigas, quantidade inválida e a embalagem somente no canal/linha de retorno',()=>{
   h.valores=rascunho;h.insumoCriado='nova';const html=renderToStaticMarkup(createElement(FormFicha,props));
   expect(html).toContain('value="receita-antiga"');expect(html).toContain('value="materiais-antigos"');expect(html).toContain('value="3,x"');expect(html).toContain('value="inválida"');expect(html).toContain('value="2,x"');expect(html).toContain('/erp/fichas/fotos?arquivo=pendente.jpg');
-  expect(html).toMatch(/data-emb-linha="7"[^]*?<option value="nova" selected=""/);expect(html).toMatch(/data-emb-linha="0"[^]*?<option value="" selected=""/);expect(html).toContain('versão original');
+  const ifood=html.match(/<li\b[^>]*data-emb-linha="7"[^>]*>([\s\S]*?)<\/li>/)?.[1];
+  const delivery=html.match(/<li\b[^>]*data-emb-linha="0"[^>]*>([\s\S]*?)<\/li>/)?.[1];
+  expect(ifood).toBeDefined();expect(delivery).toBeDefined();
+  expect(ifood).toContain('name="emb_canal" value="IFOOD"');expect(ifood).toContain('name="emb_insumo" value="nova"');expect(ifood).toContain('role="combobox"');expect(ifood).toContain('value="3,x"');
+  expect(delivery).toContain('name="emb_canal" value="DELIVERY_PROPRIO"');expect(delivery).toContain('name="emb_insumo" value=""');expect(html).toContain('versão original');
  });
  it('rascunho antigo sem materiais preserva associações atuais; marcador vazio permanece em pré-preparo',()=>{
   const antigo={...rascunho};delete antigo.materiais;delete antigo.versaoMateriais;h.valores=antigo;
-  const html=renderToStaticMarkup(createElement(FormFicha,{...props,materiais:{...props.materiais,linhas:[{canal:'IFOOD',insumoId:'nova',quantidade:'2',unidade:'un'}]}}));expect(html).toContain('value="materiais-novos"');expect(html).toContain('value="nova" selected=""');
+  const html=renderToStaticMarkup(createElement(FormFicha,{...props,materiais:{...props.materiais,linhas:[{canal:'IFOOD',insumoId:'nova',quantidade:'2',unidade:'un'}]}}));expect(html).toContain('value="materiais-novos"');expect(html).toContain('name="emb_insumo" value="nova"');
   h.valores=null;const pre=renderToStaticMarkup(createElement(FormFicha,{...props,inicial:{...props.inicial,tipo:'PRE_PREPARO',rendimentoUnidade:'kg',materiais:[]}}));expect(pre).toContain('name="materiaisNoFormulario"');expect(pre).not.toContain('name="emb_insumo"');
  });
 });

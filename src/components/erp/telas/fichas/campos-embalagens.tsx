@@ -9,12 +9,14 @@
  * lista lida, insumo do parceiro, tipo).
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { EmbalagemDoFormulario } from '@/lib/erp/canais';
 import type { LinhaMaterialDaFicha } from '@/lib/erp/ficha-unificada-campos';
 import { CANAIS, CANAIS_COM_EMBALAGEM, chaveDaEmbalagem, embalagensTambemNaReceita, lerEmbalagens, LIMITES_DO_CANAL, type CanalComEmbalagem, type EmbalagemDoCadastro } from '@/lib/erp/canal-campos';
 import { contaDoSugeridoPorCmv } from '@/lib/erp/cmv-produto-campos';
+import { planejarCopiaEmbalagens } from '@/lib/erp/embalagens-copia';
+import { SeletorDeItem } from './seletor-de-item';
 import { AVISO_DO_ARREDONDAMENTO, FarolDeCmv } from './farol';
 import { custoDoUso, custoPorUnidade, escalaDaSigla, formatarDinheiro, formatarFracao, formatarPontosBase, lerQuantidadeNa, SIGLAS_DIGITAVEIS, somar, ZERO, type Fracao } from '@/lib/erp/unidades';
 import { AJUDA, CAMPO, Erro } from '../../ui/campos';
@@ -52,11 +54,12 @@ export function CamposEmbalagens({ opcoes, linhas, aoMudar, gravadas, porcao, fa
   const proxima = useRef(Math.max(-1, ...linhas.map(l => l.chave)) + 1);
   const area = useRef<HTMLFieldSetElement>(null);
   const foco = useRef<{ chave?: number; canal: CanalComEmbalagem } | null>(null);
+  const [avisoDeCopia, setAvisoDeCopia] = useState<Partial<Record<CanalComEmbalagem, string>>>({});
   useEffect(() => {
     const pedido = foco.current;
     if (!pedido) return;
     foco.current = null;
-    const seletor = pedido.chave !== undefined ? `[data-emb-linha="${pedido.chave}"]` : `[data-emb-adicionar="${pedido.canal}"]`;
+    const seletor = pedido.chave !== undefined ? `[data-emb-linha="${pedido.chave}"] [role="combobox"]` : `[data-emb-adicionar="${pedido.canal}"]`;
     area.current?.querySelector<HTMLElement>(seletor)?.focus();
   }, [linhas]);
   const porId = useMemo(() => new Map(opcoes.map((o) => [o.id, o])), [opcoes]);
@@ -141,7 +144,7 @@ export function CamposEmbalagens({ opcoes, linhas, aoMudar, gravadas, porcao, fa
           const repetidas = naReceita
             ? embalagensTambemNaReceita(naReceita, doCanal.flatMap((l) => (porId.get(l.insumoId) ? [{ insumoId: l.insumoId, nome: porId.get(l.insumoId)!.nome }] : [])))
             : [];
-          const delivery = linhas.filter((l) => l.canal === 'DELIVERY_PROPRIO' && l.insumoId);
+          const copia = planejarCopiaEmbalagens(linhas, canal, new Set(ativas.map(o => o.id)));
           return (
             <Painel
               key={canal}
@@ -167,30 +170,25 @@ export function CamposEmbalagens({ opcoes, linhas, aoMudar, gravadas, porcao, fa
                     const conta = contaDaLinha(l);
                     const lista = o && !ativas.some((a) => a.id === o.id) ? [o, ...ativas] : ativas;
                     return (
-                      <li key={l.chave} className="rounded-[10px] border border-linha p-3">
+                      <li key={l.chave} data-emb-linha={l.chave} className="rounded-[10px] border border-linha p-3">
                         <input type="hidden" name="emb_canal" value={canal} />
                         <label htmlFor={idL} className="sr-only">
                           Embalagem da linha {n + 1} ({CANAIS[canal].rotulo})
                         </label>
-                        <select
-                          data-emb-linha={l.chave}
+                        <SeletorDeItem
                           id={idL}
                           name="emb_insumo"
-                          value={l.insumoId}
-                          onChange={(e) => mudar(l.chave, { insumoId: e.target.value })}
-                          className={`${CAMPO} min-h-11 text-base sm:text-sm`}
-                          aria-invalid={!!erro}
-                          aria-describedby={erro ? `${idL}-erro` : undefined}
-                        >
-                          <option value="">Escolha a embalagem</option>
-                          {lista.map((x) => (
-                            <option key={x.id} value={x.id}>
-                              {x.nome}
-                              {!x.ativo ? ' (desativada)' : !x.embalagem ? ' (não é embalagem)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="mt-2 flex items-stretch gap-2">
+                          valor={l.insumoId}
+                          aoEscolher={(insumoId) => mudar(l.chave, { insumoId })}
+                          rotulo={`Embalagem da linha ${n + 1} (${CANAIS[canal].rotulo})`}
+                          placeholder="Digite o nome da embalagem"
+                          vazio="Nenhuma embalagem encontrada. Confira o nome ou cadastre a embalagem."
+                          opcoes={lista.map(x => ({ valor: x.id, nome: x.nome, grupo: 'Embalagens', ordemDoGrupo: 0, detalhe: !x.ativo ? 'desativada' : !x.embalagem ? 'não é embalagem' : null }))}
+                          desabilitado={desabilitado}
+                          invalido={!!erro}
+                          descritoPor={erro ? `${idL}-erro` : undefined}
+                        />
+                        <div className="mt-2 flex flex-wrap items-stretch gap-2 sm:flex-nowrap">
                           <label htmlFor={`${idL}-q`} className="sr-only">
                             Quanto vai em uma porção{o ? ` (${o.nome})` : ''}
                           </label>
@@ -230,7 +228,7 @@ export function CamposEmbalagens({ opcoes, linhas, aoMudar, gravadas, porcao, fa
                               <span className="flex w-12 shrink-0 items-center text-[14px] text-suave">un</span>
                             </>
                           )}
-                          <span className="flex min-w-0 flex-1 items-center justify-end text-right text-[13px] tabular-nums">
+                          <span className="order-last flex w-full min-w-0 items-center justify-end text-right text-[13px] tabular-nums sm:order-none sm:w-auto sm:flex-1">
                             {conta ? (
                               conta.valor ? (
                                 <span className="text-texto">{formatarFracao(conta.valor)}</span>
@@ -245,7 +243,7 @@ export function CamposEmbalagens({ opcoes, linhas, aoMudar, gravadas, porcao, fa
                               foco.current = { canal };
                               aoMudar(linhas.filter((x) => x.chave !== l.chave));
                             }}
-                            className={classeDeBotao('fantasma', 'min-h-11 shrink-0 px-3')}
+                            className={classeDeBotao('fantasma', 'ml-auto min-h-11 shrink-0 px-3 sm:ml-0')}
                             aria-label={`Tirar ${o ? o.nome : `a linha ${n + 1}`} do ${CANAIS[canal].rotulo}`}
                           >
                             <Trash2 size={16} aria-hidden />
@@ -271,20 +269,24 @@ export function CamposEmbalagens({ opcoes, linhas, aoMudar, gravadas, porcao, fa
                 >
                   Mais uma embalagem
                 </button>
-                {canal === 'IFOOD' && doCanal.length === 0 && delivery.length > 0 && (
                   <button
                     type="button"
+                    disabled={copia.novas.length === 0 || copia.excedeLimite}
+                    aria-describedby={`${idBase}-${canal}-copia-ajuda`}
                     onClick={() => {
-                      const copiadas = delivery.map((d) => nova('IFOOD', { insumoId: d.insumoId, quantidade: d.quantidade, unidade: d.unidade }));
-                      foco.current = { canal: 'IFOOD', chave: copiadas[0]?.chave };
-                      aoMudar([...linhas, ...copiadas]);
+                      if (copia.excedeLimite || !copia.novas.length) return;
+                      const copiadas = copia.novas.map(d => nova(canal, { insumoId: d.insumoId, quantidade: d.quantidade, unidade: d.unidade }));
+                      foco.current = { canal, chave: copiadas[0]?.chave };
+                      aoMudar([...copia.manter, ...copiadas]);
+                      setAvisoDeCopia(a => ({ ...a, [canal]: `${copiadas.length} ${copiadas.length === 1 ? 'embalagem copiada' : 'embalagens copiadas'} de ${CANAIS[copia.origem].rotulo}. Ajuste as diferenças neste canal antes de salvar.` }));
                     }}
-                    className={classeDeBotao('fantasma', 'w-full sm:w-auto')}
+                    className={classeDeBotao('secundario', 'w-full sm:w-auto')}
                   >
-                    Começar com as do delivery
+                    Copiar do {CANAIS[copia.origem].rotulo}
                   </button>
-                )}
               </div>
+              <p id={`${idBase}-${canal}-copia-ajuda`} className="mt-2 text-[12px] text-suave">{copia.excedeLimite ? `A cópia ultrapassa o limite de ${LIMITES_DO_CANAL.embalagens} embalagens. Remova linhas antes de copiar.` : 'A cópia adiciona as embalagens ativas que faltam neste canal, com suas quantidades. Itens já incluídos são mantidos.'}</p>
+              <p role="status" className="mt-1 text-[13px] text-suave">{avisoDeCopia[canal]}</p>
               {novoInsumo && <div className="mt-3"><AtalhoNovoInsumo href={novoInsumo} tipo="EMBALAGEM" rotulo="Embalagem que falta: cadastrar" idDoCampo={idBase + "-" + canal + "-novo"} aoSair={() => aoCadastrar?.(canal, doCanal.find(l => !l.insumoId)?.chave)} /></div>}
               {receitaPendente && <p className="mt-3 text-[13px] text-atencao">{receitaPendente}</p>}
               <p className="mt-3 text-[12px] tabular-nums text-suave">
