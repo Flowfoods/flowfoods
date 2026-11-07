@@ -41,6 +41,41 @@ export const INDICE_DO_GRAO = 'FaturamentoLancamento_grao_humano';
 export const CHECK_DA_META_SEM_TAXA = 'CanalConfig_taxa_pendente_coerente';
 export const CHECK_DAS_FAIXAS_DE_CMV = 'CanalConfig_farol_conjunto_valido';
 export const CHECK_DO_ENVIO_DA_FICHA = 'FichaTecnica_envio_conjunto_valido';
+export const CHECK_DOS_CLIENTES_DO_FATURAMENTO = 'FaturamentoLancamento_clientes_humanos';
+
+/** INT-1.7A: a coluna antiga obrigatória continua válida em snapshots anteriores. */
+export async function conferirClientesDoFaturamento(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
+  const colunas = await db.$queryRaw<{ tipo: string; nula: string; padrao: string | null }[]>`
+    SELECT data_type AS tipo,is_nullable AS nula,column_default AS padrao
+    FROM information_schema.columns WHERE table_schema=current_schema()
+      AND table_name='FaturamentoLancamento' AND column_name='clientes'`;
+  const checks = await db.$queryRaw<{ validado: boolean; tipo: string; expressao: string }[]>`
+    SELECT c.convalidated AS validado,c.contype::text AS tipo,pg_get_expr(c.conbin,c.conrelid) AS expressao
+    FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+    WHERE n.nspname=current_schema() AND t.relname='FaturamentoLancamento' AND c.conname=${CHECK_DOS_CLIENTES_DO_FATURAMENTO}`;
+  let aplicada = colunas.some(c => c.nula === 'YES') || checks.length > 0;
+  if (!aplicada) {
+    const registro = await db.$queryRaw<{ tem: boolean }[]>`SELECT to_regclass('_prisma_migrations') IS NOT NULL AS tem`;
+    if (registro[0]?.tem) {
+      const linhas = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "_prisma_migrations"
+        WHERE migration_name='20261124000000_erp_faturamento_clientes_ausentes' AND rolled_back_at IS NULL`;
+      aplicada = (linhas[0]?.n ?? 0) > 0;
+    }
+  }
+  if (!aplicada) return [];
+  const pendencias: string[] = [];
+  if (!colunas.some(c => c.tipo === 'integer' && c.nula === 'YES' && c.padrao === null)) {
+    pendencias.push('INT-1.7A: coluna FaturamentoLancamento.clientes deve ser INTEGER nullable sem default.');
+  }
+  // Expressão de catálogo exata: um OR permissivo ou outro enum não preserva
+  // a obrigação dos lançamentos humanos, mesmo que o nome do CHECK seja igual.
+  const esperado = `((origem = 'INTEGRACAO'::"OrigemDado") OR (clientes IS NOT NULL))`;
+  const normalizar = (s: string) => s.replace(/\s+/g, ' ').trim();
+  if (!checks.some(c => c.validado && c.tipo === 'c' && normalizar(c.expressao) === esperado)) {
+    pendencias.push(`INT-1.7A: CHECK ${CHECK_DOS_CLIENTES_DO_FATURAMENTO} ausente, NOT VALID ou incorreto.`);
+  }
+  return pendencias;
+}
 
 /** 3C aditiva: não acusa ausência da fase em snapshots históricos. */
 export async function conferirEnvioDaFicha(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
@@ -1093,6 +1128,7 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
   pendencias.push(...await conferirFaixasDeCmv(db));
   pendencias.push(...await conferirEnvioDaFicha(db));
   pendencias.push(...await conferirPipelineIntegracao(db));
+  pendencias.push(...await conferirClientesDoFaturamento(db));
   return pendencias;
 }
 

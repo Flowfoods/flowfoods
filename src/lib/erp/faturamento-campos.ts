@@ -9,7 +9,8 @@
  * de PRODUTOS de pedidos CONCLUÍDOS no dia, já líquida de desconto/cupom pago
  * pela casa; sem taxa de entrega cobrada do cliente, sem 10 %/gorjeta, sem
  * pedido cancelado. `pedidos` = pedidos concluídos. `clientes` = atendimentos
- * (salão: pessoas; delivery e iFood: vazio = pedidos), não clientes únicos.
+ * (salão: pessoas; na entrada humana de delivery/iFood, vazio = pedidos),
+ * não clientes únicos. Integrações podem não informar esse dado.
  * Ticket médio = Σ valor ÷ Σ pedidos do recorte: derivado, nunca gravado.
  *
  * O grão (decisão 123): loja × canal × dia civil do Rio. O humano (digitado ou
@@ -84,6 +85,13 @@ export interface NumerosDoCanal {
   valorCentavos: number;
   pedidos: number;
   clientes: number;
+}
+
+/** A integração pode não informar atendimentos. Ausência não é zero nem pedidos. */
+export interface NumerosLidosDoCanal {
+  valorCentavos: number;
+  pedidos: number;
+  clientes: number | null;
 }
 
 export type ErrosDoCanal = Partial<Record<'valor' | 'pedidos' | 'clientes' | 'geral', string>>;
@@ -167,7 +175,7 @@ export function ticketMedio(valorCentavos: number, pedidos: number): number | nu
 export const frasePedidos = (n: number) => `${n.toLocaleString('pt-BR')} ${n === 1 ? 'pedido' : 'pedidos'}`;
 
 /** "R$ 3.210,00 · 41 pedidos" (a frase do conflito, da prévia e do histórico). */
-export function fraseDoNumero(n: NumerosDoCanal): string {
+export function fraseDoNumero(n: Pick<NumerosLidosDoCanal, 'valorCentavos' | 'pedidos'>): string {
   return `${formatarDinheiro(n.valorCentavos)} · ${frasePedidos(n.pedidos)}`;
 }
 
@@ -204,13 +212,31 @@ export function retratoDoLancamento(l: { lojaId: string; lojaNome: string; canal
 
 // ------------------------------------------------------------------ leitura única do grão
 
-export interface LinhaDoGrao extends NumerosDoCanal {
+export interface LinhaDoGrao extends NumerosLidosDoCanal {
   origem: OrigemDoLancamento;
 }
 
-export interface GraoLido extends NumerosDoCanal {
-  /** De onde vale o número: a integração, quando existe; senão o que a casa digitou. */
+/**
+ * O filtro de origem no Prisma não estreita clientes nullable. Conferir essa
+ * invariante antes de projetar qualquer linha humana para edição ou histórico;
+ * um registro inválido não pode virar zero nem corrigir silenciosamente o dado.
+ */
+export function numerosDoLancamentoHumano(linha: LinhaDoGrao): NumerosDoCanal {
+  const { valorCentavos, pedidos, clientes } = linha;
+  if (linha.origem === 'INTEGRACAO' || clientes === null ||
+      !Number.isSafeInteger(valorCentavos) || valorCentavos < 0 ||
+      !Number.isSafeInteger(pedidos) || pedidos < 0 ||
+      !Number.isSafeInteger(clientes) || clientes < 0) {
+    throw new Error('Lançamento humano com números inválidos.');
+  }
+  return { valorCentavos, pedidos, clientes };
+}
+
+export interface GraoLido extends NumerosLidosDoCanal {
+  /** Fonte da receita e dos pedidos: integração, quando existe; senão humano. */
   fonte: 'INTEGRACAO' | 'HUMANO';
+  /** Atendimentos podem vir do humano mesmo com receita/pedidos da integração. */
+  fonteClientes: 'HUMANO' | 'INTEGRACAO' | 'SEM_DADO';
   /** O que a casa digitou, quando a integração vale por cima: fica à vista como conferência. */
   conferencia: (NumerosDoCanal & { diferencaCentavos: number }) | null;
 }
@@ -219,20 +245,28 @@ export interface GraoLido extends NumerosDoCanal {
  * A leitura única do grão (decisão 125): havendo linha de INTEGRACAO, vale a
  * SOMA dela (um pedido por linha); senão, a humana. Nunca soma humano com
  * integração. A humana que fica por baixo é a conferência (diferença à vista).
+ * Clientes integrados só são somados se TODOS forem conhecidos; se faltar
+ * algum, vale o total humano uma única vez, ou null na ausência do humano.
  * A 2.2 (DRE) só lê o faturamento por aqui.
  */
 export function lerGrao(linhas: readonly LinhaDoGrao[]): GraoLido | null {
   if (linhas.length === 0) return null;
-  const soma = (ls: readonly LinhaDoGrao[]): NumerosDoCanal =>
+  const somaHumana = (ls: readonly NumerosDoCanal[]): NumerosDoCanal =>
     ls.reduce((s, l) => ({ valorCentavos: s.valorCentavos + l.valorCentavos, pedidos: s.pedidos + l.pedidos, clientes: s.clientes + l.clientes }), { valorCentavos: 0, pedidos: 0, clientes: 0 });
   const integradas = linhas.filter((l) => l.origem === 'INTEGRACAO');
-  const humanas = linhas.filter((l) => l.origem !== 'INTEGRACAO');
+  const humanas = linhas.filter((l) => l.origem !== 'INTEGRACAO').map(numerosDoLancamentoHumano);
+  const h = humanas.length > 0 ? somaHumana(humanas) : null;
   if (integradas.length > 0) {
-    const n = soma(integradas);
-    const h = humanas.length > 0 ? soma(humanas) : null;
-    return { ...n, fonte: 'INTEGRACAO', conferencia: h ? { ...h, diferencaCentavos: n.valorCentavos - h.valorCentavos } : null };
+    const n = somarNumerosLidos(integradas);
+    return {
+      ...n,
+      clientes: n.clientes === null ? (h ? h.clientes : null) : n.clientes,
+      fonte: 'INTEGRACAO',
+      fonteClientes: n.clientes !== null ? 'INTEGRACAO' : h ? 'HUMANO' : 'SEM_DADO',
+      conferencia: h ? { ...h, diferencaCentavos: n.valorCentavos - h.valorCentavos } : null,
+    };
   }
-  return { ...soma(humanas), fonte: 'HUMANO', conferencia: null };
+  return h ? { ...h, fonte: 'HUMANO', fonteClientes: 'HUMANO', conferencia: null } : null;
 }
 
 // ------------------------------------------------------------------ mês e calendário
@@ -281,13 +315,21 @@ export function canaisEmFalta(dia: string, hoje: string, primeiraData: string | 
   return ORDEM_DOS_CANAIS.filter((c) => canaisDaLoja.includes(c) && !lancados.has(c));
 }
 
-export interface TotaisDoRecorte extends NumerosDoCanal {
+export interface TotaisDoRecorte extends NumerosLidosDoCanal {
   /** Centavos, ou null sem pedido (a tela diz "—"). Derivado: nunca gravado. */
   ticketMedioCentavos: number | null;
 }
 
-export function totalizar(itens: readonly NumerosDoCanal[]): TotaisDoRecorte {
-  const t = itens.reduce((s, l) => ({ valorCentavos: s.valorCentavos + l.valorCentavos, pedidos: s.pedidos + l.pedidos, clientes: s.clientes + l.clientes }), { valorCentavos: 0, pedidos: 0, clientes: 0 });
+function somarNumerosLidos(itens: readonly NumerosLidosDoCanal[]): NumerosLidosDoCanal {
+  return itens.reduce<NumerosLidosDoCanal>((s, l) => ({
+    valorCentavos: s.valorCentavos + l.valorCentavos,
+    pedidos: s.pedidos + l.pedidos,
+    clientes: s.clientes === null || l.clientes === null ? null : s.clientes + l.clientes,
+  }), { valorCentavos: 0, pedidos: 0, clientes: 0 });
+}
+
+export function totalizar(itens: readonly NumerosLidosDoCanal[]): TotaisDoRecorte {
+  const t = somarNumerosLidos(itens);
   return { ...t, ticketMedioCentavos: ticketMedio(t.valorCentavos, t.pedidos) };
 }
 

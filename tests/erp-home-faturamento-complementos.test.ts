@@ -23,7 +23,7 @@ vi.mock('@/lib/db', () => { throw new Error('Somente mocks; não abre banco.'); 
 const HOJE = '2026-10-29';
 const alcance: Alcance = { nivel: 'LOJA', lojas: ['lojab'], permissoes: new Set(['faturamento.ver']) };
 const c: ContextoHomeLoja = { alcance, loja: { id: 'lojab', nome: 'Loja B' }, raiz: '/erp', hoje: HOJE, consultadoEm: '2026-10-29T15:00:00.000Z' };
-const g = (valorCentavos: number, pedidos: number, clientes: number): GraoLido => ({ valorCentavos, pedidos, clientes, fonte: 'INTEGRACAO', conferencia: { valorCentavos: 999999, pedidos: 777, clientes: 888, diferencaCentavos: 899999 } });
+const g = (valorCentavos: number, pedidos: number, clientes: number): GraoLido => ({ valorCentavos, pedidos, clientes, fonte: 'INTEGRACAO', fonteClientes: 'INTEGRACAO', conferencia: { valorCentavos: 999999, pedidos: 777, clientes: 888, diferencaCentavos: 899999 } });
 function mes(): MesDoFaturamento {
   const dias = diasDoMes('2026-10');
   const loja = g(10000, 1, 3), delivery = g(90000, 3, 5), zero = g(0, 0, 0), vazio = totalizar([]);
@@ -38,7 +38,7 @@ function mes(): MesDoFaturamento {
   return { mes: '2026-10', hoje: HOJE, dias, lojas: [l], total, porCanal: l.porCanal, faltas: 0, temIntegracao: true };
 }
 const projetar = (m = mes(), contexto = c) => faturamentoAnalitico({ estado: 'lido', dados: m }, contexto)!;
-const total = (pedidos: number, clientes: number, ticketMedioCentavos: number | null): TotaisDoRecorte => ({ valorCentavos: 100000, pedidos, clientes, ticketMedioCentavos });
+const total = (pedidos: number, clientes: number | null, ticketMedioCentavos: number | null): TotaisDoRecorte => ({ valorCentavos: 100000, pedidos, clientes, ticketMedioCentavos });
 const semComplementos = (p: NonNullable<ReturnType<typeof faturamentoAnalitico>>) => {
   const { complementos: _complementos, ...widget } = p.widget;
   return { ...p, widget };
@@ -89,6 +89,17 @@ describe('Faturamento · complementos puros do mesmo total', () => {
   it('zero canônico de ticket com pedidos válidos não é convertido em null nem recalculado', () => {
     expect(complementosDoFaturamento('ok', () => total(4, 8, 0))).toMatchObject({ estado: 'ok', pedidos: 4, atendimentos: 8, ticketMedioCentavos: 0 });
     expect(complementosDoFaturamento('ok', () => total(4, 8, 12345)).ticketMedioCentavos).toBe(12345);
+  });
+
+  it.each(['ok', 'parcial'] as const)('clientes explicitamente ausentes preservam pedidos e ticket no estado %s', estado => {
+    const p = complementosDoFaturamento(estado, () => total(4, null, 25000));
+    expect(p).toMatchObject({ estado, pedidos: 4, atendimentos: null, ticketMedioCentavos: 25000 });
+    expect(p.aviso).toContain('sem informação de atendimentos');
+    if (estado === 'parcial') expect(p.aviso).toContain('há canais sem lançamento');
+    const m = mes(); m.lojas[0].total.clientes = null;
+    const leitura = projetar(m);
+    expect(leitura.widget.valor.valor).toBe(100000);
+    expect(leitura.widget.complementos).toMatchObject({ pedidos: 4, atendimentos: null, ticketMedioCentavos: 25000 });
   });
 
   it('parcialidade e contexto do pai continuam explícitos nos lançamentos informados', () => {

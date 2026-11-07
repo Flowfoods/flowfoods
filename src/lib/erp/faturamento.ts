@@ -42,12 +42,14 @@ import {
   lerGrao,
   LIMITES_DO_FATURAMENTO,
   mesmosNumeros,
+  numerosDoLancamentoHumano,
   retratoDoLancamento,
   rotuloDoCanal,
   totalizar,
   type CanalVenda,
   type ErrosDoCanal,
   type GraoLido,
+  type LinhaDoGrao,
   type NumerosDoCanal,
   type OrigemDoLancamento,
   type TotaisDoRecorte,
@@ -145,9 +147,7 @@ export async function obterDia(cliente: ClienteDoParceiro, alcance: Alcance, loj
               versao: h.atualizadoEm.toISOString(),
               atualizadoEm: h.atualizadoEm,
               atualizadoPorNome: h.atualizadoPorNome,
-              valorCentavos: h.valorCentavos,
-              pedidos: h.pedidos,
-              clientes: h.clientes,
+              ...numerosDoLancamentoHumano(h),
             }
           : null,
         valendo: lerGrao(dele),
@@ -250,7 +250,7 @@ export async function lancarDia(cliente: ClienteDoParceiro, alcance: Alcance, en
       const resultado: Partial<Record<CanalVenda, SituacaoDoCanal>> = {};
       for (const { canal, numeros, versao } of lidos) {
         const atual = await tx.faturamentoLancamento.findFirst({ where: { lojaId, canal, data: dataDoBanco(data.data), origem: { in: [...HUMANAS] } } });
-        const ja = atual ? { valorCentavos: atual.valorCentavos, pedidos: atual.pedidos, clientes: atual.clientes } : null;
+        const ja = atual ? numerosDoLancamentoHumano(atual) : null;
         // Igual ao que já está (duplo clique, reenvio): nada a fazer, mesmo que a versão da tela esteja velha.
         if (ja && mesmosNumeros(ja, numeros)) {
           resultado[canal] = 'igual';
@@ -268,7 +268,7 @@ export async function lancarDia(cliente: ClienteDoParceiro, alcance: Alcance, en
           if (criadas.length === 0) {
             // Alguém criou o mesmo canal neste dia entre a leitura e a gravação.
             const quem = await tx.faturamentoLancamento.findFirst({ where: { lojaId, canal, data: dataDoBanco(data.data), origem: { in: [...HUMANAS] } } });
-            const n = quem ? { valorCentavos: quem.valorCentavos, pedidos: quem.pedidos, clientes: quem.clientes } : null;
+            const n = quem ? numerosDoLancamentoHumano(quem) : null;
             // O mesmo número na corrida (duplo clique, reenvio): a linha é uma só, e está certa.
             if (n && mesmosNumeros(n, numeros)) {
               resultado[canal] = 'igual';
@@ -338,8 +338,9 @@ export async function removerLancamento(cliente: ClienteDoParceiro, alcance: Alc
       const loja = await prepararEscrita(tx, alcance, lojaId, [dia.data]);
       const atual = await tx.faturamentoLancamento.findFirst({ where: { lojaId, canal, data: dataDoBanco(dia.data), origem: { in: [...HUMANAS] } } });
       if (!atual) throw new Recusa(recusar(fraseDoConflito(canal, '', null), { conflito: true }));
+      const numeros = numerosDoLancamentoHumano(atual);
       if (String(e.versao ?? '') !== atual.atualizadoEm.toISOString()) {
-        throw new Recusa(recusar(fraseDoConflito(canal, atual.atualizadoPorNome, atual), { conflito: true }));
+        throw new Recusa(recusar(fraseDoConflito(canal, atual.atualizadoPorNome, numeros), { conflito: true }));
       }
       const r = await tx.faturamentoLancamento.deleteMany({ where: { id: atual.id, atualizadoEm: atual.atualizadoEm } });
       if (r.count === 0) throw new Recusa(recusar(MENSAGEM_CONFLITO_DO_DIA, { conflito: true }));
@@ -349,7 +350,7 @@ export async function removerLancamento(cliente: ClienteDoParceiro, alcance: Alc
           entidade: 'FaturamentoLancamento',
           entidadeId: atual.id,
           acao: 'EXCLUIU',
-          antes: retratoDoLancamento({ lojaId, lojaNome: loja.nome, canal, data: dia.data, origem: atual.origem, valorCentavos: atual.valorCentavos, pedidos: atual.pedidos, clientes: atual.clientes }),
+          antes: retratoDoLancamento({ lojaId, lojaNome: loja.nome, canal, data: dia.data, origem: atual.origem, ...numeros }),
           motivo,
           autorNome,
         },
@@ -414,13 +415,20 @@ export async function faturamentoDosGraos(cliente: ClienteDoParceiro, alcance: P
       data: { gte: dataDoBanco(filtro.de), lte: dataDoBanco(filtro.ate) },
     },
     _sum: { valorCentavos: true, pedidos: true, clientes: true },
+    // SUM ignora NULL: a contagem é necessária para detectar ausência parcial.
+    _count: { _all: true, clientes: true },
   });
-  const porGrao = new Map<string, { lojaId: string; canal: CanalVenda; data: string; linhas: { origem: OrigemDoLancamento; valorCentavos: number; pedidos: number; clientes: number }[] }>();
+  const porGrao = new Map<string, { lojaId: string; canal: CanalVenda; data: string; linhas: LinhaDoGrao[] }>();
   for (const s of somas) {
     const data = isoDoDia(s.data);
     const k = `${s.lojaId}|${s.canal}|${data}`;
     const g = porGrao.get(k) ?? { lojaId: s.lojaId, canal: s.canal, data, linhas: [] };
-    g.linhas.push({ origem: s.origem, valorCentavos: s._sum.valorCentavos ?? 0, pedidos: s._sum.pedidos ?? 0, clientes: s._sum.clientes ?? 0 });
+    g.linhas.push({
+      origem: s.origem,
+      valorCentavos: s._sum.valorCentavos ?? 0,
+      pedidos: s._sum.pedidos ?? 0,
+      clientes: s._count.clientes === s._count._all ? s._sum.clientes : null,
+    });
     porGrao.set(k, g);
   }
   const out: GraoDeFaturamento[] = [];
@@ -638,7 +646,7 @@ async function planejarImportacao(tx: ClienteDoParceiro, alcance: Alcance, texto
       where: { lojaId: { in: Array.from(new Set(boas.map((b) => b.lojaId))) }, data: { gte: dataDoBanco(datas[0]), lte: dataDoBanco(datas[datas.length - 1]) }, origem: { in: [...HUMANAS] } },
       select: { id: true, lojaId: true, canal: true, data: true, valorCentavos: true, pedidos: true, clientes: true, atualizadoEm: true, origem: true },
     });
-    for (const x of linhas) atuais.set(`${x.lojaId}|${x.canal}|${isoDoDia(x.data)}`, { id: x.id, atualizadoEm: x.atualizadoEm, origem: x.origem, valorCentavos: x.valorCentavos, pedidos: x.pedidos, clientes: x.clientes });
+    for (const x of linhas) atuais.set(`${x.lojaId}|${x.canal}|${isoDoDia(x.data)}`, { id: x.id, atualizadoEm: x.atualizadoEm, origem: x.origem, ...numerosDoLancamentoHumano(x) });
   }
 
   const planos: PlanoDaLinha[] = interpretadas.map(({ l, r }) => {
@@ -781,5 +789,6 @@ export interface EntradaDeIntegracao {
   data: string;
   valorCentavos: number;
   pedidos: number;
-  clientes: number;
+  /** null quando a fonte não informa atendimentos; nunca inferir a partir de pedidos. */
+  clientes: number | null;
 }

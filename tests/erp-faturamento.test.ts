@@ -17,6 +17,7 @@ import {
   lerGrao,
   lerMes,
   mesVizinho,
+  numerosDoLancamentoHumano,
   retratoDoLancamento,
   rotuloDoMes,
   ticketMedio,
@@ -89,8 +90,8 @@ describe('2.1 · ler o canal do dia', () => {
     ]);
     expect(dois.ticketMedioCentavos).toBe(4000); // 400,00 ÷ 10 pedidos; a média de médias daria 66,67
     expect(totalizar([]).ticketMedioCentavos).toBeNull();
-    expect(fraseDoNumero({ valorCentavos: 321000, pedidos: 41, clientes: 41 }).replace(/\u00a0/g, ' ')).toBe('R$ 3.210,00 · 41 pedidos');
-    expect(fraseDoNumero({ valorCentavos: 100, pedidos: 1, clientes: 1 })).toContain('1 pedido');
+    expect(fraseDoNumero({ valorCentavos: 321000, pedidos: 41 }).replace(/\u00a0/g, ' ')).toBe('R$ 3.210,00 · 41 pedidos');
+    expect(fraseDoNumero({ valorCentavos: 100, pedidos: 1 })).toContain('1 pedido');
   });
 });
 
@@ -129,7 +130,7 @@ describe('2.1 · chaves', () => {
 describe('2.1 · leitura única do grão: a integração vence a digitação', () => {
   const humana = { origem: 'MANUAL' as const, valorCentavos: 100000, pedidos: 20, clientes: 20 };
   it('só humana: vale a humana; sem nada: null', () => {
-    expect(lerGrao([humana])).toMatchObject({ fonte: 'HUMANO', valorCentavos: 100000, conferencia: null });
+    expect(lerGrao([humana])).toMatchObject({ fonte: 'HUMANO', fonteClientes: 'HUMANO', valorCentavos: 100000, conferencia: null });
     expect(lerGrao([])).toBeNull();
   });
   it('com integração, vale a SOMA dela e a humana vira conferência (nunca soma as duas)', () => {
@@ -138,11 +139,82 @@ describe('2.1 · leitura única do grão: a integração vence a digitação', (
       { origem: 'INTEGRACAO', valorCentavos: 60000, pedidos: 12, clientes: 12 },
       { origem: 'INTEGRACAO', valorCentavos: 45000, pedidos: 9, clientes: 9 },
     ])!;
-    expect(r).toMatchObject({ fonte: 'INTEGRACAO', valorCentavos: 105000, pedidos: 21, clientes: 21 });
+    expect(r).toMatchObject({ fonte: 'INTEGRACAO', fonteClientes: 'INTEGRACAO', valorCentavos: 105000, pedidos: 21, clientes: 21 });
     expect(r.conferencia).toEqual({ valorCentavos: 100000, pedidos: 20, clientes: 20, diferencaCentavos: 5000 });
   });
   it('planilha (IMPORTACAO) é humana', () => {
     expect(lerGrao([{ ...humana, origem: 'IMPORTACAO' }])?.fonte).toBe('HUMANO');
+  });
+
+  it('sem clientes em qualquer integração, mantém receita/pedidos e sinaliza ausência', () => {
+    const r = lerGrao([
+      { origem: 'INTEGRACAO', valorCentavos: 60000, pedidos: 12, clientes: null },
+      { origem: 'INTEGRACAO', valorCentavos: 45000, pedidos: 9, clientes: null },
+    ]);
+    expect(r).toEqual({ valorCentavos: 105000, pedidos: 21, clientes: null, fonte: 'INTEGRACAO', fonteClientes: 'SEM_DADO', conferencia: null });
+    expect(fraseDoNumero(r!)).toContain('21 pedidos');
+    expect(totalizar([r!]).ticketMedioCentavos).toBe(5000);
+  });
+
+  it('uma integração conhecida e outra ausente não fabricam total parcial de clientes', () => {
+    const linhas = [
+      { origem: 'INTEGRACAO' as const, valorCentavos: 60000, pedidos: 12, clientes: 12 },
+      { origem: 'INTEGRACAO' as const, valorCentavos: 45000, pedidos: 9, clientes: null },
+    ];
+    expect(lerGrao(linhas)).toMatchObject({ valorCentavos: 105000, pedidos: 21, clientes: null, fonteClientes: 'SEM_DADO' });
+    expect(lerGrao([...linhas].reverse())).toEqual(lerGrao(linhas));
+  });
+
+  it.each(['MANUAL', 'IMPORTACAO'] as const)('clientes de %s suprem o grão uma vez, sem somar ao merchant conhecido', (origem) => {
+    const r = lerGrao([
+      { ...humana, origem, clientes: 34 },
+      { origem: 'INTEGRACAO', valorCentavos: 60000, pedidos: 12, clientes: 12 },
+      { origem: 'INTEGRACAO', valorCentavos: 45000, pedidos: 9, clientes: null },
+    ]);
+    expect(r).toEqual({
+      valorCentavos: 105000, pedidos: 21, clientes: 34, fonte: 'INTEGRACAO', fonteClientes: 'HUMANO',
+      conferencia: { valorCentavos: 100000, pedidos: 20, clientes: 34, diferencaCentavos: 5000 },
+    });
+  });
+
+  it('zero conhecido integrado vence clientes humanos; zero humano pode suprir ausência', () => {
+    const zero = { origem: 'INTEGRACAO' as const, valorCentavos: 0, pedidos: 0, clientes: 0 };
+    expect(lerGrao([humana, zero])).toMatchObject({ valorCentavos: 0, pedidos: 0, clientes: 0, fonteClientes: 'INTEGRACAO' });
+    const humanoZero = { origem: 'MANUAL' as const, valorCentavos: 0, pedidos: 0, clientes: 0 };
+    expect(lerGrao([humanoZero, { ...zero, clientes: null }])).toMatchObject({ clientes: 0, fonteClientes: 'HUMANO' });
+    expect(lerGrao([{ ...zero, clientes: null }])).toMatchObject({ clientes: null, fonteClientes: 'SEM_DADO' });
+  });
+
+  it('todos os clientes integrados conhecidos conservam a soma legada mesmo com humano', () => {
+    expect(lerGrao([
+      { ...humana, clientes: 90 },
+      { origem: 'INTEGRACAO', valorCentavos: 60000, pedidos: 12, clientes: 15 },
+      { origem: 'INTEGRACAO', valorCentavos: 45000, pedidos: 9, clientes: 8 },
+    ])).toMatchObject({ clientes: 23, fonteClientes: 'INTEGRACAO' });
+  });
+
+  it('totais do dia, mês, canal e rede propagam ausência sem alterar receita/pedidos/ticket', () => {
+    const conhecido = { valorCentavos: 60000, pedidos: 12, clientes: 15 };
+    const ausente = { valorCentavos: 45000, pedidos: 9, clientes: null };
+    const dia = totalizar([conhecido, ausente]);
+    expect(dia).toEqual({ valorCentavos: 105000, pedidos: 21, clientes: null, ticketMedioCentavos: 5000 });
+    expect(totalizar([dia, totalizar([conhecido])])).toEqual({ valorCentavos: 165000, pedidos: 33, clientes: null, ticketMedioCentavos: 5000 });
+    expect(totalizar([totalizar([conhecido]), dia])).toEqual(totalizar([dia, totalizar([conhecido])]));
+    expect(totalizar([totalizar([dia]), totalizar([])]).clientes).toBeNull();
+    expect(totalizar([])).toEqual({ valorCentavos: 0, pedidos: 0, clientes: 0, ticketMedioCentavos: null });
+  });
+
+  it('projeção humana mantém números e recusa null ou origem integrada, sem cast nem zero', () => {
+    expect(numerosDoLancamentoHumano(humana)).toEqual({ valorCentavos: 100000, pedidos: 20, clientes: 20 });
+    expect(numerosDoLancamentoHumano({ ...humana, origem: 'IMPORTACAO', clientes: 0 }).clientes).toBe(0);
+    expect(() => numerosDoLancamentoHumano({ ...humana, clientes: null })).toThrow('Lançamento humano com números inválidos.');
+    expect(() => numerosDoLancamentoHumano({ ...humana, origem: 'INTEGRACAO' })).toThrow('Lançamento humano com números inválidos.');
+    expect(() => lerGrao([{ ...humana, clientes: null }])).toThrow('Lançamento humano com números inválidos.');
+    expect(() => lerGrao([{ ...humana, clientes: null }, { ...humana, origem: 'INTEGRACAO' }])).toThrow('Lançamento humano com números inválidos.');
+  });
+
+  it.each([NaN, Infinity, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])('projeção humana recusa clientes inválidos (%s)', (clientes) => {
+    expect(() => numerosDoLancamentoHumano({ ...humana, clientes })).toThrow('Lançamento humano com números inválidos.');
   });
 });
 

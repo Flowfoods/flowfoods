@@ -2209,7 +2209,9 @@ model FaturamentoLancamento {
   pedidos           Int
   // ATENDIMENTOS no dia (o que o canal reporta), não clientes únicos: a
   // mesma pessoa em dois dias conta duas vezes. Ticket médio = valor ÷ pedidos.
-  clientes          Int
+  // NULL só na integração que não informa atendimentos; o CHECK da INT-1.7A
+  // mantém digitação/importação obrigatoriamente numéricas.
+  clientes          Int?
   origem            OrigemDado
   chaveIdempotencia String
   // Id externo (pedido/relatório iFood, nome do arquivo importado).
