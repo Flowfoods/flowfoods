@@ -1,7 +1,7 @@
 {
   "inicio": {
-    "versao": 11,
-    "hash": "4f45cf9cc37b486c"
+    "versao": 12,
+    "hash": "4fafb130deff6c17"
   },
   "acesso": {
     "versao": 2,
@@ -284,15 +284,15 @@
     "hash": "d880692b6801b174"
   },
   "faturamento": {
-    "versao": 1,
-    "hash": "44a50a22f657d3ba"
+    "versao": 2,
+    "hash": "092ea0378ba66aa6"
   },
   "faturamento-lancar": {
     "versao": 1,
     "hash": "8bc5df4b7032ccbc"
   },
   "faturamento-dia": {
-    "versao": 4,
+    "versao": 5,
     "hash": "8e16b01d34c29c26"
   },
   "faturamento-importar": {

@@ -25,7 +25,8 @@ import { ajudaParaATela, entradaPorChave, problemasDoRegistro } from '@/lib/erp/
 import { estadoDoPonto, itemDoPonto, type PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
 import { ATRIBUTO_POR_ULTIMO, marcadosAoComecarSozinha, ordemDaSequencia, passosDaSequencia, progressoDoPasso, proximoPasso } from '@/lib/erp/ajuda-sequencia';
 import type { DiaDaLojaLido, LojaDoFaturamento, LojaNoMes, MesDoFaturamento, DiaDaLojaNoMes } from '@/lib/erp/faturamento';
-import { CANAIS_EM_ORDEM, totalizar, type CanalVenda, type GraoLido } from '@/lib/erp/faturamento-campos';
+import { CANAIS_EM_ORDEM, lerGrao, totalizar, type CanalVenda, type GraoLido } from '@/lib/erp/faturamento-campos';
+import { formatarDinheiro } from '@/lib/erp/unidades';
 import { navegacaoDoParceiro } from '@/lib/erp/modulos';
 import { NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance, type VinculoDePermissao } from '@/lib/erp/permissoes';
@@ -92,7 +93,7 @@ const MES = '2026-10';
 const HOJE_DO_MES = '2026-10-17';
 const VP: LojaDoFaturamento = { id: 'loja-vp', nome: 'Vila da Penha', ativa: true, canais: ['LOJA', 'IFOOD'] };
 const MEIER: LojaDoFaturamento = { id: 'loja-meier', nome: 'Méier', ativa: true, canais: ['DELIVERY_PROPRIO'] };
-const grao = (valorCentavos: number, pedidos: number, fonte: GraoLido['fonte'] = 'HUMANO'): GraoLido => ({ valorCentavos, pedidos, clientes: pedidos, fonte, conferencia: null });
+const grao = (valorCentavos: number, pedidos: number, fonte: GraoLido['fonte'] = 'HUMANO'): GraoLido => ({ valorCentavos, pedidos, clientes: pedidos, fonte, fonteClientes: fonte, conferencia: null });
 
 /** Do dia 1 ao 14 completo; 15 sem iFood (falta); 16 com iFood "Não vendeu" (zero); 17 é hoje (em aberto); depois, futuro. */
 function lojaNoMes(loja: LojaDoFaturamento, fonte: GraoLido['fonte'] = 'HUMANO'): LojaNoMes {
@@ -253,7 +254,7 @@ describe('decisão 519 · os pontos do Faturamento no registro', () => {
     expect(card(DONO, 'faturamento-dia', 'nao-vendeu')).toContain('Não vendeu conta como lançado');
     expect(card(DONO, 'faturamento-dia', 'nao-vendeu')).toContain('depois que a loja começou a lançar, aparece como falta no mês; hoje ainda está em aberto');
     expect(card(DONO, 'faturamento-lancar', 'atalhos')).toContain('Depois que a loja começou a lançar, ontem já conta como falta');
-    expect(card(DONO, 'faturamento', 'integracao')).toContain('Dia com integração vale o número dela');
+    expect(card(DONO, 'faturamento', 'integracao')).toContain('Faturamento e pedidos usam a integração');
     // O card de onde se digita (o dia) diz tudo o que fica fora do número, como o do mês (P2-2 da revisão).
     for (const t of ['taxa de entrega', 'gorjeta', '10 % de serviço', 'pedido cancelado']) {
       expect(card(DONO, 'faturamento-dia', 'numeros'), `dia: ${t}`).toContain(t);
@@ -295,11 +296,11 @@ describe('decisão 519 · o texto educativo sai do corpo e mora no card (não so
     },
     {
       onde: 'mês · rodapé da integração',
-      frase: 'Dias com integração valem o número dela; o que a casa digitou fica como conferência na tela do dia.',
+      frase: 'Faturamento e pedidos usam a integração; os valores digitados ficam como conferência na tela do dia. Se a integração não informa clientes atendidos, vale o lançamento da casa, quando existir.',
       tela: (raiz: string) => telaDoMes(raiz, { integracao: true }),
       caminho: '/faturamento',
       ponto: ['faturamento', 'integracao'],
-      noCard: ['integração vale o número dela', 'O que a casa digitou fica como conferência na tela do dia'],
+      noCard: ['Faturamento e pedidos usam a integração', 'os valores digitados ficam como conferência na tela do dia'],
     },
     {
       onde: 'dia · Lançou no dia ou na loja errada?',
@@ -349,6 +350,41 @@ describe('decisão 519 · o texto educativo sai do corpo e mora no card (não so
     expect(comIntegracao).not.toContain('pode contar como falta');
     expect(comIntegracao).not.toContain('O dia volta a ficar sem lançamento neste canal');
     expect(dia).toContain('Não vendeu');
+  });
+
+  it('mês com clientes ausentes conserva receita, pedidos e ticket e mostra Sem dado', () => {
+    const vp = lojaNoMes(VP, 'INTEGRACAO');
+    vp.porCanal.IFOOD.clientes = null;
+    vp.total = totalizar(CANAIS_EM_ORDEM.map(c => vp.porCanal[c]));
+    const m = mes([vp], true);
+    const h = n(renderToStaticMarkup(createElement(TelaDoMes, {
+      m, base: '/erp/faturamento', lojaAberta: vp, podeLancar: true, bloqueio: null, veRede: true,
+    })));
+    expect(h).toContain('Clientes atendidos'); expect(h).toContain('Sem dado');
+    expect(h).toContain(formatarDinheiro(vp.total.valorCentavos));
+    expect(h).toContain('Ticket médio'); expect(h).toContain('faturamento ÷ pedidos');
+    expect(h).not.toMatch(/>null<|NaN/);
+  });
+
+  it.each([false, true])('dia explica clientes da casa ou ausência e o efeito de remover (humano=%s)', comHumano => {
+    const dia = diaLido({ integracao: true });
+    const humano = { origem: 'MANUAL' as const, valorCentavos: 100_000, pedidos: 20, clientes: 33 };
+    dia.canais[0].humano = comHumano ? { ...dia.canais[0].humano!, clientes: 33 } : null;
+    dia.canais[0].valendo = lerGrao([
+      { origem: 'INTEGRACAO', valorCentavos: 98_000, pedidos: 19, clientes: null },
+      ...(comHumano ? [humano] : []),
+    ]);
+    const acao = async () => null;
+    const h = n(renderToStaticMarkup(createElement(TelaDoDia, {
+      dia, base: '/erp/faturamento', acao, remover: () => acao, podeLancar: true, verPeriodos: true, bloqueio: null,
+    })));
+    expect(h).toContain('Vale a integração:'); expect(h).toContain('19 pedidos');
+    if (comHumano) {
+      expect(h).toContain('Clientes atendidos: 33 (informados pela casa).');
+      expect(h).toContain('Faturamento e pedidos da integração continuam. Clientes atendidos ficam sem dado.');
+      expect(h).toContain('O faturamento e os pedidos digitados ficam como conferência');
+    } else expect(h).toContain('Clientes atendidos: sem dado.');
+    expect(h).not.toMatch(/>null<|NaN/);
   });
 
   it('o card não se repete no corpo: nenhum bloco de ponto aparece escrito na tela', async () => {

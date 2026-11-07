@@ -27,16 +27,18 @@ export function complementosDoFaturamento(
   try {
     const total = lerTotal();
     const pedidos = total.pedidos, atendimentos = total.clientes, ticketMedioCentavos = total.ticketMedioCentavos;
-    if (!contador(pedidos) || !contador(atendimentos)
+    if (!contador(pedidos) || (atendimentos !== null && !contador(atendimentos))
       || (ticketMedioCentavos !== null && !Number.isSafeInteger(ticketMedioCentavos))
       || (pedidos === 0 && ticketMedioCentavos !== null)) {
       return vazio('indisponivel', 'Pedidos, atendimentos e ticket médio não puderam ser conferidos nesta leitura.');
     }
     return {
       estado, pedidos, atendimentos, ticketMedioCentavos,
-      aviso: estado === 'parcial'
-        ? 'Valores dos lançamentos informados; há canais sem lançamento. Atendimentos não representam pessoas únicas.'
-        : 'Atendimentos informados não representam pessoas únicas.',
+      aviso: atendimentos === null
+        ? `${estado === 'parcial' ? 'Valores dos lançamentos informados; há canais sem lançamento. ' : ''}Há lançamentos sem informação de atendimentos.`
+        : estado === 'parcial'
+          ? 'Valores dos lançamentos informados; há canais sem lançamento. Atendimentos não representam pessoas únicas.'
+          : 'Atendimentos informados não representam pessoas únicas.',
     };
   } catch {
     return vazio('erro', 'Não foi possível carregar pedidos, atendimentos e ticket médio.');

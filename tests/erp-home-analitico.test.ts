@@ -12,7 +12,7 @@ const c = (permissoes: Permissao[], lojaId = 'lojab'): ContextoHomeLoja => ({
   alcance: { nivel: 'LOJA', lojas: ['lojab'], permissoes: new Set(permissoes) }, loja: { id: lojaId, nome: 'Loja B' },
   raiz: '/erp', hoje: HOJE, consultadoEm: '2026-10-30T12:00:00.000Z',
 });
-const grao = (valorCentavos: number): GraoLido => ({ valorCentavos, pedidos: valorCentavos ? 10 : 0, clientes: valorCentavos ? 10 : 0, fonte: 'INTEGRACAO', conferencia: { valorCentavos: 999_999, pedidos: 100, clientes: 100, diferencaCentavos: 989_999 } });
+const grao = (valorCentavos: number): GraoLido => ({ valorCentavos, pedidos: valorCentavos ? 10 : 0, clientes: valorCentavos ? 10 : 0, fonte: 'INTEGRACAO', fonteClientes: 'INTEGRACAO', conferencia: { valorCentavos: 999_999, pedidos: 100, clientes: 100, diferencaCentavos: 989_999 } });
 export function mesDaFixture(): MesDoFaturamento {
   const dias = diasDoMes('2026-10');
   const g = grao(10_000), zero = grao(0), vazio = totalizar([]);

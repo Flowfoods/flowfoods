@@ -58,6 +58,16 @@ describe('Home · complementos canônicos do Faturamento', () => {
     const h = html(w); expect(h).toContain(formatarDinheiro(0)); expect(h).not.toContain('Não disponível');
   });
 
+  it('atendimentos ausentes mostram Sem dado sem esconder receita, pedidos ou ticket', () => {
+    const w = widget(); w.complementos = { ...c(), atendimentos: null, aviso: 'Há lançamentos sem informação de atendimentos.' };
+    const h = html(w);
+    expect(h).toContain('Sem dado'); expect(h).toContain('>80</dd>'); expect(h).toContain(formatarDinheiro(8750));
+    expect(h).not.toMatch(/Complementos indisponíveis|>0<\/dd>|>null<|NaN/);
+    const pagina = home(painel(w));
+    expect(card(pagina)).toContain(formatarDinheiro(700_000));
+    expect(pagina).toContain('aria-label="Evolução do faturamento"');
+  });
+
   it('ticket negativo recebido é formatado com sinal, sem clamp ou classificação nova', () => {
     const w = widget(); w.complementos!.ticketMedioCentavos = -1234;
     const h = html(w); expect(h).toContain(formatarDinheiro(-1234)); expect(h).not.toMatch(/farol|atingiu|saudável|progressbar/);

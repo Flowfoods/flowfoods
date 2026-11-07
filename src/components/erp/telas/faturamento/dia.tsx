@@ -73,6 +73,9 @@ export function TelaDoDia({
       integracao: integracao
         ? {
             resumo: fraseDoNumero(integracao),
+            clientes: integracao.clientes === null
+              ? 'Clientes atendidos: sem dado.'
+              : `Clientes atendidos: ${integracao.clientes.toLocaleString('pt-BR')} (${integracao.fonteClientes === 'HUMANO' ? 'informados pela casa' : 'da integração'}).`,
             conferencia: integracao.conferencia
               ? `${fraseDoNumero(integracao.conferencia)}, ${integracao.conferencia.diferencaCentavos === 0 ? 'sem diferença' : `diferença de ${formatarDinheiro(Math.abs(integracao.conferencia.diferencaCentavos))}`}`
               : null,
@@ -138,7 +141,7 @@ export function TelaDoDia({
                 versao={c.humano!.versao}
                 voltar={voltar}
                 volta={volta?.href}
-                depois={c.valendo?.fonte === 'INTEGRACAO' ? 'integracao' : c.ativo && dia.loja.ativa ? 'pode-faltar' : 'sem-lancamento'}
+                depois={c.valendo?.fonte === 'INTEGRACAO' ? c.valendo.fonteClientes === 'HUMANO' ? 'integracao-clientes' : 'integracao' : c.ativo && dia.loja.ativa ? 'pode-faltar' : 'sem-lancamento'}
               />
             ))}
           </div>

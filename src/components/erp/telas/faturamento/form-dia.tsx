@@ -38,8 +38,8 @@ export interface CanalParaATela {
   quem: string | null;
   /** O canal está desligado na loja (só aparece porque já tem lançamento): não se edita. */
   desligado: boolean;
-  /** Linha da integração valendo por cima (a digitada fica só para conferir). */
-  integracao: { resumo: string; conferencia: string | null } | null;
+  /** Receita/pedidos integrados; atendimentos podem vir da casa. */
+  integracao: { resumo: string; conferencia: string | null; clientes?: string } | null;
 }
 
 const NUMERO = `${CAMPO} min-h-12 text-right text-[17px] font-semibold tabular-nums sm:min-h-[44px]`;
@@ -94,7 +94,8 @@ function BlocoDoCanal({
       {c.integracao && (
         <p className="mb-3 rounded-[10px] border border-linha bg-forte/50 px-3 py-2 text-[13px] text-suave">
           <span className="font-semibold text-texto">Vale a integração: {c.integracao.resumo}.</span>{' '}
-          {c.integracao.conferencia ? `O que a casa digitou fica aqui só para conferir (${c.integracao.conferencia}).` : null}
+          {c.integracao.conferencia ? `O faturamento e os pedidos digitados ficam como conferência (${c.integracao.conferencia}).` : null}
+          {c.integracao.clientes ? <> {c.integracao.clientes}</> : null}
         </p>
       )}
       <div className="space-y-3">
@@ -247,10 +248,11 @@ export function FormDoDia({
  *    ainda conta como "lançando": remover o único lançamento dela tira o início);
  *  - `sem-lancamento`: canal desligado ou loja desativada, que não cobram falta.
  */
-export type DepoisDeRemover = 'integracao' | 'pode-faltar' | 'sem-lancamento';
+export type DepoisDeRemover = 'integracao' | 'integracao-clientes' | 'pode-faltar' | 'sem-lancamento';
 
 const FRASE_DEPOIS_DE_REMOVER: Record<DepoisDeRemover, string> = {
   integracao: 'Fica valendo o número da integração.',
+  'integracao-clientes': 'Faturamento e pedidos da integração continuam. Clientes atendidos ficam sem dado.',
   'pode-faltar': 'O dia volta a ficar sem lançamento neste canal e, se o dia já passou, pode contar como falta.',
   'sem-lancamento': 'O dia volta a ficar sem lançamento neste canal.',
 };

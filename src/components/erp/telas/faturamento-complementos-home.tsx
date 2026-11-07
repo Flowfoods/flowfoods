@@ -25,7 +25,7 @@ function paraExibir(widget: WidgetFaturamentoHome, leitura: FaturamentoDiarioHom
     if (estado !== 'ok' && estado !== 'parcial') return { estado, pedidos: null, atendimentos: null, ticketMedioCentavos: null, aviso };
     if ((widget.estado !== 'ok' && widget.estado !== 'parcial') || !mesmoRecorteDoFaturamento(widget, leitura)
       || widget.origem?.fonte !== 'faturamento' || widget.escopo.tipo !== 'loja'
-      || !contador(pedidos) || !contador(atendimentos) || (ticketMedioCentavos !== null && !Number.isSafeInteger(ticketMedioCentavos))
+      || !contador(pedidos) || (atendimentos !== null && !contador(atendimentos)) || (ticketMedioCentavos !== null && !Number.isSafeInteger(ticketMedioCentavos))
       || (pedidos === 0 && ticketMedioCentavos !== null)) return indisponivel();
     return { estado, pedidos, atendimentos, ticketMedioCentavos, aviso };
   } catch {
@@ -44,7 +44,7 @@ export function FaturamentoComplementosHome({ widget, leitura }: { widget: Widge
       {disponivel ? (
         <dl className="grid min-w-0 gap-3 sm:grid-cols-3">
           <div className="min-w-0"><dt className="text-[12px] text-suave">Pedidos</dt><dd className="mt-1 break-words font-display text-[22px] font-bold leading-tight tabular-nums text-texto [overflow-wrap:anywhere]">{c.pedidos!.toLocaleString('pt-BR')}</dd></div>
-          <div className="min-w-0"><dt className="text-[12px] text-suave">Atendimentos</dt><dd className="mt-1 break-words font-display text-[22px] font-bold leading-tight tabular-nums text-texto [overflow-wrap:anywhere]">{c.atendimentos!.toLocaleString('pt-BR')}</dd></div>
+          <div className="min-w-0"><dt className="text-[12px] text-suave">Atendimentos</dt><dd className="mt-1 break-words font-display text-[22px] font-bold leading-tight tabular-nums text-texto [overflow-wrap:anywhere]">{c.atendimentos === null ? <span className="text-[16px]">Sem dado</span> : c.atendimentos.toLocaleString('pt-BR')}</dd></div>
           <div className="min-w-0"><dt className="text-[12px] text-suave">Ticket médio</dt><dd className="mt-1 font-display text-[22px] font-bold leading-tight tabular-nums text-texto">{c.ticketMedioCentavos === null ? <span className="text-[16px]">Não disponível</span> : <ValorMonetarioHome centavos={c.ticketMedioCentavos} />}</dd></div>
         </dl>
       ) : (

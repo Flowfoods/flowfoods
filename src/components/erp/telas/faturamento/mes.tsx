@@ -33,7 +33,7 @@ import { ExplicacaoNoPonto, PainelComPonto, PontoDeAjuda } from '../../ui/ponto-
 type VoltaDaHome = VoltaParaAHome | null | undefined;
 
 const SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-const inteiro = (n: number) => n.toLocaleString('pt-BR');
+const inteiro = (n: number | null) => n === null ? 'Sem dado' : n.toLocaleString('pt-BR');
 
 const frasePedidos = (n: number) => `${inteiro(n)} ${n === 1 ? 'pedido' : 'pedidos'}`;
 
@@ -409,7 +409,7 @@ export function TelaDoMes({
                     <Metrica rotulo="Faturamento" valor={formatarDinheiro(t.valorCentavos)} detalhe="venda dos pedidos concluídos" />
                   </div>
                   <Metrica rotulo="Pedidos" valor={inteiro(t.pedidos)} detalhe={frasePedidos(t.pedidos)} />
-                  <Metrica rotulo="Clientes atendidos" valor={inteiro(t.clientes)} detalhe="atendimentos, não pessoas diferentes" />
+                  <Metrica rotulo="Clientes atendidos" valor={inteiro(t.clientes)} detalhe={t.clientes === null ? 'há lançamentos sem essa informação' : 'atendimentos, não pessoas diferentes'} />
                   <Metrica rotulo="Ticket médio" valor={textoDoTicket(t.ticketMedioCentavos)} detalhe="faturamento ÷ pedidos" />
                 </>
               );
@@ -434,7 +434,7 @@ export function TelaDoMes({
           )}
           {m.temIntegracao && (
             <ExplicacaoNoPonto ponto="integracao">
-              <p className="text-[12px] text-suave">Dias com integração valem o número dela; o que a casa digitou fica como conferência na tela do dia.</p>
+              <p className="text-[12px] text-suave">Faturamento e pedidos usam a integração; os valores digitados ficam como conferência na tela do dia. Se a integração não informa clientes atendidos, vale o lançamento da casa, quando existir.</p>
             </ExplicacaoNoPonto>
           )}
         </>

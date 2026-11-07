@@ -21,7 +21,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'inicio',
     rotas: [''],
     titulo: 'Visão geral da operação',
-    versao: 11,
+    versao: 12,
     aula: [
       { texto: 'Escolha uma loja no alto para ver seus indicadores, a evolução do faturamento e os pontos de atenção. Cada número informa a loja e o período a que se refere.' },
       { texto: 'Sem dados não é zero: o painel avisa sobre ausências e falhas, e Atualizar resumo tenta carregar de novo.' },
@@ -35,6 +35,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Pedidos, atendimentos e ticket vêm dos mesmos lançamentos do faturamento do mês.', para: ['faturamento.ver'] },
           { texto: 'Atendimentos não são pessoas únicas; se faltarem lançamentos, a leitura fica parcial.', para: ['faturamento.ver'] },
+          { texto: 'Se algum dia e canal continua sem informação de atendimentos, esse total fica Sem dado. Receita, pedidos e ticket continuam disponíveis.', para: ['faturamento.ver'] },
           { texto: 'Em um lançamento marcado Não vendeu, pedidos e atendimentos são zero e não há base para o ticket; isso é diferente de não lançar.', para: ['faturamento.ver'] },
         ],
       },
@@ -1699,7 +1700,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['faturamento'],
     titulo: 'Faturamento',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Quanto cada loja vendeu em cada canal, dia a dia: faturamento, pedidos e clientes atendidos.' },
       { texto: 'O ticket médio é o faturamento dividido pelos pedidos, refeito na hora. Canal que a loja vende e ficou sem lançamento aparece como falta.' },
@@ -1714,7 +1715,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'Entra a venda dos produtos dos pedidos concluídos no dia, depois de tirar o desconto ou cupom que a casa pagou.' },
           { texto: 'Não entra taxa de entrega cobrada do cliente, gorjeta, 10 % de serviço nem pedido cancelado.' },
           { texto: 'No iFood, use o total dos itens menos o incentivo que a loja bancou. A comissão do iFood entra depois, no resultado.' },
-          { texto: 'Clientes são atendimentos do dia, não pessoas diferentes. No delivery e no iFood, em branco vale o número de pedidos.' },
+          { texto: 'Clientes são atendimentos do dia, não pessoas diferentes. Na digitação e na planilha, em branco vale o número de pedidos. Ausência na integração fica Sem dado, a menos que a casa tenha informado clientes no mesmo dia e canal.' },
         ],
       },
       {
@@ -1762,7 +1763,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         // Só no mês que tem número de integração.
         id: 'integracao',
         titulo: 'Integração e o que a casa digitou',
-        blocos: [{ texto: 'Dia com integração vale o número dela. O que a casa digitou fica como conferência na tela do dia, com a diferença entre os dois.' }],
+        blocos: [{ texto: 'Faturamento e pedidos usam a integração; os valores digitados ficam como conferência na tela do dia. Se a integração não informa clientes atendidos, vale o lançamento da casa, quando existir; sem ele, fica Sem dado.' }],
       },
     ],
   },
@@ -1803,7 +1804,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['faturamento/[lojaId]/[data]'],
     titulo: 'Faturamento do dia',
-    versao: 4,
+    versao: 5,
     // Tela de lançar no celular: os campos ficam à vista, a aula abre numa linha (como nas telas de contar).
     recolhida: true,
     aula: [
@@ -1836,7 +1837,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Faturamento é a venda dos produtos dos pedidos concluídos no dia, já sem o desconto que a casa pagou; não entram taxa de entrega, gorjeta, 10 % de serviço nem pedido cancelado.' },
           { texto: 'No iFood, entra o total dos itens menos o incentivo que a loja bancou; a comissão do iFood entra depois, no resultado.' },
-          { texto: 'Clientes são atendimentos do dia, não pessoas diferentes.' },
+          { texto: 'Clientes são atendimentos, não pessoas diferentes; se a integração não os informa, vale o lançamento da casa; sem ele ou após removê-lo, fica Sem dado.' },
         ],
       },
       {
