@@ -40,7 +40,7 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
       acaoSituacao={acaoSituacaoFicha.bind(null, ficha.id)}
       linkDoInsumo={pode(ctx.alcance, 'insumos.ver') ? '/erp/insumos' : undefined}
       canais={canais}
-      linkDasEmbalagens={pode(ctx.alcance, 'fichas.editar') && verPrecos && !ctx.bloqueio ? `${BASE}/${ficha.id}/canais${de ? `?de=${encodeURIComponent(de)}` : ''}` : undefined}
+      linkDasEmbalagens={pode(ctx.alcance, 'fichas.editar') && verPrecos && !ctx.bloqueio ? `${BASE}/${ficha.id}/editar${de ? `?de=${encodeURIComponent(de)}` : ''}#ficha-materiais` : undefined}
       linkDaTaxa={verPrecos ? `${BASE}/canais` : undefined}
       linkDoProduzir={pode(ctx.alcance, 'producao.registrar') && ficha.ativa && !ctx.bloqueio ? `/erp/producao/nova?ficha=${ficha.id}` : undefined}
       podeConfigurarTaxa={pode(ctx.alcance, 'precos.editar') && !ctx.bloqueio}

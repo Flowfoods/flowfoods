@@ -1370,6 +1370,9 @@ model FichaTecnica {
   parceiroId             String
   parceiro               ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
   nome                   String
+  // 3C: identidade durável da criação moderna, vinculada à pessoa no servidor.
+  chaveEnvio             String?
+  hashEnvio              String?
   tipo                   FichaTipo
   secaoId                String?
   secao                  SecaoFicha? @relation(fields: [parceiroId, secaoId], references: [parceiroId, id], onDelete: Restrict, onUpdate: Restrict)
@@ -1422,6 +1425,7 @@ model FichaTecnica {
   @@unique([parceiroId, id])
   @@unique([parceiroId, nome])
   @@unique([parceiroId, insumoProduzidoId])
+  @@unique([parceiroId, chaveEnvio])
   @@index([parceiroId, tipo])
   @@index([parceiroId, secaoId])
   @@index([parceiroId, secaoId, subsecaoId])

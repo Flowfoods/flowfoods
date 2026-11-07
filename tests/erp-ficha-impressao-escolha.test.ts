@@ -44,10 +44,11 @@ describe('Impressão da Ficha · escolha de preços e custos', () => {
     expect(com.at(-1)!.dados).toBeNull();
   });
 
-  it('"Sem preços e custos" imprime direto, sem pedir valores ao servidor', () => {
+  it('"Sem preços e custos" aguarda a conferência operacional, sem pedir finanças', () => {
     const r = passos({ tipo: 'abrir' }, { tipo: 'confirmar', podeFinanceiro: true });
-    expect(r.some((e) => e.fase === 'carregando')).toBe(false);
-    expect(r.at(-1)).toEqual({ fase: 'imprimir', dados: null });
+    expect(r.at(-1)).toEqual({ fase: 'carregando', escolha: 'sem', dados: null });
+    expect(imprimiu(r)).toBe(false);
+    expect(transicaoDaImpressao(r.at(-1)!, { tipo: 'carregou', dados: { valores: 'operacional' } })).toEqual({ fase: 'imprimir', dados: { valores: 'operacional' } });
   });
 
   it('"Com preços e custos": espera o servidor, imprime com os valores e os descarta no afterprint', () => {
@@ -78,10 +79,10 @@ describe('Impressão da Ficha · escolha de preços e custos', () => {
     expect(r).toEqual({ fase: 'escolhendo', escolha: 'sem', erro: null, dados: null });
   });
 
-  it('sem permissão: "Com" não fica marcado nem é confirmado; nunca chega a carregar', () => {
+  it('sem permissão: "Com" não fica marcado; confere somente o papel operacional', () => {
     const r = passos({ tipo: 'abrir' }, { tipo: 'escolher', escolha: 'com', podeFinanceiro: false }, { tipo: 'confirmar', podeFinanceiro: false });
-    expect(r.at(-1)).toEqual({ fase: 'imprimir', dados: null }); // seguiu em "Sem"
-    expect(r.some((e) => e.fase === 'carregando')).toBe(false);
+    expect(r.at(-1)).toEqual({ fase: 'carregando', escolha: 'sem', dados: null });
+    expect(imprimiu(r)).toBe(false);
     expect(r[2]).toMatchObject({ fase: 'escolhendo', escolha: 'sem', erro: SEM_PERMISSAO_FINANCEIRA });
   });
 

@@ -10,7 +10,8 @@
 
 import { prisma } from '@/lib/db';
 import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
-import { cadastrarFicha, editarFicha, mudarSituacaoFicha, type ResultadoFicha } from '@/lib/erp/fichas';
+import { cadastrarFicha, editarFicha, mudarSituacaoFicha, cadastrarFichaUnificada, editarFichaUnificada, type ResultadoFicha } from '@/lib/erp/fichas';
+import { MARCADOR_MATERIAIS_DA_FICHA, type EstadoFichaUnificada } from '@/lib/erp/ficha-unificada-campos';
 import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarFaixasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import type { EstadoConfiguracao } from '@/lib/erp/canal-config-campos';
@@ -20,11 +21,14 @@ import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import type { EstadoDasFotos, EstadoImportacao } from '@/components/erp/telas/fichas/estado';
 import { revalidatePath } from 'next/cache';
 import { mudarFotosDaFicha } from '@/lib/erp/ficha-fotos';
-import { lerImpressaoFinanceira, type ImpressaoFinanceira } from '@/lib/erp/ficha-impressao';
+import { lerImpressaoFinanceira, lerImpressaoOperacional, type ImpressaoFinanceira, type ImpressaoOperacional } from '@/lib/erp/ficha-impressao';
 import { buscarClassificacao } from '@/lib/erp/ficha-secoes';
 import type { EstadoGestaoClassificacao, PedidoBuscaClassificacao, ResultadoBuscaClassificacao } from '@/lib/erp/ficha-secoes-campos';
 import {
   executarImportacao,
+  concluirFichaUnificada,
+  recusarFichaUnificada,
+  lerEnvioDaFichaUnificada,
   concluirConfiguracao,
   recusarConfiguracao,
   executarGestaoClassificacao,
@@ -42,6 +46,37 @@ async function paraEditar(slug: string) {
   const ctx = await exigirParceiro(String(slug));
   const negado = recusaDaAcao(ctx, 'fichas.editar') ?? ctx.bloqueio;
   return { ctx, negado, base: `/rodolfo/erp/${ctx.parceiro.slug}/fichas` };
+}
+
+export async function acaoCadastrarFichaUnificada(slug: string, anterior: EstadoFichaUnificada, form: FormData): Promise<EstadoFichaUnificada> {
+  const { ctx, negado, base } = await paraEditar(slug);
+  if (negado) return recusarFichaUnificada(anterior, negado);
+  const verPrecos = !recusaDaAcao(ctx, 'precos.ver'), verFichas = !recusaDaAcao(ctx, 'fichas.ver');
+  if (form.has(MARCADOR_MATERIAIS_DA_FICHA) && !verPrecos) return recusarFichaUnificada(anterior, 'Você não tem permissão para alterar embalagens por canal.');
+  const envio = await lerEnvioDaFichaUnificada(form);
+  if (!envio.ok) return { ok: false, vez: (anterior?.vez ?? 0) + 1, erros: envio.erros };
+  const r = await cadastrarFichaUnificada(ctx.cliente, envio.entrada, envio.foto, ctx.sessao.autorNome, ctx.sessao.userId);
+  if (r.ok && !r.repetido) await auditar(ctx, 'erp_ficha_criada', { id: r.id });
+  return concluirFichaUnificada(r, anterior, base, form, { verFichas, verPrecos }, true);
+}
+
+export async function acaoEditarFichaUnificada(slug: string, id: string, anterior: EstadoFichaUnificada, form: FormData): Promise<EstadoFichaUnificada> {
+  const { ctx, negado, base } = await paraEditar(slug);
+  if (negado) return recusarFichaUnificada(anterior, negado);
+  const verPrecos = !recusaDaAcao(ctx, 'precos.ver'), verFichas = !recusaDaAcao(ctx, 'fichas.ver');
+  if (form.has(MARCADOR_MATERIAIS_DA_FICHA) && !verPrecos) return recusarFichaUnificada(anterior, 'Você não tem permissão para alterar embalagens por canal.');
+  const envio = await lerEnvioDaFichaUnificada(form);
+  if (!envio.ok) return { ok: false, vez: (anterior?.vez ?? 0) + 1, erros: envio.erros };
+  const r = await editarFichaUnificada(ctx.cliente, String(id), envio.entrada, envio.foto, ctx.sessao.autorNome);
+  if (r.ok && !r.repetido && r.mudou.length) await auditar(ctx, 'erp_ficha_alterada', { id: r.id });
+  return concluirFichaUnificada(r, anterior, base, form, { verFichas, verPrecos }, false);
+}
+
+export async function acaoImpressaoOperacional(slug: string, id: string, versao: string): Promise<ImpressaoOperacional> {
+  const ctx = await exigirParceiro(String(slug));
+  const negado = recusaDaAcao(ctx, 'fichas.ver');
+  if (negado) return { ok: false, erro: negado };
+  return lerImpressaoOperacional(ctx.cliente, id, versao);
 }
 
 type Ctx = Awaited<ReturnType<typeof exigirParceiro>>;
@@ -126,7 +161,7 @@ export async function acaoSalvarEmbalagens(slug: string, id: string, anterior: E
   const r = await salvarEmbalagens(ctx.cliente, String(id), lerEnvioDasEmbalagens(form), ctx.sessao.autorNome);
   if (r.ok) await auditar(ctx, 'erp_ficha_embalagens', { id: r.id });
   const proxima = form.get('continuar') === 'precos' && !recusaDaAcao(ctx, 'fichas.ver');
-  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'embalagens', igual: 'igual' }, proxima ? 'precos' : null, { de: deSeguroDaFicha(form.get('de')) });
+  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'embalagens', igual: 'igual' }, proxima ? 'precos' : null, { de: deSeguroDaFicha(form.get('de')), voltarAEdicao: !!recusaDaAcao(ctx, 'fichas.ver') });
 }
 
 /** 1.9: a taxa do iFood do parceiro. */

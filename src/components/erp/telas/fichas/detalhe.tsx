@@ -116,7 +116,7 @@ export function TelaDetalheFicha({
         acao={
           <div className="flex flex-wrap items-center gap-2">
             {/* N.5 + decisão 510: a página de impressão sai sem valores e pergunta, a cada vez, se inclui preços e custos. */}
-            <Link href={`${base}/${f.id}/imprimir`} className={classeDeBotao('secundario')}>
+            <Link href={`${base}/${f.id}/imprimir${de ? '?de=' + encodeURIComponent(de) : ''}`} className={classeDeBotao('secundario')}>
               <Printer size={16} aria-hidden />
               Imprimir ou PDF
             </Link>

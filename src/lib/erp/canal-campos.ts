@@ -165,6 +165,7 @@ export function lerEmbalagens(
 ): Leitura<EmbalagemDoCanal[]> {
   const erros: Erros = {};
   const out: EmbalagemDoCanal[] = [];
+  if (linhas.some(linha => !ehCanalComEmbalagem(linha.canal))) return { ok: false, erros: { materiais: 'Embalagens de expedição pertencem a Delivery próprio ou iFood.' } };
   for (const canal of CANAIS_COM_EMBALAGEM) {
     const doCanal = linhas.filter((l) => l.canal === canal);
     if (doCanal.length > LIMITES_DO_CANAL.embalagens) erros[`emb-${canal}`] = `Até ${LIMITES_DO_CANAL.embalagens} embalagens por canal.`;

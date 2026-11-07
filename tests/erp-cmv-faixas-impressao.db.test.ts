@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarFicha, obterFicha, obterFichaComCanais } from '@/lib/erp/fichas';
-import { lerImpressaoFinanceira } from '@/lib/erp/ficha-impressao';
+import { lerImpressaoFinanceira, obterFichaParaImpressao } from '@/lib/erp/ficha-impressao';
 import { obterFaixasDeCmv, salvarFaixasDeCmv, salvarPrecos } from '@/lib/erp/canais';
 import { compararFracoes } from '@/lib/erp/unidades';
 import { cadastrarInsumoDeTeste, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
@@ -35,6 +35,7 @@ describe.skipIf(!URL_TESTE)('3B · fotografia financeira de detalhe e impressão
     const insumo = await a.insumo.findUniqueOrThrow({ where: { id: insumoId } });
     const configuracoes = await a.canalConfig.findMany(), precos = await a.produtoCanal.findMany();
     const versao = (await obterFicha(a, fichaId))!.versao;
+    const versaoOperacional = (await obterFichaParaImpressao(a, fichaId))!.versaoOperacional;
     let mudou = false;
     const durante: ClienteDoParceiro = { ...a, transacao: (fn, opcoes) => a.transacao(tx => {
       const interno: ClienteDoParceiro = { ...tx, transacao: f => f(interno), canalConfig: new Proxy({ ...tx.canalConfig }, { get(alvo, prop, receptor) {
@@ -56,7 +57,7 @@ describe.skipIf(!URL_TESTE)('3B · fotografia financeira de detalhe e impressão
     }, opcoes) };
     async function ler(cliente: ClienteDoParceiro) {
       if (modo === 'detalhe') return (await obterFichaComCanais(cliente, fichaId, { verPrecos: true }))!.canais!.cmv;
-      const r = await lerImpressaoFinanceira(cliente, fichaId, versao);
+      const r = await lerImpressaoFinanceira(cliente, fichaId, versaoOperacional);
       if (!r.ok) throw new Error(r.erro); return r.canais!;
     }
     try {

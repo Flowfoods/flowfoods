@@ -40,6 +40,49 @@ export const CHECKS_DA_2_1 = [
 export const INDICE_DO_GRAO = 'FaturamentoLancamento_grao_humano';
 export const CHECK_DA_META_SEM_TAXA = 'CanalConfig_taxa_pendente_coerente';
 export const CHECK_DAS_FAIXAS_DE_CMV = 'CanalConfig_farol_conjunto_valido';
+export const CHECK_DO_ENVIO_DA_FICHA = 'FichaTecnica_envio_conjunto_valido';
+
+/** 3C aditiva: não acusa ausência da fase em snapshots históricos. */
+export async function conferirEnvioDaFicha(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
+  const pendencias: string[] = [];
+  const colunas = await db.$queryRaw<{ nome: string; tipo: string; nula: string; padrao: string | null }[]>`
+    SELECT column_name AS nome,data_type AS tipo,is_nullable AS nula,column_default AS padrao
+    FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='FichaTecnica'
+      AND column_name IN ('chaveEnvio','hashEnvio')`;
+  let aplicada = colunas.length > 0;
+  if (!aplicada) {
+    const marca = await db.$queryRaw<{ tem: boolean }[]>`SELECT to_regclass('_prisma_migrations') IS NOT NULL AS tem`;
+    if (marca[0]?.tem) {
+      const rows = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "_prisma_migrations" WHERE migration_name='20261122000000_erp_ficha_envio' AND rolled_back_at IS NULL`;
+      aplicada = (rows[0]?.n ?? 0) > 0;
+    }
+  }
+  if (!aplicada) return pendencias;
+  for (const nome of ['chaveEnvio', 'hashEnvio']) if (!colunas.some(c => c.nome === nome && c.tipo === 'text' && c.nula === 'YES' && c.padrao === null)) pendencias.push(`3C: coluna FichaTecnica.${nome} deve ser TEXT nullable sem default.`);
+  const checks = await db.$queryRaw<{ validado: boolean; tipo: string; definicao: string }[]>`
+    SELECT c.convalidated AS validado,c.contype::text AS tipo,pg_get_constraintdef(c.oid) AS definicao
+    FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+    WHERE n.nspname=current_schema() AND t.relname='FichaTecnica' AND c.conname=${CHECK_DO_ENVIO_DA_FICHA}`;
+  // pg_get_constraintdef é canônico: preservar agrupamento e caixa dos literais
+  // impede aceitar uma regex diferente ou um OR que permita conjunto parcial.
+  const normalizar = (s: string) => s.replace(/\s+/g, ' ').trim();
+  const esperado = `CHECK (((("chaveEnvio" IS NULL) AND ("hashEnvio" IS NULL)) OR (("chaveEnvio" IS NOT NULL) AND ("hashEnvio" IS NOT NULL) AND ("chaveEnvio" ~ '^[0-9a-f]{40}$'::text) AND ("hashEnvio" ~ '^[0-9a-f]{64}$'::text))))`;
+  if (!checks.some(c => c.validado && c.tipo === 'c' && normalizar(c.definicao) === normalizar(esperado))) pendencias.push(`3C: CHECK ${CHECK_DO_ENVIO_DA_FICHA} ausente, NOT VALID ou incorreto.`);
+  const indices = await db.$queryRaw<{ valido: boolean; pronto: boolean; unico: boolean; parcial: boolean; expressao: boolean; colunas: string[] }[]>`
+    SELECT i.indisvalid AS valido,i.indisready AS pronto,i.indisunique AS unico,i.indpred IS NOT NULL AS parcial,i.indexprs IS NOT NULL AS expressao,
+      ARRAY(SELECT a.attname FROM unnest(i.indkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.num ORDER BY k.ord) AS colunas
+    FROM pg_index i JOIN pg_class idx ON idx.oid=i.indexrelid JOIN pg_class t ON t.oid=i.indrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+    WHERE n.nspname=current_schema() AND t.relname='FichaTecnica' AND idx.relname='FichaTecnica_parceiroId_chaveEnvio_key'`;
+  if (!indices.some(i => i.valido && i.pronto && i.unico && !i.parcial && !i.expressao && JSON.stringify(i.colunas) === '["parceiroId","chaveEnvio"]')) pendencias.push('3C: índice único de FichaTecnica por parceiro/chaveEnvio ausente ou incorreto.');
+  const triggers = await db.$queryRaw<{ tipo: number; habilitado: string; funcao: string; seguranca: boolean; configuracoes: string[] | null; fonte: string }[]>`
+    SELECT tr.tgtype::int AS tipo,tr.tgenabled::text AS habilitado,p.proname AS funcao,p.prosecdef AS seguranca,p.proconfig AS configuracoes,p.prosrc AS fonte
+    FROM pg_trigger tr JOIN pg_class t ON t.oid=tr.tgrelid JOIN pg_namespace n ON n.oid=t.relnamespace JOIN pg_proc p ON p.oid=tr.tgfoid
+    WHERE n.nspname=current_schema() AND t.relname='FichaTecnica' AND tr.tgname='FichaTecnica_envio_imutavel' AND NOT tr.tgisinternal`;
+  const corpo = `BEGIN IF NEW."chaveEnvio" IS DISTINCT FROM OLD."chaveEnvio" OR NEW."hashEnvio" IS DISTINCT FROM OLD."hashEnvio" THEN RAISE EXCEPTION 'A identidade do envio da ficha não muda.' USING ERRCODE = '23514'; END IF; RETURN NEW; END;`;
+  const semEspacos = (s: string) => s.replace(/\s+/g, ' ').trim();
+  if (!triggers.some(t => t.tipo === 19 && t.habilitado === 'O' && t.funcao === 'erp_ficha_envio_imutavel' && !t.seguranca && t.configuracoes?.includes('search_path=pg_catalog') && semEspacos(t.fonte) === semEspacos(corpo))) pendencias.push('3C: gatilho FichaTecnica_envio_imutavel ausente ou incorreto.');
+  return pendencias;
+}
 
 /** Colunas aditivas; o catálogo da fase anterior continua sendo um snapshot válido. */
 export async function conferirFaixasDeCmv(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
@@ -897,6 +940,7 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
   }
   pendencias.push(...await conferirClassificacaoDeFichas(db));
   pendencias.push(...await conferirFaixasDeCmv(db));
+  pendencias.push(...await conferirEnvioDaFicha(db));
   return pendencias;
 }
 

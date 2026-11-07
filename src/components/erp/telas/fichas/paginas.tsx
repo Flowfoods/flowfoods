@@ -12,7 +12,7 @@ import { formatarFator, itemParaCampo, rendimentoParaCampo } from '@/lib/erp/fic
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
 import { TrilhaDaPagina } from '../../shell/trilha';
-import type { AcaoDeCadastro } from '../cadastro/estado';
+import type { AcaoFichaUnificada, ContextoMateriaisDaFicha } from '@/lib/erp/ficha-unificada-campos';
 import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import type { AcaoDeImportacao } from './estado';
 import { FormFicha, type ValoresDaFicha } from './form-ficha';
@@ -93,12 +93,14 @@ export function TelaFormFicha({
   verCustos,
   classificacao,
   de = '',
+  materiais = null,
+  verFichas = true,
 }: {
   /** Ausente = nova. */
   ficha?: FichaNaTela;
   base: string;
   contexto: string;
-  acao: AcaoDeCadastro;
+  acao: AcaoFichaUnificada;
   opcoes: InsumoDoFormulario[];
   preparos: PreparoDoFormularioNaTela[];
   /** O servidor já retirou os valores das opções quando esta permissão não existe. */
@@ -107,6 +109,8 @@ export function TelaFormFicha({
   novoInsumo?: string;
   classificacao?: ContextoClassificacao;
   de?: string;
+  materiais?: ContextoMateriaisDaFicha | null;
+  verFichas?: boolean;
 }) {
   const rende = ficha && rendimentoParaCampo(ficha.rendimentoMilesimos, ficha.unidadeRendimento, ficha.tipo);
   const inicial: ValoresDaFicha | undefined = ficha && {
@@ -125,13 +129,16 @@ export function TelaFormFicha({
     validades: ficha.validades,
     consumoImediato: ficha.consumoImediato,
     classificacao: classificacao ? classificacaoParaCampos(classificacao.atual) : undefined,
+    materiais: materiais?.linhas.map((l, chave) => ({ ...l, chave })),
+    versaoMateriais: materiais?.versao,
+    versaoDaFicha: ficha.versao,
   };
   const busca = de ? `?de=${encodeURIComponent(de)}` : '';
-  const volta = ficha ? `${base}/${ficha.id}${busca}` : `${base}${de ? `?${de}` : ''}`;
+  const volta = !verFichas ? base.replace(/\/fichas$/, '') : ficha ? `${base}/${ficha.id}${busca}` : `${base}${de ? `?${de}` : ''}`;
   return (
     <div className="mx-auto max-w-4xl space-y-6 xl:max-w-6xl">
-      <TrilhaDaPagina itens={ficha ? [{ rotulo: ficha.nome, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Nova ficha' }]} />
-      <Voltar href={volta}>{ficha ? `Voltar para ${ficha.nome}` : 'Voltar para a lista'}</Voltar>
+      <TrilhaDaPagina itens={ficha ? [{ rotulo: ficha.nome, ...(verFichas ? { href: volta } : {}) }, { rotulo: 'Editar' }] : [{ rotulo: 'Nova ficha' }]} />
+      <Voltar href={volta}>{!verFichas ? 'Voltar para o início' : ficha ? `Voltar para ${ficha.nome}` : 'Voltar para a lista'}</Voltar>
       <PageHeader
         icone="fichas"
         cor={COR.fichas}
@@ -148,12 +155,15 @@ export function TelaFormFicha({
         opcoes={opcoes}
         preparos={preparos}
         inicial={inicial}
-        fotoAtual={ficha?.foto ? urlDaFoto(base, ficha.id, ficha.foto) : null}
+        fotoAtual={verFichas && ficha?.foto ? urlDaFoto(base, ficha.id, ficha.foto) : null}
+        temFotoAtual={!!ficha?.foto}
         versao={ficha?.versao}
         bloqueio={bloqueio}
         novoInsumo={novoInsumo}
         classificacao={classificacao}
         de={de}
+        materiais={materiais}
+        podeConferirPrecos={verFichas && verCustos}
       />
     </div>
   );

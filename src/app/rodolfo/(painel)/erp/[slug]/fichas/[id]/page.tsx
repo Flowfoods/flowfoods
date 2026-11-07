@@ -41,7 +41,7 @@ export default async function ParceiroFichaPage({
       acaoSituacao={acaoSituacaoFicha.bind(null, ctx.parceiro.slug, ficha.id)}
       linkDoInsumo={`${base}/insumos`}
       canais={canais}
-      linkDasEmbalagens={ctx.bloqueio ? undefined : `${base}/fichas/${ficha.id}/canais${de ? `?de=${encodeURIComponent(de)}` : ''}`}
+      linkDasEmbalagens={ctx.bloqueio ? undefined : `${base}/fichas/${ficha.id}/editar${de ? `?de=${encodeURIComponent(de)}` : ''}#ficha-materiais`}
       linkDaTaxa={`${base}/fichas/canais`}
       linkDoProduzir={ficha.ativa && !ctx.bloqueio ? `/rodolfo/erp/${ctx.parceiro.slug}/producao/nova?ficha=${ficha.id}` : undefined}
       podeConfigurarTaxa={!ctx.bloqueio}

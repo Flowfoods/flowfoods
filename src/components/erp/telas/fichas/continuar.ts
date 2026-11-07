@@ -10,8 +10,14 @@ export function concluirEtapaDaFicha(
   base: string,
   feito: { mudou: string; igual?: string },
   etapa: 'embalagens' | 'precos' | null,
-  retorno?: { de: string },
+  retorno?: { de: string; voltarAEdicao?: boolean },
 ): EstadoCadastro {
+  if (r.ok && retorno?.voltarAEdicao) {
+    revalidatePath(base, 'layout');
+    const busca = new URLSearchParams({ feito: r.mudou.length === 0 && feito.igual ? feito.igual : feito.mudou });
+    if (retorno.de) busca.set('de', retorno.de);
+    redirect(`${base}/${r.id}/editar?${busca}`);
+  }
   if (!r.ok || !etapa) return concluir(r, anterior, base, feito, undefined, undefined, 'insumo', retorno ? { de: retorno.de, aLista: false } : undefined);
   revalidatePath(base, 'layout');
   const frase = r.mudou.length === 0 && feito.igual ? feito.igual : feito.mudou;

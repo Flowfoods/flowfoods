@@ -17,7 +17,7 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: atual.auditoria } } }
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { resolverAlcance, type Permissao } from '@/lib/erp/permissoes';
-import { cadastrarFicha, obterFicha } from '@/lib/erp/fichas';
+import { cadastrarFicha } from '@/lib/erp/fichas';
 import { obterFaixasDeCmv, obterTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoConfiguracao } from '@/lib/erp/canal-config-campos';
 import * as erp from '@/app/erp/fichas/actions';
@@ -134,7 +134,7 @@ describe.skipIf(!URL_TESTE)('3B · actions reais, permissão atual e impressão 
     expect(json(pagina.props)).not.toMatch(/farol|aBp|bBp|cBp|dBp|confortavel|cmvBp|precoCentavos/);
     const operacional = renderToStaticMarkup(createElement(TelaImpressaoFicha, pagina.props));
     expect(operacional).toContain('Misturar.'); expect(operacional).not.toContain('Confortável');
-    const versao = (await obterFicha(a, f.id))!.versao;
+    const versao = pagina.props.ficha.versaoOperacional;
     for (const imprimir of [() => acaoImpressaoFinanceira(f.id, versao), () => imprimirN1(parceiro.slug, f.id, versao)]) {
       acesso(); const r = await imprimir(); if (!r.ok) throw new Error(r.erro);
       expect(r.canais).toHaveLength(3); expect(r.canais!.every(c => c.metaBp === null && c.farol.faixa === 'confortavel')).toBe(true);

@@ -31,7 +31,7 @@ vi.mock('react', async original => ({
 }));
 vi.mock('@/components/erp/ui/ponto-de-ajuda', () => ({ useTemPonto: () => false, PontoDeAjuda: () => null }));
 
-import { CampoFoto } from '@/components/erp/telas/fichas/campo-foto';
+import { CampoFoto, type IntencaoFotoDaFicha } from '@/components/erp/telas/fichas/campo-foto';
 import { LIMITE_DA_FOTO } from '@/lib/erp/foto';
 
 type Elemento = ReactElement<Record<string, unknown>>;
@@ -62,14 +62,16 @@ describe('foto da ficha: somente a escolha vigente pode mudar o formulário', ()
   let criarUrl: Mock<(arquivo: Blob | MediaSource) => string>;
   let revogarUrl: Mock<(url: string) => void>;
 
-  function montar(atual: string | null = '/foto-gravada') {
+  function montar(atual: string | null = '/foto-gravada', controlado?: IntencaoFotoDaFicha, temFotoAtual = !!atual) {
+    let intencao = controlado;
+    const aoAlterar = vi.fn((v: IntencaoFotoDaFicha) => { intencao = v; });
     const i: Instancia = { refs: [], ref: 0, estados: [], estado: 0, efeitos: [], efeito: 0, pendentes: [], desmontada: false, atualizacoesDepois: 0 };
     const aoOcupar = vi.fn(), aoMudar = vi.fn();
     const entrada = { files: [] as File[], value: '' };
     let arvore: Elemento;
     function renderizar() {
       i.ref = 0; i.estado = 0; i.efeito = 0; ciclo.atual = i;
-      try { arvore = CampoFoto({ atual, nome: 'Prato', idBase: 'ficha', envio: '/erp/fichas/fotos', aoOcupar, aoMudar }); }
+      try { arvore = CampoFoto({ atual, temFotoAtual, nome: 'Prato', idBase: 'ficha', envio: '/erp/fichas/fotos', aoOcupar, aoMudar, ...(controlado ? { valor: intencao, aoAlterar } : {}) }); }
       finally { ciclo.atual = null; }
       const el = elementos(arvore).find(e => e.type === 'input' && e.props.type === 'file')!;
       const ref = (el as unknown as { ref: { current: unknown } }).ref;
@@ -79,7 +81,9 @@ describe('foto da ficha: somente a escolha vigente pode mudar o formulário', ()
     }
     renderizar();
     const h = {
-      i, entrada, aoOcupar, aoMudar, renderizar,
+      i, entrada, aoOcupar, aoMudar, aoAlterar, renderizar,
+      intencao: () => intencao,
+      erroDaImagem() { const img = elementos(renderizar()).find(e => e.type === 'img')!; (img.props.onError as () => void)(); renderizar(); },
       selecionar(arquivo: File | null) {
         entrada.files = arquivo ? [arquivo] : [];
         entrada.value = arquivo?.name ?? '';
@@ -235,4 +239,29 @@ describe('foto da ficha: somente a escolha vigente pode mudar o formulário', ()
     h.desmontar();
     expect(revogarUrl.mock.calls).toEqual([['blob:A.jpg'], ['blob:B.jpg']]);
   });
+  it('restaura token controlado pela rota protegida, sem File/blob, e conserva intenção diante de erro do GET', () => {
+    const h = montar('/foto-gravada', { tipo: 'nova', arquivo: 'pendente foto.jpg' });
+    expect(h.imagem()).toBe('/erp/fichas/fotos?arquivo=pendente%20foto.jpg'); expect(h.nomeEnviado()).toBe('pendente foto.jpg');
+    h.erroDaImagem(); expect(h.mensagem()).toContain('Escolha a foto novamente'); expect(h.intencao()).toEqual({ tipo: 'nova', arquivo: 'pendente foto.jpg' }); expect(h.aoAlterar).not.toHaveBeenCalled();
+    h.remover(); expect(h.intencao()).toEqual({ tipo: 'remover' }); expect(h.nomeEnviado()).toBeUndefined(); expect(h.imagem()).toBeUndefined();
+    h.remover(false); expect(h.intencao()).toEqual({ tipo: 'manter' }); expect(h.imagem()).toBe('/foto-gravada');
+  });
+  it('upload confirmado atualiza intenção controlada e só a última escolha vira token do rascunho', async () => {
+    const h = montar(null, { tipo: 'manter' }); const a=h.selecionar(foto('A.jpg')); await tick(); const b=h.selecionar(foto('B.jpg')); await tick();
+    responder('B.jpg',{arquivo:'B-pendente.jpg'}); await b; responder('A.jpg',{arquivo:'A-pendente.jpg'}); await a;
+    expect(h.intencao()).toEqual({tipo:'nova',arquivo:'B-pendente.jpg'}); expect(h.aoAlterar).toHaveBeenCalledExactlyOnceWith({tipo:'nova',arquivo:'B-pendente.jpg'});
+  });
+  it('principal sem URL pode ser mantida, removida e restaurada sem buscar imagem proibida', () => {
+    const h = montar(null, { tipo: 'manter' }, true);
+    expect(h.imagem()).toBeUndefined(); expect(h.intencao()).toEqual({ tipo: 'manter' }); expect(h.mensagem()).toContain('Foto salva.'); expect(h.mensagem()).toContain('Trocar foto'); expect(h.mensagem()).toContain('Tirar a foto');
+    h.remover(); expect(h.intencao()).toEqual({ tipo: 'remover' }); expect(h.mensagem()).toContain('será removida ao salvar'); expect(h.imagem()).toBeUndefined();
+    h.remover(false); expect(h.intencao()).toEqual({ tipo: 'manter' }); expect(h.mensagem()).toContain('visualização não está disponível'); expect(h.imagem()).toBeUndefined(); expect(fetchTeste).not.toHaveBeenCalled();
+  });
+  it('editor sem URL principal vê blob recém-enviado e GET da pendente restaurada', async () => {
+    const h = montar(null, { tipo: 'manter' }, true); const envio = h.selecionar(foto('nova.jpg')); await tick(); responder('nova.jpg', { arquivo: 'pendente-nova.jpg' }); await envio;
+    expect(h.imagem()).toBe('blob:nova.jpg'); expect(h.intencao()).toEqual({ tipo: 'nova', arquivo: 'pendente-nova.jpg' }); expect(h.nomeEnviado()).toBe('pendente-nova.jpg');
+    h.desmontar(); const restaurada = montar(null, { tipo: 'nova', arquivo: 'pendente-nova.jpg' }, true);
+    expect(restaurada.imagem()).toBe('/erp/fichas/fotos?arquivo=pendente-nova.jpg'); expect(restaurada.mensagem()).not.toContain('visualização não está disponível'); expect(restaurada.mensagem()).toContain('Tirar a foto');
+  });
+
 });

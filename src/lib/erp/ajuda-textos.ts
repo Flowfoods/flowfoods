@@ -362,11 +362,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/nova', 'fichas/[id]/editar'],
     titulo: 'Montar a ficha',
-    versao: 5,
+    versao: 6,
     aula: [
       { texto: 'Monte a receita com a quantidade limpa, sem casca e sem osso; o fator de correção cobre a perda da limpeza: cebola 1,18 quer dizer que 354 g sujas dão 300 g limpas.' },
       { texto: 'Pré-preparo diz quanto rende pronto, onde guarda e quanto dura; marque consumo imediato quando nada fica guardado.' },
       { texto: 'Seção e subseção são opcionais, para pratos e pré-preparos. Escolha uma existente ou escreva um nome novo; o nome novo só é criado ao salvar a ficha.' },
+      { texto: 'As embalagens ficam na mesma edição, em bloco separado da receita e do preparo. Delivery próprio e iFood têm quantidades por porção; Loja usa somente a receita.', para: ['precos.ver'] },
+      { texto: 'Salvar confirma receita e embalagens juntas; a prévia acompanha os ingredientes, o rendimento e as embalagens digitadas, sem mudar o preço manual.', para: ['precos.ver'] },
     ],
     secoes: [
       {
@@ -403,7 +405,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       {
         id: 'foto',
         titulo: 'Foto da ficha',
-        blocos: [{ texto: 'Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. A foto é reduzida e guardada sem a localização do celular.' }],
+        blocos: [
+          { texto: 'Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. A foto é reduzida e guardada sem a localização do celular.' },
+          { texto: 'Espere o envio da foto terminar antes de cadastrar um insumo; se ela não estiver mais disponível ao voltar, escolha novamente, mantendo os outros campos do rascunho.' },
+        ],
       },
       {
         id: 'rendimento',
@@ -417,6 +422,24 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Etapas do preparo',
         blocos: [{ texto: 'Uma ação por etapa. A ordem aqui é a ordem na ficha e na impressão, e etapa em branco não é gravada.' }],
         secao: 'preparo',
+      },
+      {
+        id: 'embalagens',
+        titulo: 'Embalagens por canal',
+        blocos: [
+          { texto: 'Escolha embalagens cadastradas e a quantidade por porção de cada canal; copiar Delivery para iFood é opcional, e as listas podem ser ajustadas separadamente.', para: ['precos.ver'] },
+          { texto: 'Os canais são alternativas para o pedido; embalagem também presente na receita pede conferência para evitar contar o mesmo uso duas vezes.', para: ['precos.ver'] },
+          { texto: 'Cadastrar um insumo exige acesso próprio e não salva a ficha; a prévia usa referências da abertura e fica pendente com custo ausente ou entrada inválida.', para: ['precos.ver'] },
+        ],
+      },
+      {
+        id: 'rascunho',
+        titulo: 'Rascunho e confirmação',
+        blocos: [
+          { texto: 'O rascunho fica nesta aba por 20 minutos, separado por pessoa, parceiro e ficha; fechar a aba não guarda uma cópia para outra sessão.' },
+          { texto: 'Se alguém salvou antes, o rascunho continua disponível, mas a versão antiga não sobrescreve a nova; confira a ficha salva antes de refazer as alterações.' },
+          { texto: 'Sem resposta, confira a ficha antes de repetir: a edição pode indicar conflito mesmo quando a primeira tentativa foi gravada.' },
+        ],
       },
     ],
   },
@@ -890,14 +913,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/[id]', 'fichas/[id]/imprimir'],
     titulo: 'Detalhe da ficha',
-    versao: 7,
+    versao: 8,
     aula: [
       { texto: 'Foto, descrição comercial, seção e subseção (com aviso quando arquivadas), o que a receita leva e o modo de preparo em etapas.' },
       { texto: 'O custo por porção e de cada item, com a conta à mostra.', para: ['precos.ver'] },
       { texto: 'Pré-preparo: “Produzir” planeja um lote dele, com os insumos tirados da receita.', para: ['producao.registrar'] },
       { texto: 'Em “Preço e CMV por canal”: custo físico, meta, sugestão pela meta, seu preço, CMV com sua faixa e comparação com a meta, e resultado após os custos informados.', para: ['precos.ver'] },
       { texto: 'Preço em branco é preço não definido: o canal fica sem dados até você pôr o seu. A sugestão nunca muda o seu preço.', para: ['precos.ver'] },
-      { texto: 'Na página de impressão, o botão pergunta antes o que sai no papel; cancelar não imprime, e o Ctrl+P de lá sai sem valores.' },
+      { texto: 'A impressão usa a ficha salva, com ingredientes por rendimento e embalagens por porção; o botão confere alterações e pergunta o que sai no papel.' },
     ],
     secoes: [
       {
@@ -919,6 +942,15 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'O percentual aparece com uma casa decimal; a faixa considera o CMV sem arredondar e mostra seu intervalo. A impressão com preços e custos inclui essa informação; a impressão sem valores não a recebe.', para: ['precos.ver'] },
         ],
       },
+      {
+        id: 'impressao',
+        titulo: 'Conferir o que sai no papel',
+        blocos: [
+          { texto: 'Delivery e iFood aparecem separados, com nome, unidade e quantidade por porção de cada embalagem; são alternativas, não uma soma para o mesmo pedido.' },
+          { texto: 'Rascunho não salvo não entra na impressão; se a ficha ou as embalagens mudaram, o botão pede recarga, e cancelar não imprime.' },
+          { texto: 'Ctrl+P sai sem valores e usa a versão já carregada, sem buscar alterações mais recentes.' },
+        ],
+      },
     ],
   },
   {
@@ -926,10 +958,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/[id]/canais'],
     titulo: 'Embalagens por canal',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'O que vai no saco em cada canal: caixa, sacola, guardanapo.' },
       { texto: 'Delivery e iFood têm listas próprias. A loja não leva embalagem.' },
+      { texto: 'As embalagens também ficam na edição da ficha, em bloco separado; esta página continua disponível para ajustar somente as embalagens.' },
       { texto: 'Em cada canal, a sugestão pela meta, o CMV e sua faixa acompanham as embalagens digitadas na tela. É uma prévia; o preço muda só no passo de preços.', para: ['precos.ver'] },
     ],
   },

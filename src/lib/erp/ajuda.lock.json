@@ -48,8 +48,8 @@
     "hash": "2ba19a51b9664164"
   },
   "ficha-nova": {
-    "versao": 5,
-    "hash": "96572108eb1abf29"
+    "versao": 6,
+    "hash": "00e2d1fd71afc1e8"
   },
   "ficha-importar": {
     "versao": 1,
@@ -156,12 +156,12 @@
     "hash": "83ece79d9848d788"
   },
   "ficha": {
-    "versao": 7,
-    "hash": "623fdbbf6ef65031"
+    "versao": 8,
+    "hash": "9eb5a925f50f75e1"
   },
   "ficha-embalagens": {
-    "versao": 3,
-    "hash": "d61dbde0e55636b3"
+    "versao": 4,
+    "hash": "5154f1922d4d9555"
   },
   "precificacao": {
     "versao": 3,

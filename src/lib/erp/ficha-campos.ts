@@ -247,7 +247,7 @@ export const passosEmTexto = (passos: readonly string[]): string | null => (pass
  */
 export function lerFormFicha(
   entrada: EntradaDaFicha,
-  doCadastro: ReadonlyMap<string, InsumoDaFicha>,
+  doCadastro: ReadonlyMap<string, Pick<InsumoDaFicha, 'id' | 'nome' | 'unidade' | 'ativo' | 'produzidoPor' | 'tipo'>>,
   jaNaFicha: ReadonlySet<string> = new Set(),
   opcoes: {
     /** Pré-preparos que a entrada cita, lidos pelo portão (de outro parceiro: não estão aqui). */
@@ -427,7 +427,7 @@ export interface ItemParaCusto {
   /** Custo de referência do insumo; null = "Sem preço". */
   custo: CustoExato | null;
   /** Pré-preparo (1.3): o custo DELE, já calculado (o item usa o custo por unidade de rendimento). */
-  preparo?: CustoDaFicha;
+  preparo?: Pick<CustoDaFicha, 'porRendimento' | 'faltaPreco'>;
 }
 
 export interface CustoDaFicha {

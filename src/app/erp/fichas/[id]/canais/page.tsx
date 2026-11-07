@@ -28,6 +28,7 @@ export default async function ErpEmbalagensDaFichaPage({ params, searchParams }:
   if (!leitura) notFound();
   const { ficha, canais, opcoes } = leitura;
   const de = deSeguroDaFicha(searchParams?.de);
+  if ((!ficha.ativa || !canais) && !pode(ctx.alcance, 'fichas.ver')) notFound();
   if (!ficha.ativa || !canais) redirect(`${BASE}/${ficha.id}${de ? `?de=${encodeURIComponent(de)}` : ''}`);
   return (
     <TelaEmbalagensDaFicha

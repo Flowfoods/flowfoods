@@ -136,7 +136,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect('canais' in imp.props).toBe(false);
     expect(json(imp.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
     // Decisão de 31/10: mesmo chamando a ação direto, quem não vê preços recebe a recusa, nunca os valores.
-    const forcado = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
+    const forcado = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versaoOperacional);
     expect(forcado.ok).toBe(false);
     expect(json(forcado)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
   });
@@ -166,7 +166,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(imp.props.ficha.verCustos).toBe(false);
     expect(imp.props.podeFinanceiro).toBe(true);
     expect(json(imp.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
-    const comValores = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
+    const comValores = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versaoOperacional);
     if (!comValores.ok) throw new Error(comValores.erro);
     expect(comValores.ficha.verCustos).toBe(true);
     expect(comValores.ficha.id).toBe(ids.ficha);
@@ -189,7 +189,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(html).toContain('Tostar o pão.');
     expect(html).toContain('Imprimir ou salvar em PDF');
     expect(html).not.toMatch(/7,37|Preço e CMV|Custo da receita|R\$/);
-    const r = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
+    const r = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versaoOperacional);
     if (!r.ok) throw new Error(r.erro);
     const papel = renderToStaticMarkup(createElement(DocumentoDaFicha, { ficha: r.ficha, canais: r.canais, contexto: 'Visões', base: '/erp/fichas', geradoEm: new Date() }));
     expect(papel).toContain('Preço e CMV por canal');
@@ -224,9 +224,11 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
   it('impressão: o navegador recebe só o que o papel usa (sem histórico, autores, usos ou composição do pré-preparo)', async () => {
     atual.ctx = ctxDe('GERENTE');
     const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
-    const campos = ['ativa', 'consumoImediato', 'custo', 'descricao', 'foto', 'id', 'itens', 'modoPreparo', 'nome', 'passosPreparo', 'rendimentoMilesimos', 'tipo', 'unidadeRendimento', 'validades', 'verCustos', 'versao'];
+    const campos = ['ativa', 'consumoImediato', 'custo', 'descricao', 'foto', 'id', 'itens', 'materiais', 'modoPreparo', 'nome', 'passosPreparo', 'rendimentoMilesimos', 'tipo', 'unidadeRendimento', 'validades', 'verCustos', 'versao', 'versaoOperacional'];
     expect(Object.keys(imp.props.ficha).sort()).toEqual(campos);
-    const r = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
+    expect(imp.props.ficha.materiais).toEqual([]);
+    expect(imp.props.ficha.versaoOperacional).toMatch(/^[0-9a-f]{64}$/);
+    const r = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versaoOperacional);
     if (!r.ok) throw new Error(r.erro);
     expect(Object.keys(r.ficha).sort()).toEqual(campos);
     expect(Object.keys(r.ficha.itens[0]).sort()).toEqual(['custo', 'fatorCorrecaoMilesimos', 'id', 'nome', 'preparo', 'quantidadeMilesimos', 'unidade']);
@@ -239,10 +241,10 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(imp.props.ficha.verCustos).toBe(false);
     expect(imp.props.podeFinanceiro).toBe(true);
     expect(json(imp.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
-    const r = await imp.props.carregarFinanceiro(ids.ficha, imp.props.ficha.versao);
+    const r = await imp.props.carregarFinanceiro(ids.ficha, imp.props.ficha.versaoOperacional);
     expect(r.ok && r.ficha.verCustos).toBe(true);
     // O slug escolhe o parceiro em exigirParceiro (sessão do nível 1); aqui o contexto é simulado, então só se confere a ligação.
-    const direto = await acaoImpressaoFinanceiraN1(P.id, ids.ficha, imp.props.ficha.versao);
+    const direto = await acaoImpressaoFinanceiraN1(P.id, ids.ficha, imp.props.ficha.versaoOperacional);
     expect(direto.ok).toBe(true);
   });
 

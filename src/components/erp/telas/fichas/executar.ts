@@ -22,8 +22,46 @@ import type { ResultadoDoCanal } from '@/lib/erp/canais';
 import { PREFIXO_DO_PREPARO } from './prefixo';
 import { classificacaoDoFormulario, type EstadoGestaoClassificacao } from '@/lib/erp/ficha-secoes-campos';
 import { gerirClassificacao } from '@/lib/erp/ficha-secoes';
+import { materiaisDoFormulario, type EntradaFichaUnificada, type EstadoFichaUnificada, type ResultadoFichaUnificada } from '@/lib/erp/ficha-unificada-campos';
+import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 
 const textoDe = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');
+
+export function recusarFichaUnificada(anterior: EstadoFichaUnificada, motivo: string): EstadoFichaUnificada {
+  return { ok: false, vez: (anterior?.vez ?? 0) + 1, erros: { geral: motivo } };
+}
+
+/** Confirmação explícita do próprio envio, antes de limpar o rascunho e navegar. */
+export function concluirFichaUnificada(r: ResultadoFichaUnificada, anterior: EstadoFichaUnificada, base: string,
+  form: FormData, permissoes: { verFichas: boolean; verPrecos: boolean }, criando: boolean): EstadoFichaUnificada {
+  const vez = (anterior?.vez ?? 0) + 1;
+  if (!r.ok) return { ok: false, vez, erros: r.erros, conflito: r.conflito, indeterminado: r.indeterminado };
+  revalidatePath(base, 'layout');
+  const feito = criando ? 'criada' : r.mudou.length ? 'editada' : 'igual';
+  const busca = new URLSearchParams({ feito });
+  const de = deSeguroDaFicha(form.get('de'), permissoes.verPrecos);
+  if (de) busca.set('de', de);
+  const conferir = permissoes.verFichas && permissoes.verPrecos && form.get('tipo') === 'PRATO' && form.get('continuar') === 'precos';
+  if (conferir) busca.set('etapa', 'precos');
+  // Replay não afirma que o registro permanece ativo. Sem fichas.ver, o início é sempre um destino autorizado.
+  const destino = r.repetido && !permissoes.verFichas ? base.replace(/\/fichas$/, '')
+    : `${base}/${r.id}${permissoes.verFichas ? '' : '/editar'}?${busca}${conferir ? '#preco-por-canal' : ''}`;
+  const comum = { ok: true as const, vez, id: r.id, destino, mensagem: r.repetido ? 'Este cadastro já havia sido confirmado.' : 'Ficha salva.' };
+  return r.repetido ? { ...comum, repetido: true }
+    : { ...comum, repetido: false, versao: r.versao, versaoMateriais: permissoes.verPrecos ? r.versaoMateriais : null };
+}
+
+export async function lerEnvioDaFichaUnificada(form: FormData): Promise<{ ok: true; entrada: EntradaFichaUnificada; foto: MudancaDeFoto } | { ok: false; erros: Record<string, string> }> {
+  const materiais = materiaisDoFormulario(form);
+  if (!materiais.ok) return materiais as { ok: false; erros: Record<string, string> };
+  for (const nome of ['chaveEnvio', 'versao']) {
+    const valores = form.getAll(nome);
+    if (valores.length > 1 || valores.some(v => typeof v !== 'string')) return { ok: false, erros: { geral: 'Pedido de ficha inválido. Reabra o formulário.' } };
+  }
+  const lido = await lerEnvioDaFicha(form);
+  if ('erroDaFoto' in lido) return { ok: false, erros: { foto: lido.erroDaFoto } };
+  return { ok: true, entrada: { ...lido.entrada, chaveEnvio: form.get('chaveEnvio'), materiais: materiais.materiais }, foto: lido.foto };
+}
 
 export function recusarConfiguracao(anterior: EstadoConfiguracao, motivo: string): EstadoConfiguracao {
   return { ok: false, erros: { geral: motivo }, vez: (anterior?.vez ?? 0) + 1 };

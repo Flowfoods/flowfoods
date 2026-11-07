@@ -58,7 +58,7 @@ export function TelaEmbalagensDaFicha({
   de?: string;
 }) {
   const busca = de ? `?de=${encodeURIComponent(de)}` : '';
-  const volta = `${base}/${ficha.id}${busca}`;
+  const volta = `${base}/${ficha.id}${podeConferirPrecos ? '' : '/editar'}${busca}`;
   const mensagem = fraseDoFeitoDaFicha(feito);
   const inicial: LinhaDaEmbalagem[] = canais.embalagens.map((e) => {
     const q = quantidadeParaCampo(e.quantidadeMilesimos, e.unidade);
@@ -75,7 +75,7 @@ export function TelaEmbalagensDaFicha({
         {' '}A quantidade é por porção de cada produto, inclusive a sacola. Configure apenas o uso que ainda não está na receita; usos diferentes do mesmo insumo podem coexistir.
         {' '}Salvar esta previsão de custo não movimenta estoque. Condimentos comestíveis continuam como ingredientes.
       </p>
-      <Link href={`${base}/${ficha.id}/editar${busca}`} className={classeDeBotao('secundario')}>Revisar receita e rendimento</Link>
+      <Link href={`${base}/${ficha.id}/editar${busca}#ficha-materiais`} className={classeDeBotao('secundario')}>Editar receita e embalagens juntas</Link>
       <FormEmbalagens
         acao={acao}
         aqui={`${base}/${ficha.id}/canais${busca}`}

@@ -21,20 +21,21 @@
  *   agora; o retrato antigo fica no histórico);
  * - pré-preparo mantém, na mesma transação, o insumo que ele produz (nome,
  *   unidade, situação e — 1.4 — conservação e validades acompanham a ficha);
- * - a foto vai para o disco ANTES da transação e sai se ela não fechar; a
- *   antiga só é apagada depois do commit.
+ * - a foto tem ciclo próprio: no fluxo integrado, replay/CAS precedem sua
+ *   movimentação; rollback conhecido compensa, confirmação incerta preserva.
  */
 
 import type { Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import type { ClienteDoParceiro } from './tenant';
-import { ehErroDeUnicidade } from './tenant';
+import { checkVioladoDe, ehDeadlock, ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
 import { idsDeFichaPelaBusca } from './busca';
-import { cmvDaLista, custoPorCanal } from './canais';
+import { cmvDaLista, custoPorCanal, contextoMateriaisDaFicha, materiaisDaFicha, salvarEmbalagensNaTransacao, RecusaDoCanal } from './canais';
 import { filtrosFaixasCmvCanonicos, type FiltroDaFaixaDoCmv } from './cmv-faixas-campos';
 import { classificacaoDaLinha, ErroDeClassificacao, resolverClassificacao, SELECAO_DA_CLASSIFICACAO, travarClassificacao } from './ficha-secoes';
 import type { ClassificacaoDaFicha } from './ficha-secoes-campos';
-import { diferenca, type Erros } from './insumo-campos';
+import { diferenca, lerChaveDeEnvio, type Erros } from './insumo-campos';
 import {
   chaveDoItem,
   custoDoInsumo,
@@ -64,6 +65,9 @@ import { lerFotosDeApoio } from './ficha-fotos-campos';
 import { apagarFoto, assumirFotoPendente, devolverFotoPendente, faxinarPendentesDeVezEmQuando, salvarFoto } from './arquivos';
 import { cabeNaExibicao, UNIDADES, type CustoExato, type Fracao, type Unidade } from './unidades';
 import { colunasDaValidade, retratoDaValidade, SELECAO_DA_VALIDADE, validadesDaLinha, type Validades } from './validade';
+import { proximaVersaoDaFicha } from './ficha-versao';
+import { hashDoEnvioDaFicha } from './ficha-envio';
+import { MENSAGEM_ENVIO_INDETERMINADO, type EntradaFichaUnificada, type ResultadoFichaUnificada } from './ficha-unificada-campos';
 
 export type ResultadoFicha =
   | { ok: true; id: string; nome: string; mudou: string[] }
@@ -373,7 +377,7 @@ async function sincronizarInsumoProduzido(
 
   if (f.tipo !== 'PRE_PREPARO') {
     if (!f.insumoProduzidoId) return;
-    await tx.fichaTecnica.updateMany({ where: { id: f.id }, data: { insumoProduzidoId: null } });
+    await tx.fichaTecnica.updateMany({ where: { id: f.id }, data: { insumoProduzidoId: null, atualizadoEm: await proximaVersaoDaFicha(tx, f.id) } });
     const ins = await tx.insumo.findUnique({ where: { id: f.insumoProduzidoId }, select: { nome: true, ativo: true } });
     if (ins?.ativo) {
       await tx.insumo.updateMany({ where: { id: f.insumoProduzidoId }, data: { ativo: false } });
@@ -470,12 +474,13 @@ async function sincronizarInsumoProduzido(
     });
     insumoId = novo.id;
   }
-  await tx.fichaTecnica.updateMany({ where: { id: f.id }, data: { insumoProduzidoId: insumoId } });
+  await tx.fichaTecnica.updateMany({ where: { id: f.id }, data: { insumoProduzidoId: insumoId, atualizadoEm: await proximaVersaoDaFicha(tx, f.id) } });
 }
 
 // --------------------------------------------------------- gravar (comum)
 
 export interface Gravacao {
+  envio?: { chaveEnvio: string; hashEnvio: string };
   /** Ficha nova (null) ou a versão lida da existente. */
   atual: Pick<FichaGravada, 'id' | 'atualizadoEm' | 'fotoArquivo' | 'insumoProduzidoId' | 'secaoId' | 'subsecaoId'> | null;
   classificacao?: unknown;
@@ -514,6 +519,7 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
     const nova = await tx.fichaTecnica.create({
       data: {
         parceiroId: tx.parceiroId,
+        ...g.envio,
         nome: d.nome,
         secaoId: resolvida.secaoId,
         subsecaoId: resolvida.subsecaoId,
@@ -556,6 +562,7 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
   const r = await tx.fichaTecnica.updateMany({
     where: { id: g.atual.id, atualizadoEm: g.atual.atualizadoEm, ativa: true },
     data: {
+      atualizadoEm: await proximaVersaoDaFicha(tx, g.atual.id),
       nome: d.nome,
       secaoId: resolvida.secaoId,
       subsecaoId: resolvida.subsecaoId,
@@ -617,10 +624,10 @@ async function comFoto<T>(
   try {
     return await fn(nova);
   } catch (e) {
-    if (nova && nova !== 'manter') {
-      if (foto.tipo === 'enviada') await devolverFotoPendente(cliente.parceiroId, nova.arquivo);
-      else await apagarFoto(cliente.parceiroId, nova.arquivo);
-    }
+    const rollbackConhecido = e instanceof RecusaDaFicha || e instanceof ErroDeClassificacao
+      || ehErroDeUnicidade(e) || !!erroDeInsumoExcluidoNaFk(e) || !!checkVioladoDe(e) || ehDeadlock(e);
+    if (rollbackConhecido && nova && nova !== 'manter') await compensarFotoUnificada(cliente, foto, nova);
+    // Em erro de COMMIT indeterminado, o arquivo pode já estar referenciado.
     throw e;
   }
 }
@@ -731,6 +738,136 @@ export async function editarFicha(
   return resultado;
 }
 
+// --------------------------------------------------- edição integrada (3C)
+
+const CONFLITO_DO_ENVIO = 'Este envio já foi salvo com outros dados. Confira a ficha salva antes de iniciar um novo cadastro.';
+type NovaFoto = { arquivo: string; mime: string; bytes: number };
+
+/** Nunca compensar um arquivo que possa estar referenciado por uma transação confirmada. */
+export async function compensarFotoUnificada(cliente: ClienteDoParceiro, foto: MudancaDeFoto, nova: NovaFoto | null) {
+  if (!nova) return;
+  try {
+    const usada = await cliente.fichaTecnica.findFirst({ where: { OR: [
+      { fotoArquivo: nova.arquivo }, { fotosApoio: { array_contains: [{ arquivo: nova.arquivo }] } },
+    ] }, select: { id: true } });
+    if (usada) return;
+    if (foto.tipo === 'enviada') await devolverFotoPendente(cliente.parceiroId, nova.arquivo);
+    else await apagarFoto(cliente.parceiroId, nova.arquivo);
+  } catch {
+    // Arquivo órfão recuperável é preferível a apagar uma foto possivelmente salva.
+  }
+}
+
+/** A criação reconhece apenas a identidade original; não promete estado/versões atuais. */
+async function reconhecerEnvio(tx: ClienteDoParceiro, chaveEnvio: string, hashEnvio: string): Promise<ResultadoFichaUnificada | null> {
+  const anterior = await tx.fichaTecnica.findFirst({ where: { chaveEnvio }, select: { id: true, hashEnvio: true } });
+  if (!anterior) return null;
+  return anterior.hashEnvio === hashEnvio
+    ? { ok: true, id: anterior.id, mudou: [], repetido: true }
+    : { ok: false, erros: { geral: CONFLITO_DO_ENVIO }, conflito: true };
+}
+
+export async function cadastrarFichaUnificada(cliente: ClienteDoParceiro, entrada: EntradaFichaUnificada,
+  foto: MudancaDeFoto = { tipo: 'manter' }, autorNome = 'Sistema', pessoaId: string): Promise<ResultadoFichaUnificada> {
+  const envio = lerChaveDeEnvio(entrada.chaveEnvio);
+  if (!envio.ok || !envio.chave || typeof pessoaId !== 'string' || !pessoaId) return { ok: false, erros: { geral: 'Identificação do envio inválida. Reabra o formulário.' } };
+  const chaveEnvio = createHash('sha256').update(`${pessoaId}|${envio.chave}`).digest('hex').slice(0, 40);
+  let hashEnvio: string;
+  try { hashEnvio = hashDoEnvioDaFicha(entrada, foto); }
+  catch { return { ok: false, erros: { geral: 'Pedido de ficha inválido. Confira o formulário.' } }; }
+  return gravarFichaUnificada(cliente, null, entrada, foto, autorNome, { chaveEnvio, hashEnvio });
+}
+
+export async function editarFichaUnificada(cliente: ClienteDoParceiro, id: string, entrada: EntradaFichaUnificada,
+  foto: MudancaDeFoto = { tipo: 'manter' }, autorNome = 'Sistema'): Promise<ResultadoFichaUnificada> {
+  if (typeof id !== 'string' || !/^[a-z0-9]{1,64}$/i.test(id)) return { ok: false, erros: { geral: 'Ficha não encontrada.' }, naoEncontrado: true };
+  if (typeof entrada.versao !== 'string' || Number.isNaN(new Date(entrada.versao).getTime())) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_FICHA }, conflito: true };
+  return gravarFichaUnificada(cliente, id, entrada, foto, autorNome);
+}
+
+async function gravarFichaUnificada(cliente: ClienteDoParceiro, id: string | null, entrada: EntradaFichaUnificada,
+  foto: MudancaDeFoto, autorNome: string, envio?: { chaveEnvio: string; hashEnvio: string }): Promise<ResultadoFichaUnificada> {
+  const pronta = prepararMudancaDeFoto(foto);
+  if (pronta && 'erro' in pronta) return { ok: false, erros: { foto: pronta.erro } };
+  const arquivos: { nova: NovaFoto | null; antiga: string | null } = { nova: null, antiga: null };
+  let nome = '';
+  try {
+    const resultado = await cliente.transacao(async tx => {
+      await travarGrafoDeFichas(tx);
+      if (envio) {
+        const repetido = await reconhecerEnvio(tx, envio.chaveEnvio, envio.hashEnvio);
+        if (repetido) return repetido;
+      }
+      // CAS antes de assumir a foto pendente: a retentativa de edição nunca tenta mover o arquivo outra vez.
+      if (id) await tx.sql`SELECT "id" FROM "FichaTecnica" WHERE "parceiroId"=${tx.parceiroId} AND "id"=${id} FOR NO KEY UPDATE`;
+      const atual = id ? await tx.fichaTecnica.findUnique({ where: { id }, select: SELECAO_PARA_EDITAR }) : null;
+      if (id && !atual) throw new RecusaDaFicha({ ok: false, erros: { geral: 'Ficha não encontrada.' }, naoEncontrado: true });
+      if (atual && !atual.ativa) throw new RecusaDaFicha({ ok: false, erros: { geral: MENSAGEM_FICHA_DESATIVADA } });
+      if (atual && atual.atualizadoEm.toISOString() !== entrada.versao) throw new RecusaDaFicha({ ok: false, erros: { geral: MENSAGEM_CONFLITO_FICHA }, conflito: true });
+      const { doCadastro, preparos, jaNaFicha } = await cadastroDaEntrada(tx, entrada, atual);
+      const lido = lerFormFicha(entrada, doCadastro, jaNaFicha, { preparos, ...(atual ? { propriaId: atual.id } : {}) });
+      if (!lido.ok) throw new RecusaDaFicha({ ...lido, erros: await explicarInsumoExcluido(tx, entrada, lido.erros) });
+      if (atual && entrada.validade === undefined) lido.dados.validades = validadesDaLinha(atual);
+      if (atual && entrada.consumoImediato === undefined) lido.dados.consumoImediato = atual.consumoImediato && !lido.dados.validades;
+      nome = lido.dados.nome;
+      await conferirEstrutura(tx, lido.dados, atual, doCadastro);
+      if (entrada.materiais && lido.dados.tipo !== 'PRATO' && entrada.materiais.linhas.length) throw new RecusaDaFicha({ ok: false, erros: { materiais: 'Materiais de expedição são da ficha de prato. Volte a Prato ou retire as linhas explicitamente.' } });
+      if (entrada.materiais) {
+        const anteriores = await materiaisDaFicha(tx, id);
+        if (entrada.materiais.versao !== anteriores.versao) throw new RecusaDaFicha({ ok: false, erros: { geral: 'As embalagens mudaram. Recarregue a ficha antes de salvar; nada foi gravado.' }, conflito: true });
+      }
+      let nova: NovaFoto | null | 'manter' = foto.tipo === 'manter' ? 'manter' : null;
+      if (foto.tipo === 'trocar' && pronta) {
+        const arquivo = await salvarFoto(tx.parceiroId, pronta.bytes, pronta.extensao);
+        nova = arquivos.nova = { arquivo, mime: pronta.mime, bytes: pronta.bytes.length };
+      } else if (foto.tipo === 'enviada') {
+        nova = arquivos.nova = await assumirFotoPendente(tx.parceiroId, foto.arquivo);
+        if (!nova) throw new RecusaDaFicha({ ok: false, erros: { foto: MENSAGEM_FOTO_SUMIU } });
+      }
+      const r = await gravarFicha(tx, { atual, classificacao: entrada.classificacao, dados: lido.dados,
+        doCadastro, preparos, foto: !atual && nova === 'manter' ? null : nova,
+        ...(atual ? { antes: retratoDaFicha(dadosDaFichaGravada(atual), doCadastro, atual.fotoArquivo, preparos) } : {}), autorNome, envio });
+      if (atual && nova !== 'manter' && r.mudou.includes('foto')) arquivos.antiga = atual.fotoArquivo;
+      let materiaisMudaram: string[] = [];
+      if (entrada.materiais && lido.dados.tipo === 'PRATO') {
+        const materiais = await salvarEmbalagensNaTransacao(tx, r.id, { impressao: entrada.materiais.versao, linhas: entrada.materiais.linhas }, autorNome);
+        materiaisMudaram = materiais.mudou;
+      }
+      const final = await tx.fichaTecnica.findUnique({ where: { id: r.id }, select: { atualizadoEm: true } });
+      if (!final) throw new Error('Ficha ausente após gravação.');
+      const materiais = await materiaisDaFicha(tx, r.id);
+      return { ok: true as const, id: r.id, nome, mudou: [...new Set([...r.mudou, ...materiaisMudaram])], repetido: false as const,
+        versao: final.atualizadoEm.toISOString(), versaoMateriais: materiais.versao };
+    });
+    if (resultado.ok && !resultado.repetido) await apagarFoto(cliente.parceiroId, arquivos.antiga);
+    return resultado;
+  } catch (e) {
+    const conhecida = e instanceof RecusaDaFicha || e instanceof RecusaDoCanal || e instanceof ErroDeClassificacao
+      || ehErroDeUnicidade(e) || !!erroDeInsumoExcluidoNaFk(e) || !!checkVioladoDe(e) || ehDeadlock(e);
+    // Relê fora da transação abortada, sob a mesma guarda. Serve também ao COMMIT cuja resposta se perdeu.
+    if (envio && (!(e instanceof RecusaDaFicha) && !(e instanceof RecusaDoCanal) && !(e instanceof ErroDeClassificacao))) {
+      try {
+        const repetido = await cliente.transacao(async tx => { await travarGrafoDeFichas(tx); return reconhecerEnvio(tx, envio.chaveEnvio, envio.hashEnvio); });
+        if (repetido) return repetido;
+        await compensarFotoUnificada(cliente, foto, arquivos.nova);
+      } catch {
+        return { ok: false, erros: { geral: MENSAGEM_ENVIO_INDETERMINADO }, indeterminado: true };
+      }
+    } else if (conhecida) await compensarFotoUnificada(cliente, foto, arquivos.nova);
+    if (e instanceof RecusaDaFicha || e instanceof RecusaDoCanal) return e.resultado;
+    if (e instanceof ErroDeClassificacao) return { ok: false, erros: e.erros };
+    if (ehErroDeUnicidade(e)) {
+      const erro = await erroDeNomeRepetido(cliente, nome);
+      if (!erro.ok) return erro;
+    }
+    const fk = erroDeInsumoExcluidoNaFk(e);
+    if (fk) return fk;
+    if (checkVioladoDe(e)) return { ok: false, erros: { geral: 'O banco recusou algum dado da ficha. Confira os valores e tente novamente; nada foi gravado.' } };
+    if (ehDeadlock(e)) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_FICHA }, conflito: true };
+    return { ok: false, erros: { geral: MENSAGEM_ENVIO_INDETERMINADO }, indeterminado: true };
+  }
+}
+
 // --------------------------------------------------- desativar/reativar
 
 /** Desativar/reativar; o insumo que o pré-preparo produz acompanha. */
@@ -744,12 +881,13 @@ export async function mudarSituacaoFicha(
   const motivo = typeof motivoTexto === 'string' ? motivoTexto.trim().replace(/\s+/g, ' ').slice(0, 200) || null : null;
   try {
     return await cliente.transacao(async (tx) => {
+      await tx.sql`SELECT "id" FROM "FichaTecnica" WHERE "parceiroId"=${tx.parceiroId} AND "id"=${id} FOR NO KEY UPDATE`;
       const atual = await tx.fichaTecnica.findUnique({
         where: { id },
         select: { nome: true, tipo: true, unidadeRendimento: true, insumoProduzidoId: true, ...SELECAO_DA_VALIDADE },
       });
       if (!atual) throw new RecusaDaFicha({ ok: false, erros: { geral: 'Ficha não encontrada.' }, naoEncontrado: true });
-      const r = await tx.fichaTecnica.updateMany({ where: { id, ativa: !ativa }, data: { ativa } });
+      const r = await tx.fichaTecnica.updateMany({ where: { id, ativa: !ativa }, data: { ativa, atualizadoEm: await proximaVersaoDaFicha(tx, id) } });
       if (r.count === 0) {
         throw new RecusaDaFicha({
           ok: false,
@@ -1144,6 +1282,65 @@ export async function preparosParaFicha(cliente: ClienteDoParceiro, jaNaFicha: s
 }
 
 export type PreparoDoFormulario = Awaited<ReturnType<typeof preparosParaFicha>>[number];
+
+/** Edição operacional: só dados da receita, sem passar pela seleção financeira da cascata. */
+async function fichaOperacionalParaEditar(tx: ClienteDoParceiro, id: string): Promise<FichaNaTela | null> {
+  const f = await tx.fichaTecnica.findUnique({ where: { id }, select: {
+    ...SELECAO_DA_CLASSIFICACAO, id: true, nome: true, tipo: true, descricao: true, modoPreparo: true,
+    passosPreparo: true, rendimentoMilesimos: true, unidadeRendimento: true, ativa: true, origem: true,
+    atualizadoEm: true, fotoArquivo: true, fotosApoio: true, ...SELECAO_DA_VALIDADE, consumoImediato: true,
+    insumoProduzido: { select: { id: true, nome: true } },
+    usadaComoSub: { select: { ficha: { select: { id: true, nome: true, ativa: true } } } },
+    itens: { orderBy: { ordem: 'asc' }, select: { id: true, insumoId: true, subfichaId: true,
+      quantidadeMilesimos: true, fatorCorrecaoMilesimos: true,
+      insumo: { select: { nome: true, unidade: true, ativo: true } },
+      subficha: { select: { id: true, nome: true, unidadeRendimento: true, rendimentoMilesimos: true, ativa: true } } } },
+  } });
+  if (!f) return null;
+  return {
+    id: f.id, classificacao: classificacaoDaLinha(f), nome: f.nome, tipo: f.tipo, descricao: f.descricao,
+    modoPreparo: f.modoPreparo, passosPreparo: f.passosPreparo, rendimentoMilesimos: f.rendimentoMilesimos,
+    unidadeRendimento: f.unidadeRendimento, ativa: f.ativa, origem: f.origem, versao: f.atualizadoEm.toISOString(),
+    foto: versaoDaFoto(f.fotoArquivo), fotosApoio: lerFotosDeApoio(f.fotosApoio).map(a => ({ arquivo: a.arquivo, legenda: a.legenda })),
+    insumoProduzido: f.insumoProduzido, validades: validadesDaLinha(f), consumoImediato: f.consumoImediato,
+    usadaEm: Array.from(new Map(f.usadaComoSub.map(u => [u.ficha.id, u.ficha])).values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    itens: f.itens.map(i => ({ id: i.id, insumoId: i.insumoId, subfichaId: i.subfichaId,
+      nome: i.subficha?.nome ?? i.insumo?.nome ?? '?', unidade: (i.subficha?.unidadeRendimento ?? i.insumo?.unidade ?? 'UN') as Unidade,
+      ativo: i.subficha?.ativa ?? i.insumo?.ativo ?? true, quantidadeMilesimos: i.quantidadeMilesimos,
+      fatorCorrecaoMilesimos: i.fatorCorrecaoMilesimos, custoDoInsumo: null, custo: null,
+      preparo: i.subficha ? { id: i.subficha.id, rendimentoMilesimos: i.subficha.rendimentoMilesimos,
+        unidadeRendimento: i.subficha.unidadeRendimento, custo: null, itens: [] } : null })),
+    custo: null, verCustos: false,
+    historico: await listarHistorico(tx, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 10, verPrecos: false, verFichas: true }),
+  };
+}
+
+/** Receita, versões, escolhas e materiais vêm da mesma fotografia do banco. */
+export async function lerEdicaoDaFicha(cliente: ClienteDoParceiro, id: string | null, permissoes: { verPrecos: boolean }) {
+  return cliente.transacao(async tx => {
+    const lida = id && permissoes.verPrecos ? await obterFicha(tx, id, permissoes) : null;
+    const ficha = lida ? fichaNaTela(lida, true) : id && !permissoes.verPrecos ? await fichaOperacionalParaEditar(tx, id) : null;
+    if (id && !ficha) return null;
+    const insumos = ficha?.itens.flatMap(i => i.insumoId ? [i.insumoId] : []) ?? [];
+    const subfichas = ficha?.itens.flatMap(i => i.subfichaId ? [i.subfichaId] : []) ?? [];
+    if (permissoes.verPrecos) {
+      const opcoes = await insumosParaFicha(tx, insumos);
+      const preparos = await preparosParaFicha(tx, subfichas, id ?? undefined);
+      return { ficha, ...opcoesDaFichaNaTela(opcoes, preparos, true), materiais: await contextoMateriaisDaFicha(tx, id) };
+    }
+    // Não calcular custos para depois descartá-los no formulário operacional.
+    const opcoes = await tx.insumo.findMany({
+      where: { fichaQueProduz: { is: null }, OR: [{ ativo: true, NOT: { tipo: 'MATERIAL' } }, { id: { in: insumos } }] },
+      orderBy: { nome: 'asc' }, select: { id: true, nome: true, unidade: true, ativo: true, categoria: { select: { nome: true, ordem: true } } },
+    });
+    const preparos = await tx.fichaTecnica.findMany({
+      where: { tipo: 'PRE_PREPARO', OR: [{ ativa: true }, { id: { in: subfichas } }], ...(id ? { NOT: { id } } : {}) },
+      orderBy: { nome: 'asc' }, select: { id: true, nome: true, unidadeRendimento: true, ativa: true },
+    });
+    return { ficha, opcoes: opcoes.map(i => ({ ...i, unidade: i.unidade as Unidade, custo: null })),
+      preparos: preparos.map(p => ({ id: p.id, nome: p.nome, unidade: p.unidadeRendimento as Unidade, ativo: p.ativa, custo: null, incompleto: null })), materiais: null };
+  }, { repetivel: true });
+}
 
 /** N.5: editar a receita não concede acesso aos custos dos insumos nem dos pré-preparos. */
 export type PreparoDoFormularioNaTela = Omit<PreparoDoFormulario, 'custo' | 'incompleto'> & {

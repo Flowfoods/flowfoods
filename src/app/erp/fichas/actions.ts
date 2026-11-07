@@ -9,7 +9,8 @@
  */
 
 import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
-import { cadastrarFicha, editarFicha, mudarSituacaoFicha } from '@/lib/erp/fichas';
+import { cadastrarFicha, editarFicha, mudarSituacaoFicha, cadastrarFichaUnificada, editarFichaUnificada } from '@/lib/erp/fichas';
+import { MARCADOR_MATERIAIS_DA_FICHA, type EstadoFichaUnificada } from '@/lib/erp/ficha-unificada-campos';
 import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarFaixasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import type { EstadoConfiguracao } from '@/lib/erp/canal-config-campos';
@@ -19,11 +20,14 @@ import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import type { EstadoDasFotos, EstadoImportacao } from '@/components/erp/telas/fichas/estado';
 import { revalidatePath } from 'next/cache';
 import { mudarFotosDaFicha } from '@/lib/erp/ficha-fotos';
-import { lerImpressaoFinanceira, type ImpressaoFinanceira } from '@/lib/erp/ficha-impressao';
+import { lerImpressaoFinanceira, lerImpressaoOperacional, type ImpressaoFinanceira, type ImpressaoOperacional } from '@/lib/erp/ficha-impressao';
 import { buscarClassificacao } from '@/lib/erp/ficha-secoes';
 import type { EstadoGestaoClassificacao, PedidoBuscaClassificacao, ResultadoBuscaClassificacao } from '@/lib/erp/ficha-secoes-campos';
 import {
   executarImportacao,
+  concluirFichaUnificada,
+  recusarFichaUnificada,
+  lerEnvioDaFichaUnificada,
   concluirConfiguracao,
   recusarConfiguracao,
   executarGestaoClassificacao,
@@ -38,6 +42,35 @@ import {
 } from '@/components/erp/telas/fichas/executar';
 
 const BASE = '/erp/fichas';
+
+export async function acaoCadastrarFichaUnificada(anterior: EstadoFichaUnificada, form: FormData): Promise<EstadoFichaUnificada> {
+  const { ctx, negado } = await paraEditar();
+  if (negado) return recusarFichaUnificada(anterior, negado);
+  const verPrecos = !recusaDaAcao(ctx, 'precos.ver'), verFichas = !recusaDaAcao(ctx, 'fichas.ver');
+  if (form.has(MARCADOR_MATERIAIS_DA_FICHA) && !verPrecos) return recusarFichaUnificada(anterior, 'Você não tem permissão para alterar embalagens por canal.');
+  const envio = await lerEnvioDaFichaUnificada(form);
+  if (!envio.ok) return { ok: false, vez: (anterior?.vez ?? 0) + 1, erros: envio.erros };
+  const r = await cadastrarFichaUnificada(ctx.cliente, envio.entrada, envio.foto, ctx.sessao.autorNome, ctx.sessao.userId);
+  return concluirFichaUnificada(r, anterior, BASE, form, { verFichas, verPrecos }, true);
+}
+
+export async function acaoEditarFichaUnificada(id: string, anterior: EstadoFichaUnificada, form: FormData): Promise<EstadoFichaUnificada> {
+  const { ctx, negado } = await paraEditar();
+  if (negado) return recusarFichaUnificada(anterior, negado);
+  const verPrecos = !recusaDaAcao(ctx, 'precos.ver'), verFichas = !recusaDaAcao(ctx, 'fichas.ver');
+  if (form.has(MARCADOR_MATERIAIS_DA_FICHA) && !verPrecos) return recusarFichaUnificada(anterior, 'Você não tem permissão para alterar embalagens por canal.');
+  const envio = await lerEnvioDaFichaUnificada(form);
+  if (!envio.ok) return { ok: false, vez: (anterior?.vez ?? 0) + 1, erros: envio.erros };
+  const r = await editarFichaUnificada(ctx.cliente, String(id), envio.entrada, envio.foto, ctx.sessao.autorNome);
+  return concluirFichaUnificada(r, anterior, BASE, form, { verFichas, verPrecos }, false);
+}
+
+export async function acaoImpressaoOperacional(id: string, versao: string): Promise<ImpressaoOperacional> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'fichas.ver');
+  if (negado) return { ok: false, erro: negado };
+  return lerImpressaoOperacional(ctx.cliente, id, versao);
+}
 
 /** Contexto de quem pode editar agora, ou a frase da recusa. */
 async function paraEditar() {
@@ -111,7 +144,7 @@ export async function acaoSalvarEmbalagens(id: string, anterior: EstadoCadastro,
   if (negado) return recusado(anterior, negado);
   const r = await salvarEmbalagens(ctx.cliente, String(id), lerEnvioDasEmbalagens(form), ctx.sessao.autorNome);
   const proxima = form.get('continuar') === 'precos' && !recusaDaAcao(ctx, 'fichas.ver');
-  return concluirEtapaDaFicha(r, anterior, BASE, { mudou: 'embalagens', igual: 'igual' }, proxima ? 'precos' : null, { de: deSeguroDaFicha(form.get('de')) });
+  return concluirEtapaDaFicha(r, anterior, BASE, { mudou: 'embalagens', igual: 'igual' }, proxima ? 'precos' : null, { de: deSeguroDaFicha(form.get('de')), voltarAEdicao: !!recusaDaAcao(ctx, 'fichas.ver') });
 }
 
 /** 1.9: a taxa do iFood do parceiro é condição comercial: só quem muda preços (a dona). */

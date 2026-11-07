@@ -9,10 +9,12 @@
  */
 
 import type { ClienteDoParceiro } from './tenant';
+import { checkVioladoDe, ehDeadlock, ehErroDeUnicidade } from './tenant';
 import { NOME_DA_FOTO } from './foto';
+import { proximaVersaoDaFicha } from './ficha-versao';
 import { LEGENDA_MAX, MAXIMO_DE_APOIOS, lerFotosDeApoio, type FotoDeApoio } from './ficha-fotos-campos';
-import { apagarFoto, assumirFotoPendente, devolverFotoPendente } from './arquivos';
-import { MENSAGEM_CONFLITO_FICHA, MENSAGEM_FICHA_DESATIVADA } from './fichas';
+import { apagarFoto, assumirFotoPendente } from './arquivos';
+import { compensarFotoUnificada, MENSAGEM_CONFLITO_FICHA, MENSAGEM_FICHA_DESATIVADA } from './fichas';
 
 export { LEGENDA_MAX, MAXIMO_DE_APOIOS, lerFotosDeApoio, type FotoDeApoio } from './ficha-fotos-campos';
 
@@ -77,18 +79,16 @@ export async function mudarFotosDaFicha(cliente: ClienteDoParceiro, id: string, 
   if (Number.isNaN(lida.getTime())) return { ok: false, erro: MENSAGEM_CONFLITO_FICHA, conflito: true };
   if (typeof id !== 'string' || !/^[a-z0-9]{1,64}$/i.test(id)) return { ok: false, erro: 'Ficha não encontrada.' };
 
-  // A foto nova sai de pendentes ANTES da transação (o disco não entra no rollback): se a gravação falhar, volta.
-  let assumida: { arquivo: string; mime: string; bytes: number } | null = null;
+  const foto: { assumida: { arquivo: string; mime: string; bytes: number } | null } = { assumida: null };
   if (pedido.tipo === 'adicionar') {
     const nome = nomeValido(pedido.enviada);
     if (!nome) return { ok: false, erro: 'Escolha a foto.' };
-    assumida = await assumirFotoPendente(cliente.parceiroId, nome);
-    if (!assumida) return { ok: false, erro: 'A foto enviada não está mais aqui (passou muito tempo). Escolha de novo.' };
   }
 
   let apagar: string | null = null;
   try {
     const feito = await cliente.transacao(async (tx) => {
+      await tx.sql`SELECT "id" FROM "FichaTecnica" WHERE "parceiroId"=${tx.parceiroId} AND "id"=${id} FOR NO KEY UPDATE`;
       const f = await tx.fichaTecnica.findUnique({ where: { id }, select: { nome: true, ativa: true, atualizadoEm: true, fotoArquivo: true, fotoMime: true, fotoBytes: true, fotosApoio: true } });
       if (!f) throw recusa('Ficha não encontrada.');
       if (!f.ativa) throw recusa(MENSAGEM_FICHA_DESATIVADA);
@@ -105,7 +105,9 @@ export async function mudarFotosDaFicha(cliente: ClienteDoParceiro, id: string, 
       switch (pedido.tipo) {
         case 'adicionar': {
           if (apoios.length >= MAXIMO_DE_APOIOS) throw recusa(`Até ${MAXIMO_DE_APOIOS} fotos de apoio. Tire uma antes de pôr outra.`);
-          apoios.push({ ...assumida!, legenda: legendaDe(pedido.legenda) });
+          foto.assumida = await assumirFotoPendente(cliente.parceiroId, nomeValido(pedido.enviada)!);
+          if (!foto.assumida) throw recusa('A foto enviada não está mais aqui (passou muito tempo). Escolha de novo.');
+          apoios.push({ ...foto.assumida, legenda: legendaDe(pedido.legenda) });
           frase = 'foto de apoio adicionada';
           break;
         }
@@ -157,9 +159,11 @@ export async function mudarFotosDaFicha(cliente: ClienteDoParceiro, id: string, 
         default:
           throw recusa('Pedido inválido.');
       }
+      if ((principal?.arquivo ?? null) === f.fotoArquivo && JSON.stringify(apoios) === JSON.stringify(lerFotosDeApoio(f.fotosApoio))) return frase;
       const r = await tx.fichaTecnica.updateMany({
         where: { id, atualizadoEm: f.atualizadoEm, ativa: true },
         data: {
+          atualizadoEm: await proximaVersaoDaFicha(tx, id),
           fotoArquivo: principal?.arquivo ?? null,
           fotoMime: principal?.mime ?? null,
           fotoBytes: principal?.bytes ?? null,
@@ -189,7 +193,9 @@ export async function mudarFotosDaFicha(cliente: ClienteDoParceiro, id: string, 
     if (apagar) await apagarFoto(cliente.parceiroId, apagar);
     return { ok: true, feito };
   } catch (e) {
-    if (assumida) await devolverFotoPendente(cliente.parceiroId, assumida.arquivo);
+    if ((e instanceof Recusa || !!checkVioladoDe(e) || ehDeadlock(e) || ehErroDeUnicidade(e)) && foto.assumida) {
+      await compensarFotoUnificada(cliente, { tipo: 'enviada', arquivo: foto.assumida.arquivo }, foto.assumida);
+    }
     if (e instanceof Recusa) return e.resultado;
     throw e;
   }

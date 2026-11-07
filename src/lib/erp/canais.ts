@@ -59,6 +59,9 @@ import {
 import { camposDoCmv, cmvDoCanal, lerMetasDeCmv, retratoDoCmv, type CmvDoCanal } from './cmv-produto-campos';
 import { CAMPOS_DO_FAROL, campoDaFaixa, lerFaixasDeCmv, type CortesDoFarol, type ConfiguracaoDoFarol } from './cmv-faixas-campos';
 import type { ConfirmacaoConfiguracao } from './canal-config-campos';
+import { proximaVersaoDaFicha } from './ficha-versao';
+import type { ContextoMateriaisDaFicha } from './ficha-unificada-campos';
+import { quantidadeParaCampo, UNIDADES } from './unidades';
 
 export type ResultadoDoCanal = { ok: true; id: string; mudou: string[]; confirmacao?: ConfirmacaoConfiguracao } | { ok: false; erros: Erros; conflito?: boolean; naoEncontrado?: boolean };
 
@@ -67,6 +70,7 @@ class Recusa extends Error {
     super('recusa');
   }
 }
+export { Recusa as RecusaDoCanal };
 
 export const MENSAGEM_CONFLITO_DAS_EMBALAGENS =
   'Alguém mudou as embalagens desta ficha agora há pouco. Recarregue a página para ver a versão nova; nada foi gravado.';
@@ -261,6 +265,40 @@ export async function embalagensParaEscolher(cliente: ClienteDoParceiro, jaNaFic
 
 export type EmbalagemDoFormulario = Awaited<ReturnType<typeof embalagensParaEscolher>>[number];
 
+/** Leitura operacional deliberadamente sem preços, compras, custos ou configurações. */
+export async function materiaisDaFicha(tx: ClienteDoParceiro, fichaId: string | null) {
+  const produto = fichaId ? await tx.produtoVenda.findFirst({
+    where: { fichaId, marcaId: null },
+    select: { id: true, embalagens: { select: { canal: true, insumoId: true, quantidadeMilesimos: true,
+      insumo: { select: { nome: true, unidade: true } } } } },
+  }) : null;
+  const lista = (produto?.embalagens ?? []).filter(e => ehCanalComEmbalagem(e.canal)).map(e => ({
+    canal: e.canal as CanalComEmbalagem, insumoId: e.insumoId, quantidadeMilesimos: e.quantidadeMilesimos,
+    nome: e.insumo.nome, unidade: e.insumo.unidade as Unidade,
+  })).sort((a, b) => CANAIS_COM_EMBALAGEM.indexOf(a.canal) - CANAIS_COM_EMBALAGEM.indexOf(b.canal)
+    || a.nome.localeCompare(b.nome, 'pt-BR') || (a.insumoId < b.insumoId ? -1 : 1));
+  return { produtoId: produto?.id ?? null, lista, versao: impressaoDasEmbalagens(lista) };
+}
+
+/** Só o formulário autorizado recebe opções com custo e configuração para a prévia canônica. */
+export async function contextoMateriaisDaFicha(tx: ClienteDoParceiro, fichaId: string | null): Promise<ContextoMateriaisDaFicha> {
+  const atual = await materiaisDaFicha(tx, fichaId);
+  const opcoes = await embalagensParaEscolher(tx, atual.lista.map(l => l.insumoId));
+  const cfg = await configsDosCanais(tx);
+  const canais = atual.produtoId ? await tx.produtoCanal.findMany({ where: { produtoId: atual.produtoId },
+    select: { canal: true, precoManualCentavos: true, ativo: true } }) : [];
+  return {
+    versao: atual.versao, opcoes,
+    linhas: atual.lista.map(l => { const q = quantidadeParaCampo(l.quantidadeMilesimos, l.unidade); return {
+      canal: l.canal, insumoId: l.insumoId, quantidade: q.texto, unidade: q.escala === 'menor' ? UNIDADES[l.unidade].menor : UNIDADES[l.unidade].sigla,
+    }; }),
+    precos: Object.fromEntries(ORDEM_DOS_CANAIS.map(canal => [canal, {
+      metaBp: cfg.metas[canal], precoCentavos: canais.find(c => c.canal === canal)?.precoManualCentavos ?? null,
+      ofertado: canais.find(c => c.canal === canal)?.ativo ?? true, cortesDoFarol: cfg.faixas[canal],
+    }])) as ContextoMateriaisDaFicha['precos'],
+  };
+}
+
 // ------------------------------------------------------------ gravar embalagens
 
 /** O produto de venda da casa: sem marca, nome = o da ficha (o nome acompanha a ficha ao renomear). */
@@ -294,65 +332,69 @@ export async function salvarEmbalagens(
 ): Promise<ResultadoDoCanal> {
   if (!ID.test(fichaId)) return { ok: false, erros: { geral: 'Ficha não encontrada.' }, naoEncontrado: true };
   try {
-    return await cliente.transacao(async (tx) => {
-      // A ficha travada: duas gravações das embalagens dela entram uma de cada vez (e a 2ª confere a impressão).
-      const f = await pratoTravado(tx, fichaId);
-      const atual = await embalagensGravadas(tx, f.id);
-      if (typeof entrada.impressao !== 'string' || entrada.impressao !== impressaoDasEmbalagens(atual.lista)) {
-        throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DAS_EMBALAGENS }, conflito: true });
-      }
-      // Os insumos citados, travados (FOR SHARE) e só deste parceiro.
-      const ids = Array.from(new Set(entrada.linhas.map((l) => l.insumoId).filter((x) => typeof x === 'string' && ID.test(x))));
-      if (ids.length) await tx.sql`SELECT 1 FROM "Insumo" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ANY(${ids}::text[]) FOR SHARE`;
-      const lidos = ids.length
-        ? await tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true, tipo: true, ativo: true } })
-        : [];
-      const cadastro = new Map<string, EmbalagemDoCadastro>(lidos.map((i) => [i.id, { ...i, unidade: i.unidade as Unidade }]));
-      const lido = lerEmbalagens(entrada.linhas, cadastro, new Set(atual.lista.map((e) => `${e.canal}:${e.insumoId}`)));
-      if (!lido.ok) throw new Recusa({ ok: false, erros: lido.erros });
-
-      const nomes = new Map<string, { nome: string; unidade: Unidade }>([
-        ...atual.lista.map((e) => [e.insumoId, { nome: e.insumo.nome, unidade: e.insumo.unidade }] as const),
-        ...lidos.map((i) => [i.id, { nome: i.nome, unidade: i.unidade as Unidade }] as const),
-      ]);
-      const antes = { nome: f.nome, ...retratoDasEmbalagens(atual.lista, nomes) };
-      const depois = { nome: f.nome, ...retratoDasEmbalagens(lido.dados, nomes) };
-      const mudanca = diferenca(antes, depois);
-      if (!mudanca) return { ok: true as const, id: f.id, mudou: [] };
-
-      const produtoId = atual.produtoId ?? (await criarProdutoDaCasa(tx, f));
-      await tx.produtoEmbalagem.deleteMany({ where: { produtoId, canal: { in: [...CANAIS_COM_EMBALAGEM] } } });
-      if (lido.dados.length) {
-        await tx.produtoEmbalagem.createMany({
-          data: lido.dados.map((e: EmbalagemDoCanal) => ({
-            parceiroId: tx.parceiroId,
-            produtoId: produtoId!,
-            canal: e.canal,
-            insumoId: e.insumoId,
-            quantidadeMilesimos: e.quantidadeMilesimos,
-          })),
-        });
-      }
-      await tx.historicoAlteracao.create({
-        data: {
-          parceiroId: tx.parceiroId,
-          entidade: 'FichaTecnica',
-          entidadeId: f.id,
-          acao: 'ALTEROU',
-          antes: mudanca.antes,
-          depois: mudanca.depois,
-          autorNome,
-        },
-      });
-      return { ok: true as const, id: f.id, mudou: mudanca.campos };
-    });
+    return await cliente.transacao(tx => salvarEmbalagensNaTransacao(tx, fichaId, entrada, autorNome));
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
-    // Dois "primeiros" produtos da mesma ficha (a trava da ficha já serializa; fica o seguro).
     if (ehErroDeUnicidade(e)) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_DAS_EMBALAGENS }, conflito: true };
     if (checkVioladoDe(e)) return { ok: false, erros: { geral: 'Algum número passou do limite (até 1.000 por porção). Confira e salve de novo.' } };
     throw e;
   }
+}
+
+/** Receita e materiais compartilham a mesma transação; recusas não podem virar commit parcial. */
+export async function salvarEmbalagensNaTransacao(tx: ClienteDoParceiro, fichaId: string,
+  entrada: { impressao: unknown; linhas: readonly EmbalagemDigitada[] }, autorNome: string) {
+  // A ficha travada: duas gravações das embalagens dela entram uma de cada vez (e a 2ª confere a impressão).
+  const f = await pratoTravado(tx, fichaId);
+  const atual = await embalagensGravadas(tx, f.id);
+  if (typeof entrada.impressao !== 'string' || entrada.impressao !== impressaoDasEmbalagens(atual.lista)) {
+    throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DAS_EMBALAGENS }, conflito: true });
+  }
+  // Os insumos citados, travados (FOR SHARE) e só deste parceiro.
+  const ids = Array.from(new Set(entrada.linhas.map((l) => l.insumoId).filter((x) => typeof x === 'string' && ID.test(x))));
+  if (ids.length) await tx.sql`SELECT 1 FROM "Insumo" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ANY(${ids}::text[]) ORDER BY "id" FOR SHARE`;
+  const lidos = ids.length
+    ? await tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true, tipo: true, ativo: true } })
+    : [];
+  const cadastro = new Map<string, EmbalagemDoCadastro>(lidos.map((i) => [i.id, { ...i, unidade: i.unidade as Unidade }]));
+  const lido = lerEmbalagens(entrada.linhas, cadastro, new Set(atual.lista.map((e) => `${e.canal}:${e.insumoId}`)));
+  if (!lido.ok) throw new Recusa({ ok: false, erros: lido.erros });
+
+  const nomes = new Map<string, { nome: string; unidade: Unidade }>([
+    ...atual.lista.map((e) => [e.insumoId, { nome: e.insumo.nome, unidade: e.insumo.unidade }] as const),
+    ...lidos.map((i) => [i.id, { nome: i.nome, unidade: i.unidade as Unidade }] as const),
+  ]);
+  const antes = { nome: f.nome, ...retratoDasEmbalagens(atual.lista, nomes) };
+  const depois = { nome: f.nome, ...retratoDasEmbalagens(lido.dados, nomes) };
+  const mudanca = diferenca(antes, depois);
+  if (!mudanca) return { ok: true as const, id: f.id, mudou: [] };
+
+  const produtoId = atual.produtoId ?? (await criarProdutoDaCasa(tx, f));
+  await tx.produtoEmbalagem.deleteMany({ where: { produtoId, canal: { in: [...CANAIS_COM_EMBALAGEM] } } });
+  if (lido.dados.length) {
+    await tx.produtoEmbalagem.createMany({
+      data: lido.dados.map((e: EmbalagemDoCanal) => ({
+        parceiroId: tx.parceiroId,
+        produtoId: produtoId!,
+        canal: e.canal,
+        insumoId: e.insumoId,
+        quantidadeMilesimos: e.quantidadeMilesimos,
+      })),
+    });
+  }
+  await tx.fichaTecnica.updateMany({ where: { id: f.id }, data: { atualizadoEm: await proximaVersaoDaFicha(tx, f.id) } });
+  await tx.historicoAlteracao.create({
+    data: {
+      parceiroId: tx.parceiroId,
+      entidade: 'FichaTecnica',
+      entidadeId: f.id,
+      acao: 'ALTEROU',
+      antes: mudanca.antes,
+      depois: mudanca.depois,
+      autorNome,
+    },
+  });
+  return { ok: true as const, id: f.id, mudou: mudanca.campos };
 }
 
 /** Campos do histórico que a gravação das embalagens mexe (para a frase do "feito"). */

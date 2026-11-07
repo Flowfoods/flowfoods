@@ -168,7 +168,7 @@ describe('3B: dois grupos explícitos e retorno completo', () => {
 
 describe('3B impressão financeira e operacional', () => {
   const valor = { num: 3504n, den: 1n };
-  const ficha: FichaNoPapel = { id: 'f', nome: 'Prato no papel', tipo: 'PRATO', ativa: true, versao: '2026-11-06T12:00:00.000Z', descricao: null, rendimentoMilesimos: 1000, unidadeRendimento: 'UN', validades: null, consumoImediato: true, foto: null, passosPreparo: [], modoPreparo: null, verCustos: true, custo: { total: valor, porRendimento: valor, itens: [], semPreco: [], preparosIncompletos: [], faltaPreco: [] }, itens: [] };
+  const ficha: FichaNoPapel = { materiais: [], versaoOperacional: 'papel-v1', id: 'f', nome: 'Prato no papel', tipo: 'PRATO', ativa: true, versao: '2026-11-06T12:00:00.000Z', descricao: null, rendimentoMilesimos: 1000, unidadeRendimento: 'UN', validades: null, consumoImediato: true, foto: null, passosPreparo: [], modoPreparo: null, verCustos: true, custo: { total: valor, porRendimento: valor, itens: [], semPreco: [], preparosIncompletos: [], faltaPreco: [] }, itens: [] };
   it('papel financeiro traz intervalo e meta independentes, sem depender de cor ou hover', () => {
     const h = render(DocumentoDaFicha, { ficha, canais: [conta(3504)], contexto: 'Casa', base: '/erp/fichas', geradoEm: new Date('2026-11-06') });
     expect(h).toContain('35,0%'); expect(h).toContain('Atenção'); expect(h).toContain('Acima de 35% até 40%'); expect(h).toContain('acima da meta');

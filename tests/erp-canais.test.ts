@@ -154,9 +154,9 @@ describe('embalagens por canal: leitura do formulário', () => {
   ]);
   const l = (canal: string, insumoId: string, quantidade: string, unidade = 'un') => ({ canal, insumoId, quantidade, unidade });
 
-  it('delivery e iFood com listas diferentes; g na embalagem em kg; o canal LOJA forjado não entra', () => {
+  it('delivery e iFood com listas diferentes; g na embalagem em kg', () => {
     const r = lerEmbalagens(
-      [l('DELIVERY_PROPRIO', 'cx', '1'), l('DELIVERY_PROPRIO', 'gu', '2'), l('IFOOD', 'cx', '1'), l('IFOOD', 'fi', '5', 'g'), l('LOJA', 'cx', '1')],
+      [l('DELIVERY_PROPRIO', 'cx', '1'), l('DELIVERY_PROPRIO', 'gu', '2'), l('IFOOD', 'cx', '1'), l('IFOOD', 'fi', '5', 'g')],
       cad,
     );
     expect(r).toEqual({
@@ -168,6 +168,12 @@ describe('embalagens por canal: leitura do formulário', () => {
         { canal: 'IFOOD', insumoId: 'fi', quantidadeMilesimos: 5 },
       ],
     });
+  });
+
+  it('recusa o envio inteiro com canal LOJA forjado, mesmo junto de uma linha válida', () => {
+    const recusa = { ok: false, erros: { materiais: 'Embalagens de expedição pertencem a Delivery próprio ou iFood.' } };
+    expect(lerEmbalagens([l('LOJA', 'cx', '1')], cad)).toEqual(recusa);
+    expect(lerEmbalagens([l('IFOOD', 'cx', '1'), l('LOJA', 'cx', '1')], cad)).toEqual(recusa);
   });
 
   it('recusa: não é embalagem, desativada (a não ser que já estivesse), repetida, unidade de outra família, zero, acima de 1.000, de outro parceiro', () => {
