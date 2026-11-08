@@ -17,7 +17,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
-const atual = vi.hoisted(() => ({ userId: '' }));
+const atual = vi.hoisted(() => ({ userId: '', semSessao: false }));
 
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
@@ -49,7 +49,7 @@ vi.mock('@/lib/erp/contexto', async () => {
   const { ALCANCE_FLOWFOODS } = await import('@/lib/erp/permissoes');
   const sessao = () => ({ userId: atual.userId, autorNome: 'Rodolfo (FlowFoods)' });
   return {
-    exigirNivel1: async () => sessao(),
+    exigirNivel1: async () => { if (atual.semSessao) throw new Error('SEM_SESSAO_N1'); return sessao(); },
     exigirParceiro: async (slug: string) => {
       const parceiro = await parceiroPorSlug(slug);
       if (!parceiro) throw new Error('NOT_FOUND');
@@ -64,10 +64,12 @@ import { prisma } from '@/lib/db';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { registrarApp } from '@/lib/integracoes/core/apps';
+import { registrarParecerApp, historicoDoParecer, EVENTO_PARECER } from '@/lib/integracoes/core/homologacao';
 import { mudarModulo } from '@/lib/integracoes/core/conexoes';
 import { lerRegistroDaLeitura, marcarParceiroDeHomologacao, MENSAGEM_TROCA_COM_LOJA_LIGADA } from '@/lib/integracoes/core/central';
 import type { EstadoForm } from '@/components/erp/ui/campos';
 import * as acoes from '@/app/rodolfo/(painel)/integracoes/actions';
+import ParecerAppPage from '@/app/rodolfo/(painel)/integracoes/apps/[id]/page';
 import CentralPage from '@/app/rodolfo/(painel)/integracoes/page';
 import ParceiroPage from '@/app/rodolfo/(painel)/integracoes/[slug]/page';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
@@ -164,6 +166,57 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     await db.user.delete({ where: { id: atual.userId } });
     await db.$disconnect();
     await prisma.$disconnect();
+  });
+
+  it('parecer de produção tem registro atômico, histórico e trava de concorrência', async () => {
+    const r = await registrarApp({ provedor: 'IFOOD', ambiente: 'PRODUCAO', nome: 'BI parecer', categoria: 'BI', clientId: `parecer-${sufixo}`, nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET', modulos: ['ANALYTICS'] }, 'teste');
+    if (!r.ok) throw new Error('app não criado');
+    apps.push(r.id);
+    const entrada = { estado: 'EM_ANDAMENTO', validacaoEm: '2026-11-07', liberacaoEm: '', referencia: 'https://developer.ifood.com.br/pt-BR/developer/applications/app-bi/details', conferido: 'sim' };
+    const autor = { userId: atual.userId, autorNome: 'Responsável sintético' };
+    const agora = new Date('2026-11-08T12:00:00Z');
+    const versao = async () => (await db.integracaoApp.findUniqueOrThrow({ where: { id: r.id } })).atualizadoEm.toISOString();
+    const v1 = await versao();
+    expect(await registrarParecerApp(r.id, v1, entrada, autor, agora)).toEqual({ ok: true });
+    expect((await db.integracaoApp.findUniqueOrThrow({ where: { id: r.id } })).estadoHomologacao).toBe('EM_ANDAMENTO');
+    expect(await historicoDoParecer(r.id)).toMatchObject([{ estado: 'EM_ANDAMENTO', validacaoEm: '2026-11-07', liberacaoEm: '', autorNome: autor.autorNome, referencia: entrada.referencia }]);
+    const v2 = await versao();
+    const resultados = await Promise.all([
+      registrarParecerApp(r.id, v2, { ...entrada, estado: 'HOMOLOGADO', liberacaoEm: '2026-11-08' }, autor, agora),
+      registrarParecerApp(r.id, v2, { ...entrada, estado: 'RECUSADO' }, autor, agora),
+    ]);
+    expect(resultados.filter(x => x.ok)).toHaveLength(1);
+    expect(resultados.filter(x => !x.ok)).toHaveLength(1);
+    expect(await historicoDoParecer(r.id)).toHaveLength(2);
+    // Falhar o FK do autor na auditoria desfaz também o estado do app.
+    const antes = await db.integracaoApp.findUniqueOrThrow({ where: { id: r.id } });
+    await expect(registrarParecerApp(r.id, antes.atualizadoEm.toISOString(), { ...entrada, estado: 'PENDENTE' }, { ...autor, userId: 'usuario-inexistente' }, agora)).rejects.toThrow();
+    const depois = await db.integracaoApp.findUniqueOrThrow({ where: { id: r.id } });
+    expect(depois.estadoHomologacao).toBe(antes.estadoHomologacao);
+    expect(depois.atualizadoEm).toEqual(antes.atualizadoEm);
+    expect(await historicoDoParecer(r.id)).toHaveLength(2);
+    expect(await registrarParecerApp(r.id, v1, entrada, autor, agora)).toMatchObject({ ok: false });
+    const teste = await db.integracaoApp.findUniqueOrThrow({ where: { id: appTeste } });
+    expect(await registrarParecerApp(appTeste, teste.atualizadoEm.toISOString(), entrada, autor, agora)).toMatchObject({ ok: false });
+    expect(await db.auditLog.count({ where: { evento: EVENTO_PARECER, dados: { path: ['appId'], equals: appTeste } } })).toBe(0);
+    await expect(ParecerAppPage({ params: Promise.resolve({ id: appTeste }), searchParams: Promise.resolve({}) })).rejects.toThrow('NOT_FOUND');
+    const pagina = await html(ParecerAppPage({ params: Promise.resolve({ id: r.id }), searchParams: Promise.resolve({}) }));
+    expect(pagina).toContain('Consultar página usada no registro');
+    expect(pagina).toContain(entrada.referencia);
+    expect(pagina).toContain('Histórico de pareceres');
+    expect(pagina).not.toContain('IFOOD_BI_CLIENT_SECRET');
+    // Dois envios após navegação usam versões novas; o formulário antigo não sobrescreve.
+    const v3 = await versao();
+    const salvo = await rodar(acoes.acaoRegistrarParecer(r.id, v3, null, form(entrada)));
+    expect(salvo.feito).toBe('parecer');
+    expect((await rodar(acoes.acaoRegistrarParecer(r.id, v3, null, form(entrada)))).estado?.ok).toBe(false);
+    expect((await rodar(acoes.acaoRegistrarParecer(r.id, await versao(), null, form({ ...entrada, estado: 'PENDENTE' })))).feito).toBe('parecer');
+    atual.semSessao = true;
+    try {
+      await expect(acoes.acaoRegistrarParecer(r.id, await versao(), null, form(entrada))).rejects.toThrow('SEM_SESSAO_N1');
+      await expect(ParecerAppPage({ params: Promise.resolve({ id: r.id }), searchParams: Promise.resolve({}) })).rejects.toThrow('SEM_SESSAO_N1');
+    } finally { atual.semSessao = false; }
+    expect(await historicoDoParecer(r.id)).toHaveLength(4);
   });
 
   it('a Central mostra apps (Client ID, NOME da variável do cofre e validade do acesso), leituras de teste e parceiros; nunca o token nem o segredo', async () => {

@@ -7,6 +7,31 @@ continua restrito ao comando manual de leitura e aos testes sintéticos.
 
 ## Pausar e conferir
 
+### Registrar o parecer do iFood (INT-1.9)
+
+Na Central, cada app de produção BI com somente Analytics oferece **Registrar
+parecer do iFood**. O nível 1 registra a situação conferida no Developer, a
+data da validação técnica e, quando existir, a data de liberação. Use as datas
+civis de Brasília; aprovação técnica com app ainda em revisão corresponde a
+**Em andamento**, não a Homologado. A liberação precisa ser posterior ou igual
+à validação. Guarde relatório/captura no dossiê privado e informe a página
+consultada, sem query string, segredo ou link temporário do PDF.
+
+Situação e recibo de auditoria são gravados na mesma transação. A versão do app
+impede um formulário antigo de sobrescrever outro registro. O histórico mostra
+os últimos 20 registros com autor, datas e referência. A referência identifica
+a página consultada; não substitui a evidência guardada nem verifica o iFood.
+O primeiro HTTP autorizado por loja continua sendo evidência separada.
+
+Essa tela não faz chamadas externas, não concede acesso e não ativa conexões.
+**Registrar Homologado pode liberar a coleta de conexões já ativas/autorizadas**,
+se todos os demais controles permitirem. Retirar a homologação bloqueia novas
+emissões/publicações pelos controles existentes, preservando vínculos e dados.
+Uma requisição em voo pode terminar, mas sua publicação reconfere o acesso.
+Não usar o registro para contornar uma revisão ainda pendente no provedor.
+
+### Controle da coleta
+
 No ambiente seguro do servidor, dentro do serviço FlowFoods:
 
 ```sh

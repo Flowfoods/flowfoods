@@ -14,6 +14,7 @@ import { moduloLiberado } from '@/lib/erp/liberacao';
 import { COR } from '@/lib/erp/modulos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { listarApps } from '@/lib/integracoes/core/apps';
+import { appAceitaParecer } from '@/lib/integracoes/core/homologacao';
 import { ROTULO_DO_AMBIENTE, ROTULO_DO_MODULO } from '@/lib/integracoes/core/campos';
 import { ultimasLeiturasDeTeste, validadeDosTokens } from '@/lib/integracoes/core/central';
 import { conexoesDoParceiro } from '@/lib/integracoes/core/conexoes';
@@ -84,6 +85,7 @@ export default async function CentralDeIntegracoesPage() {
                         <dt className="text-suave">Acesso guardado</dt>
                         <dd className="text-texto">{!t ? 'nenhum ainda' : valido ? `vale até ${QUANDO.format(t.expiraEm)}` : `venceu em ${QUANDO.format(t.expiraEm)}; a próxima leitura pede outro`}</dd>
                       </dl>
+                      {appAceitaParecer(a) && <Link href={`/rodolfo/integracoes/apps/${a.id}`} className="inline-block text-sm underline underline-offset-4">Registrar parecer do iFood</Link>}
                     </li>
                   );
                 })}
