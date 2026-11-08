@@ -136,7 +136,7 @@ export default async function IntegracoesDoParceiroNoNivel1(
                                 {m.ultimoErro && m.estado === 'ERRO_PERMISSAO' && <p className="text-[13px] text-erro">{m.ultimoErro}</p>}
                                 {semHomologacao && (m.estado === 'AUTORIZADO' || m.estado === 'PAUSADO') && (
                                   <p className="text-[13px] text-suave">
-                                    Em produção, só ativa depois que o iFood homologar o app. A marca de homologação entra nesta Central junto com a homologação do app de produção.
+                                    Em produção, só ativa depois que o iFood homologar o app. Confira e registre o parecer em Apps no iFood, na Central de Integrações.
                                   </p>
                                 )}
                                 {podeEscrever && acoes.length > 0 && <FormAcoesDoModulo key={`${m.id}-${m.estado}`} slug={parceiro.slug} moduloId={m.id} acoes={acoes} />}

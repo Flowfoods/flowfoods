@@ -14,6 +14,7 @@ export interface AppDeIntegracao extends DadosDoApp {
   id: string;
   estadoHomologacao: 'NAO_SE_APLICA' | 'PENDENTE' | 'EM_ANDAMENTO' | 'HOMOLOGADO' | 'RECUSADO';
   criadoEm: Date;
+  atualizadoEm: Date;
 }
 
 const SELECAO = {
@@ -27,6 +28,7 @@ const SELECAO = {
   modulos: true,
   estadoHomologacao: true,
   criadoEm: true,
+  atualizadoEm: true,
 } as const;
 
 export async function listarApps(): Promise<AppDeIntegracao[]> {

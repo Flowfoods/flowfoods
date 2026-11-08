@@ -18,6 +18,7 @@ import { prisma } from '@/lib/db';
 import { exigirNivel1, exigirParceiro } from '@/lib/erp/contexto';
 import { mudarLiberacao } from '@/lib/erp/liberacao';
 import { registrarApp } from '@/lib/integracoes/core/apps';
+import { registrarParecerApp } from '@/lib/integracoes/core/homologacao';
 import { marcarParceiroDeHomologacao } from '@/lib/integracoes/core/central';
 import { desligarConexao, ligarConexao, mudarModulo, prepararModulo } from '@/lib/integracoes/core/conexoes';
 import type { EstadoForm } from '@/components/erp/ui/campos';
@@ -41,6 +42,18 @@ function revalidar(slug?: string) {
 function voltarCom(slug: string, feito: CodigoFeito): never {
   revalidar(slug);
   redirect(`/rodolfo/integracoes/${encodeURIComponent(slug)}?feito=${feito}`);
+}
+
+export async function acaoRegistrarParecer(appId: string, versao: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
+  const sessao = await exigirNivel1();
+  const vez = proxima(anterior);
+  const r = await registrarParecerApp(appId, versao, {
+    estado: form.get('estado'), validacaoEm: form.get('validacaoEm'), liberacaoEm: form.get('liberacaoEm'),
+    referencia: form.get('referencia'), conferido: form.get('conferido'),
+  }, sessao);
+  if (!r.ok) return { ok: false, erros: r.erros, vez };
+  revalidatePath('/rodolfo/integracoes', 'layout');
+  redirect(`/rodolfo/integracoes/apps/${encodeURIComponent(appId)}?feito=parecer`);
 }
 
 export async function acaoRegistrarApp(anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
