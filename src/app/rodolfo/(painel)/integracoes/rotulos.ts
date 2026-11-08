@@ -32,7 +32,7 @@ export const FEITO = {
   solicitar: 'Pedido de acesso registrado. Falta a loja aprovar o app no Portal do Parceiro.',
   'cancelar-pedido': 'Pedido de acesso cancelado.',
   autorizar: 'Módulo marcado como autorizado.',
-  ativar: 'Módulo ativo. A busca dos números começa quando a sincronização diária existir.',
+  ativar: 'Módulo ativo. A coleta de Analytics depende de produção homologada e autorizada, integração liberada e coleta geral habilitada; confira a situação da loja. TEST fica fora da rotina automática.',
   pausar: 'Módulo pausado. Nada é buscado nesta loja até retomar.',
   retomar: 'Módulo ativo de novo.',
   preparou: 'Módulo preparado. Ele começa como não solicitado.',

@@ -1,4 +1,4 @@
-# Analytics — contrato diário e distribuição de pagamentos
+# Analytics — contrato diário e distribuições marginais
 
 O contrato separa resposta agrupada válida, cobertura completa e compatibilidade
 com a consulta diária. Nenhum desses estados autoriza uma loja nem publica
@@ -96,6 +96,45 @@ entrega.** A fixture oficial agrupada não foi convertida em marginal, e nenhum
 valor TEST é preenchido no produto. A implementação não homologa apps nem
 autoriza ou ativa a coleta de uma loja.
 
+## Horário e primeiro pedido — INT-1.8D, versão 1
+
+O perfil `complementares` solicita somente `terms.orderCreationHour.count` e
+`terms.customerFirstOrderInMerchant.count`, sem groupBy, métricas ou pagamento.
+Usa uma página de tamanho 1, um item completo e identidade de ambiente,
+merchant UUID canônico, dia, fuso persistido, perfil e versão. O builder legado
+`consultaDistribuicoes` mantém sua consulta de três termos; não é usado pelo
+novo perfil de dois termos.
+
+Os dois campos devem estar presentes no item. Cada um aceita null explícito
+ou objeto `value` com mapa de contagens e `cardinality` opcional. Campo ausente,
+extra ou envelope incompleto recusa a publicação. Cada mapa mantém NULL,
+vazio e zero informado sem completar um com o outro. Cardinalidade não é total
+de ocorrências. Chaves desconhecidas não são removidas nem convertidas.
+
+O scanner puro compartilhado com pagamentos preserva duplicatas/Unicode e
+prova os inteiros a partir do léxico original antes do arredondamento de
+JSON.parse. Os limites são 2 MiB de corpo, 2.000 termos por campo, 800 bytes
+por chave e contagem não negativa até MAX_SAFE; somas posteriores usam BigInt.
+Campos normalizados têm `{termo, ocorrencias}` com contagem decimal textual.
+O SQL reconfere os dois mapas contra o raw; JSON null não substitui SQL NULL.
+
+O rótulo de hora não promete conversão para Brasília: o fuso do recorte não
+documenta o fuso dos buckets. São horas reconhecidas apenas as chaves canônicas
+0–23; outras permanecem distintas. Não há zero implícito em horas ausentes.
+Primeiro pedido é por merchant. Mais de um merchant na mesma loja ERP não
+permite deduplicar pessoas, inferir retenção ou dizer clientes únicos.
+
+Os denominadores são as ocorrências de cada distribuição, incluindo termos
+desconhecidos apresentados. Não somar os dois totais nem cruzar os buckets
+entre si, com pagamento ou com o grão financeiro. Cobertura exige snapshot
+PUBLICADO próprio por fonte/dia, com disponibilidade de cada campo independente.
+Revisão pendente não substitui a última versão publicada.
+
+O contrato usa os ModelTermFields documentados na referência oficial acima.
+Não foi capturada resposta marginal real completa para estes campos. Nenhum
+valor TEST é inferido ou incorporado ao produto. A persistência não alimenta
+KPI diário, faturamento ou DRE e não ativa configurações.
+
 ## Dinheiro
 
 A conversão exige `{ moeda: 'BRL', unidade: 'REAL' | 'CENTAVO' }` explícito,
@@ -131,5 +170,5 @@ requestId, sem corpo bruto. Aceita arquivo regular até 10 MiB.
 INT-1.4. Demonstra a proteção que a futura INT-1.6 deve respeitar. Testes de janela
 completa e de normalização usam massa sintética identificada, sem alegar cobertura
 oficial dos 91 grupos. O diagnóstico acima permanece específico do contrato
-diário; não valida a distribuição de pagamentos. Jobs, ponte financeira,
+diário; não valida pagamentos nem distribuições complementares. Jobs, ponte financeira,
 homologação e acesso produtivo têm gates próprios.

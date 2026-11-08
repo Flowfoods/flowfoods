@@ -793,7 +793,7 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
   it('outra conexão da mesma empresa não pode substituir a identidade persistida da tarefa', async () => {
     const m = await massa();
     const t = await adquirir(m);
-    if (t.perfil === 'pagamentos') throw new Error('Este controle legado exige a tarefa diária da fixture.');
+    if (t.perfil !== 'diario') throw new Error('Este controle legado exige a tarefa diária da fixture.');
     const loja = await cadastrarLoja(m.cliente, { nome: 'Segunda loja sintética' }, AUTOR);
     if (!loja.ok) throw new Error(JSON.stringify(loja));
     const merchantId = randomUUID();

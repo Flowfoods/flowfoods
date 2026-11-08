@@ -8,6 +8,7 @@ import { registrarEsperaAnalytics } from '../core/controle-analytics';
 import { mudarModulo } from '../core/conexoes';
 import { DIMENSOES_DIARIAS, METRICAS_DIARIAS, normalizarDiaAnalytics } from './analytics';
 import { normalizarPagamentosAnalytics } from './analytics-pagamentos';
+import { normalizarComplementaresAnalytics } from './analytics-complementares';
 import { diaSeguinte } from './datas';
 import { classificar } from './respostas';
 import { sinalizarFaturamentoAnalytics } from './faturamento-pendencias';
@@ -51,6 +52,7 @@ function tarefaDe(e: Execucao): TarefaAnalytics {
   };
   const identidade = { ambiente: c.ambiente, merchantId: c.idExterno, dia: e.dia.toISOString().slice(0, 10) };
   if (e.perfil === 'pagamentos') return { ...base, perfil: 'pagamentos', identidade: { ...identidade, perfil: 'pagamentos', fuso: e.fuso, versaoContrato: 1 } };
+  if (e.perfil === 'complementares') return { ...base, perfil: 'complementares', identidade: { ...identidade, perfil: 'complementares', fuso: e.fuso, versaoContrato: 1 } };
   if (e.perfil !== 'acesso' && e.perfil !== 'diario') throw new ErroPipelineAnalytics('ENTRADA', 'Perfil de coleta desconhecido.');
   return { ...base, perfil: e.perfil, identidade: { ...identidade, perfil: e.perfil === 'acesso' ? 'homologacao' : 'diario' } };
 }
@@ -59,7 +61,7 @@ function tarefaDe(e: Execucao): TarefaAnalytics {
 export async function agendarJanela(cliente: ClienteDoParceiro, j: JanelaAnalytics): Promise<void> {
   if (!diaSeguinte(j.dia) || !diaSeguinte(j.ciclo) || !(j.tipo in PRIORIDADE)
     || !['REAL', 'CENTAVO'].includes(j.unidade) || !j.moduloId || j.moduloId.length > 60
-    || (j.perfil !== undefined && !['diario', 'pagamentos'].includes(j.perfil)) || (j.tipo === 'ACESSO' && j.perfil !== undefined)) {
+    || (j.perfil !== undefined && !['diario', 'pagamentos', 'complementares'].includes(j.perfil)) || (j.tipo === 'ACESSO' && j.perfil !== undefined)) {
     throw new ErroPipelineAnalytics('ENTRADA', 'Janela de coleta inválida.');
   }
   try { new Intl.DateTimeFormat('en-US', { timeZone: j.fuso }).format(); }
@@ -124,7 +126,7 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
             AND (e.estado IN ('PLANEJADA','AGUARDANDO') OR (e.estado = 'EXECUTANDO' AND e."leaseAte" < clock_timestamp() AND e.dono <> ${posse.id}))
             AND erp_integracao_exigir_acesso(${tx.parceiroId}, e."moduloId", ${posse.id}, e.perfil = 'acesso')
           ORDER BY (SELECT max(h."iniciadaEm") FROM "IntegracaoExecucao" h WHERE h."parceiroId" = e."parceiroId" AND h.perfil = e.perfil) ASC NULLS FIRST,
-            CASE e.perfil WHEN 'acesso' THEN 0 WHEN 'diario' THEN 1 ELSE 2 END,
+            CASE e.perfil WHEN 'acesso' THEN 0 WHEN 'diario' THEN 1 WHEN 'pagamentos' THEN 2 WHEN 'complementares' THEN 3 ELSE 4 END,
             e.prioridade, e."naoAntesDe", e.dia DESC, e.id LIMIT 30`;
         for (const c of candidatos) {
           // A recusa não altera evidência nem passa para outra conexão sem repetir a verificação.
@@ -155,7 +157,7 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
       if (bytes > 2 * 1024 * 1024 || !Number.isInteger(p.pagina) || p.pagina < 1 || p.pagina > 1000 || p.http !== 200) {
         throw new ErroPipelineAnalytics('LIMITE', 'Resposta fora dos limites da coleta.');
       }
-      if (t.perfil === 'pagamentos' ? p.versaoContrato !== 1 : p.versaoContrato !== undefined) {
+      if (['pagamentos', 'complementares'].includes(t.perfil) ? p.versaoContrato !== 1 : p.versaoContrato !== undefined) {
         throw new ErroPipelineAnalytics('CORPO', 'Versão de recibo incompatível com o perfil.');
       }
       let resposta: unknown;
@@ -268,6 +270,43 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
           parceiroId: tx.parceiroId, execucaoId: t.id, geracao: t.geracao, paginaInicial: 1,
           versaoContrato: normalizado.versaoContrato, situacao: fechado ? 'PENDENTE_PERIODO' : 'PUBLICADO', hash: sha256,
           parcelas: normalizado.parcelas === null ? Prisma.DbNull : normalizado.parcelas.map(p => ({ ...p })),
+        } });
+        await encerrar(tx, t, fechado ? 'PENDENTE_PERIODO' : 'SUCESSO', {
+          ultimoHash: sha256, ...(!fechado ? { ultimaPublicacaoEm: new Date() } : {}),
+        });
+        return fechado ? 'pendente-periodo' : 'publicada';
+      }, { timeout: 30_000 });
+    },
+    async publicarComplementares(t: TarefaAnalytics): Promise<'publicada' | 'sem-mudanca' | 'pendente-periodo'> {
+      await confirmarPosse();
+      if (t.perfil !== 'complementares') throw new ErroPipelineAnalytics('ENTRADA', 'Esta tarefa não é uma distribuição complementar.');
+      const paginas = await cliente.integracaoPayload.findMany({ where: { execucaoId: t.id, geracao: t.geracao }, orderBy: { pagina: 'asc' } });
+      for (const p of paginas) {
+        if (p.versaoContrato !== 1 || hash(p.corpoOriginal) !== p.sha256) throw new ErroPipelineAnalytics('CORPO', 'Versão ou hash do recibo complementar inválido.');
+      }
+      const normalizado = normalizarComplementaresAnalytics(t.identidade, paginas.map(p => ({
+        identidade: t.identidade, paginaSolicitada: p.pagina, versaoContrato: 1, corpoOriginal: p.corpoOriginal,
+      })));
+      const sha256 = hash(JSON.stringify([t.identidade.ambiente, t.identidade.merchantId, t.identidade.dia,
+        t.identidade.fuso, t.identidade.perfil, normalizado.versaoContrato, normalizado.horarios, normalizado.primeirosPedidos]));
+      return cliente.transacao(async tx => {
+        await travarParaEscrever(tx);
+        await conferir(tx, t);
+        const atuais = await tx.integracaoPayload.findMany({ where: { execucaoId: t.id, geracao: t.geracao }, orderBy: { pagina: 'asc' }, select: { pagina: true, sha256: true, versaoContrato: true } });
+        if (atuais.length !== paginas.length || atuais.some((p, i) => p.pagina !== paginas[i].pagina || p.sha256 !== paginas[i].sha256 || p.versaoContrato !== paginas[i].versaoContrato)) {
+          throw new ErroPipelineAnalytics('CORPO', 'A evidência complementar mudou durante a preparação.');
+        }
+        const anterior = await tx.integracaoDistribuicaoSnapshot.findFirst({ where: { execucaoId: t.id, situacao: 'PUBLICADO' }, orderBy: { geracao: 'desc' } });
+        if (anterior?.hash === sha256 && anterior.versaoContrato === normalizado.versaoContrato) {
+          await encerrar(tx, t, 'SUCESSO', { ultimoHash: sha256 });
+          return 'sem-mudanca';
+        }
+        const fechado = (await datasEmPeriodoFechado(tx, [t.identidade.dia])).has(t.identidade.dia);
+        await tx.integracaoDistribuicaoSnapshot.create({ data: {
+          parceiroId: tx.parceiroId, execucaoId: t.id, geracao: t.geracao, paginaInicial: 1,
+          versaoContrato: normalizado.versaoContrato, situacao: fechado ? 'PENDENTE_PERIODO' : 'PUBLICADO', hash: sha256,
+          horarios: normalizado.horarios === null ? Prisma.DbNull : normalizado.horarios.map(p => ({ ...p })),
+          primeirosPedidos: normalizado.primeirosPedidos === null ? Prisma.DbNull : normalizado.primeirosPedidos.map(p => ({ ...p })),
         } });
         await encerrar(tx, t, fechado ? 'PENDENTE_PERIODO' : 'SUCESSO', {
           ultimoHash: sha256, ...(!fechado ? { ultimaPublicacaoEm: new Date() } : {}),

@@ -23,6 +23,7 @@ function fixture() {
       if (sql.includes('current_setting')) return [{ repetivel: estado.repetivel, leitura: estado.leitura }];
       if (sql.includes('SELECT DISTINCT c.')) return estado.conflitos;
       if (sql.includes('IntegracaoPagamentoSnapshot')) return [];
+      if (sql.includes('IntegracaoDistribuicaoSnapshot')) return [];
       if (sql.includes('DISTINCT ON')) return estado.versoes;
       if (sql.includes('FROM "KpiIfoodDia"')) return estado.linhas;
       throw new Error('Consulta não reconhecida.');
@@ -56,6 +57,9 @@ describe('Painel Analytics · gates e projeção do leitor', () => {
     expect(r).toMatchObject({ ok: true, painel: { cobertura: { completa: true, paresCobertos: 1 }, resumo: { indicadores: { gmv: { valor: '1000' } } } } });
     expect(r).toMatchObject({ painel: { pagamentos: { cobertura: { completa: false, paresEsperados: 1, paresCobertos: 0 },
       total: { estado: 'sem-dado', motivo: 'cobertura-parcial' }, distribuicao: { estado: 'sem-dado', motivo: 'cobertura-parcial' } } } });
+    expect(r).toMatchObject({ painel: { complementares: { cobertura: { completa: false, paresEsperados: 1, paresCobertos: 0 },
+      horarios: { total: { estado: 'sem-dado', motivo: 'cobertura-parcial' } },
+      primeirosPedidos: { total: { estado: 'sem-dado', motivo: 'cobertura-parcial' } } } } });
     expect(f.transacao).toHaveBeenCalledWith(expect.any(Function), { repetivel: true, relatorio: {} });
     expect(JSON.stringify(r)).not.toMatch(/snapshot-interno|corpoOriginal|execucaoId|appId|leaseAte|requestId/);
     expect(f.consultas.filter(s => s.includes('KpiIfoodDia'))).toHaveLength(1);

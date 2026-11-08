@@ -1,5 +1,6 @@
 import type { IdentidadeAnalytics, UnidadeMonetariaAnalytics } from './analytics';
 import type { IdentidadePagamentos } from './analytics-pagamentos';
+import type { IdentidadeComplementares } from './analytics-complementares';
 import type { Classificacao } from './respostas';
 
 export type TipoJanela = 'D1' | 'REVISAO' | 'HISTORICO' | 'ACESSO';
@@ -12,7 +13,7 @@ export interface JanelaAnalytics {
   fuso: string;
   unidade: UnidadeMonetariaAnalytics['unidade'];
   /** Omissão conserva o planejamento diário legado. ACESSO não aceita outro perfil. */
-  perfil?: 'diario' | 'pagamentos';
+  perfil?: 'diario' | 'pagamentos' | 'complementares';
 }
 interface TarefaBase {
   id: string;
@@ -29,6 +30,7 @@ interface TarefaBase {
 export type TarefaAnalytics = TarefaBase & (
   | { perfil: 'diario' | 'acesso'; identidade: IdentidadeAnalytics }
   | { perfil: 'pagamentos'; identidade: IdentidadePagamentos }
+  | { perfil: 'complementares'; identidade: IdentidadeComplementares }
 );
 export interface PaginaDoTransporte {
   pagina: number;

@@ -10,6 +10,7 @@ import { FiltrosPainelAnalytics } from './painel-filtros';
 import { AUSENCIA_ANALYTICS, MedidaDoPainel } from './painel-medidas';
 import { SerieDoPainelAnalytics } from './painel-serie';
 import { PagamentosDoPainel } from './painel-pagamentos';
+import { ComplementaresDoPainel } from './painel-complementares';
 
 export interface PropsPainelAnalytics {
   resultado: ResultadoDoPainelAnalytics;
@@ -63,7 +64,7 @@ export function PainelAnalytics({ resultado, base, baseSituacao, teste = false }
   const temNegativo = i && [i.gmv, i.gmvSemEntrega, i.gmvConcluido, i.gmvCancelado].some(m => m.estado === 'disponivel' && m.valor.startsWith('-'));
   return <div className="min-w-0 space-y-5">
     {avisoTeste}
-    <Painel titulo="Loja e período" subtitulo="Dados até ontem. Dias e horários de São Paulo.">
+    <Painel titulo="Loja e período" subtitulo="Dados até ontem. Datas do recorte em São Paulo.">
       {resultado.lojas.length ? <FiltrosPainelAnalytics base={base} filtros={resultado.filtros} lojas={resultado.lojas} fontes={p?.fontes ?? []} ontem={p?.periodo.ateOntem ?? ontemDoPainelAnalytics()} />
         : <Vazio titulo="Nenhuma loja disponível para este painel.">O acesso às lojas precisa ser conferido pela FlowFoods.</Vazio>}
     </Painel>
@@ -110,10 +111,7 @@ export function PainelAnalytics({ resultado, base, baseSituacao, teste = false }
         </div>
       </section>
       <PagamentosDoPainel key={`${p.loja.id}:${p.periodo.inicio}:${p.periodo.fim}:${p.fontes.filter(f => f.selecionada).map(f => f.chave).join(',')}`} dados={p.pagamentos} fontes={p.fontes} />
-      <Painel titulo="Distribuições ainda indisponíveis">
-        <dl className="grid gap-4 sm:grid-cols-2">{['Horário do pedido', 'Primeiro pedido do cliente'].map(titulo => <div key={titulo}><dt className="mb-1 text-[13px] font-medium text-texto">{titulo}</dt><dd className="text-[13px] text-suave">Indisponível</dd></div>)}</dl>
-        <p className="mt-4 text-[12px] leading-relaxed text-suave">Ainda não há leitura validada dessas distribuições neste painel. Ausência não equivale a zero.</p>
-      </Painel>
+      <ComplementaresDoPainel key={`complementares:${p.loja.id}:${p.periodo.inicio}:${p.periodo.fim}:${p.fontes.filter(f => f.selecionada).map(f => f.chave).join(',')}`} dados={p.complementares} fontes={p.fontes} />
       {baseSituacao && <Link href={`${baseSituacao}?${new URLSearchParams({ loja: p.loja.id, dia: p.periodo.fim }).toString()}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Conferir a situação da integração no último dia do período</Link>}
     </>}
   </div>;

@@ -385,7 +385,7 @@ export function FormPrepararModulo({ slug, conexaoId, opcoes, semOpcao }: { slug
 }
 
 const PEDE_CONFIRMACAO: Record<string, { titulo: string; detalhe: string; confirmar: string }> = {
-  ativar: { titulo: 'Ativar este módulo?', detalhe: 'Com o módulo ativo, a busca diária dos números desta loja vai rodar quando existir. Hoje nada é buscado.', confirmar: 'Ativar' },
+  ativar: { titulo: 'Ativar este módulo?', detalhe: 'Em produção, a coleta de Analytics exige app homologado, acesso autorizado e integração liberada, além da coleta geral habilitada. Ativar não confirma uma leitura. TEST fica fora da rotina automática.', confirmar: 'Ativar' },
   pausar: { titulo: 'Pausar este módulo?', detalhe: 'A busca desta loja para até você retomar. Nada é apagado.', confirmar: 'Pausar' },
 };
 
