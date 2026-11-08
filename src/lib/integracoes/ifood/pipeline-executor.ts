@@ -3,6 +3,7 @@ import {
   conferirConsultaDiaria, conferirPaginasAnalytics, consultaDoDia, consultaMinima,
   ErroContratoAnalytics, lerPaginaAnalytics, type PaginaRecebidaAnalytics,
 } from './analytics';
+import { conferirIdentidadePagamentos, consultaPagamentos, normalizarPagamentosAnalytics } from './analytics-pagamentos';
 import { criarClienteIfood, type OpcoesDoCliente } from './http';
 import { caminhoDosKpis } from './leitura-test';
 import {
@@ -16,6 +17,7 @@ export interface RepositorioDoExecutorAnalytics {
   renovar(tarefa: TarefaAnalytics): Promise<void>;
   salvarPagina(tarefa: TarefaAnalytics, pagina: PaginaDoTransporte): Promise<void>;
   publicar(tarefa: TarefaAnalytics): Promise<PublicacaoAnalytics>;
+  publicarPagamentos(tarefa: TarefaAnalytics): Promise<Exclude<PublicacaoAnalytics, 'vazia'>>;
   verificarAcesso(tarefa: TarefaAnalytics): Promise<void>;
   falhar(tarefa: TarefaAnalytics, falha: FalhaAnalytics): Promise<void>;
 }
@@ -32,7 +34,7 @@ export interface ResultadoDaExecucaoAnalytics {
 /**
  * A fila decide retomadas duráveis. Este executor não dorme para repetir 429/5xx/rede nem retoma pela idade do lease.
  * A renovação única de token após 401 continua no cliente canônico; cada emissão passa novamente pelo guard.
- * TEST conserva a identidade TEST no repositório. Nenhum resultado daqui alimenta faturamento/DRE (INT-1.7).
+ * TEST conserva sua identidade isolada. A marginal de pagamentos nunca sinaliza faturamento/DRE.
  */
 export async function executarTarefaAnalytics(tarefa: TarefaAnalytics, o: OpcoesDoExecutorAnalytics): Promise<ResultadoDaExecucaoAnalytics> {
   const repo = o.repositorio;
@@ -45,10 +47,14 @@ export async function executarTarefaAnalytics(tarefa: TarefaAnalytics, o: Opcoes
   try {
     // Não permite que opções de outro app/ambiente transportem a identidade adquirida.
     if (o.http.app.id !== tarefa.appId || o.http.app.ambiente !== tarefa.identidade.ambiente
-      || (tarefa.perfil === 'diario' ? tarefa.identidade.perfil !== 'diario' : tarefa.identidade.perfil !== 'homologacao')) {
+      || (tarefa.perfil === 'diario' ? tarefa.identidade.perfil !== 'diario' : tarefa.perfil === 'acesso'
+        ? tarefa.identidade.perfil !== 'homologacao' : tarefa.identidade.perfil !== 'pagamentos')) {
       throw new ErroContratoAnalytics('IDENTIDADE', 'O cliente não corresponde à tarefa adquirida.');
     }
-    conferirPaginasAnalytics(tarefa.identidade, []); // valida identidade/data antes de token ou rede
+    if (tarefa.perfil === 'pagamentos') {
+      conferirIdentidadePagamentos(tarefa.identidade);
+      if (tarefa.identidade.fuso !== tarefa.fuso) throw new ErroContratoAnalytics('IDENTIDADE', 'O fuso não corresponde à tarefa adquirida.');
+    } else conferirPaginasAnalytics(tarefa.identidade, []); // antes de token ou rede
     const cliente = criarClienteIfood({
       ...o.http, maxTentativas: 1, esperaMaximaMs: 0,
       transporte: async pedido => {
@@ -61,7 +67,8 @@ export async function executarTarefaAnalytics(tarefa: TarefaAnalytics, o: Opcoes
     let bytes = 0;
     for (let pagina = 1; pagina <= 1_000; pagina++) {
       await repo.renovar(tarefa);
-      const consulta = tarefa.perfil === 'diario' ? consultaDoDia(tarefa.identidade.dia, pagina) : consultaMinima(tarefa.identidade.dia, pagina);
+      const consulta = tarefa.perfil === 'diario' ? consultaDoDia(tarefa.identidade.dia, pagina) : tarefa.perfil === 'pagamentos'
+        ? consultaPagamentos(tarefa.identidade.dia) : consultaMinima(tarefa.identidade.dia, pagina);
       const resultado = await cliente.chamar({
         metodo: 'POST', caminho: caminhoDosKpis(tarefa.identidade.merchantId), familia: 'analytics',
         corpo: consulta, idempotente: true, preservarCorpo: true,
@@ -83,8 +90,13 @@ export async function executarTarefaAnalytics(tarefa: TarefaAnalytics, o: Opcoes
       try { resposta = JSON.parse(resultado.corpoOriginal); } catch { throw new ErroContratoAnalytics('ESQUEMA', 'Corpo do Analytics inválido.'); }
       if (resultado.status !== 200 || resposta === null) throw new ErroContratoAnalytics('ESQUEMA', 'A coleta exige JSON HTTP 200 não nulo.');
       // Conserva a evidência limitada, inclusive quando o contrato diário vier incompatível. Publicar revalida tudo.
-      await repo.salvarPagina(tarefa, { pagina, corpoOriginal: resultado.corpoOriginal, http: resultado.status, requestId: resultado.requestId });
+      await repo.salvarPagina(tarefa, { pagina, corpoOriginal: resultado.corpoOriginal, http: resultado.status, requestId: resultado.requestId,
+        ...(tarefa.perfil === 'pagamentos' ? { versaoContrato: 1 as const } : {}) });
       paginas++;
+      if (tarefa.perfil === 'pagamentos') {
+        normalizarPagamentosAnalytics(tarefa.identidade, [{ identidade: tarefa.identidade, paginaSolicitada: pagina, versaoContrato: 1, corpoOriginal: resultado.corpoOriginal }]);
+        return { estado: await repo.publicarPagamentos(tarefa), paginas };
+      }
       if (tarefa.perfil === 'acesso') {
         // Consulta mínima usa terms, não groupBy. Isto prova acesso, nunca cobertura ou receita do dia.
         if (resultado.status !== 200 || !resposta || typeof resposta !== 'object' || Array.isArray(resposta)) {

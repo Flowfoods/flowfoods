@@ -16,6 +16,10 @@ const tarefa = (): TarefaAnalytics => ({
   identidade: { ambiente: 'TEST', merchantId: '11111111-2222-4333-8444-555555555555', dia: '2026-11-06', perfil: 'diario' },
   fuso: 'America/Sao_Paulo', unidade: { moeda: 'BRL', unidade: 'REAL' },
 });
+const tarefaPagamentos = (): TarefaAnalytics => ({ ...tarefa(), perfil: 'pagamentos',
+  identidade: { ambiente: 'TEST', merchantId: '11111111-2222-4333-8444-555555555555', dia: '2026-11-06',
+    fuso: 'America/Sao_Paulo', perfil: 'pagamentos', versaoContrato: 1 },
+});
 const grupo = (id: string) => ({
   groupByKey: { value: { orderStatus: id, salesChannel: 'NOVO', deliveredBy: null, category: null }, count: 7 },
   ...Object.fromEntries(METRICAS_DIARIAS.map(nome => [nome, { sum: 1.99 }])),
@@ -30,6 +34,7 @@ function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())]) {
     renovar: vi.fn(async () => { eventos.push('renovar'); }),
     salvarPagina: vi.fn(async (_t, p) => { eventos.push(`pagina:${p.pagina}`); }),
     publicar: vi.fn(async () => { eventos.push('publicar'); return 'publicada' as const; }),
+    publicarPagamentos: vi.fn(async () => { eventos.push('pagamentos'); return 'publicada' as const; }),
     verificarAcesso: vi.fn(async () => { eventos.push('acesso'); }),
     falhar: vi.fn(async () => { eventos.push('falhar'); }),
   };
@@ -47,6 +52,49 @@ function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())]) {
   const http = { app: APP, tokens, limitador, transporte, env: ENV, relogio: () => AGORA, dormir, maxTentativas: 6, esperaMaximaMs: 999_999 };
   return { repositorio, http, eventos, pedidos, sonos, transporte };
 }
+
+describe('INT-1.8C · executor marginal usa a fila/cota existentes', () => {
+  const marginal = (paymentMethod: unknown = { value: { PIX: 4 } }) => ({ data: [{ paymentMethod }], currentPage: 1, size: 1, totalItems: 1, totalPages: 1 });
+  it.each([null, { value: {} }, { value: { PIX: 4, DINHEIRO: 0 } }])('guarda uma página versionada e publica apenas marginal %#', async mapa => {
+    const m = montar([json(marginal(mapa))]), t = tarefaPagamentos();
+    expect(await executarTarefaAnalytics(t, m)).toEqual({ estado: 'publicada', paginas: 1 });
+    expect(m.eventos).toEqual(['renovar', 'renovar', 'http', 'pagina:1', 'pagamentos']);
+    expect(m.repositorio.salvarPagina).toHaveBeenCalledWith(t, expect.objectContaining({ pagina: 1, versaoContrato: 1 }));
+    expect(m.repositorio.publicar).not.toHaveBeenCalled(); expect(m.repositorio.verificarAcesso).not.toHaveBeenCalled();
+    expect(JSON.parse(m.pedidos[0].corpo!)).toEqual({ page: 1, size: 1, filter: { referenceDate: { gte: '2026-11-06', lt: '2026-11-07' } }, agg: { terms: { paymentMethod: ['count'] } } });
+    expect(m.pedidos).toHaveLength(1);
+  });
+  it('conserva evidência incompatível e não percorre páginas de resposta agrupada', async () => {
+    const m = montar([json(pagina(1, 5))]);
+    expect(await executarTarefaAnalytics(tarefaPagamentos(), m)).toEqual({ estado: 'falhou', paginas: 1 });
+    expect(m.repositorio.salvarPagina).toHaveBeenCalledOnce(); expect(m.repositorio.publicarPagamentos).not.toHaveBeenCalled();
+    expect(m.pedidos).toHaveLength(1); expect(m.sonos).toEqual([]);
+  });
+  it('recusa fração original que JSON.parse arredonda para inteiro', async () => {
+    const m = montar([{ ...json({}), corpo: '{"data":[{"paymentMethod":{"value":{"PIX":1.00000000000000001}}}],"currentPage":1,"size":1,"totalItems":1,"totalPages":1}' }]);
+    expect(await executarTarefaAnalytics(tarefaPagamentos(), m)).toEqual({ estado: 'falhou', paginas: 1 });
+    expect(m.repositorio.publicarPagamentos).not.toHaveBeenCalled();
+  });
+  it.each([403, 429, 503])('preserva recusa %i durável sem retry local nem publicar diário', async status => {
+    const m = montar([json({ error: true }, status, { 'retry-after': '600' })]);
+    expect(await executarTarefaAnalytics(tarefaPagamentos(), m)).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(m.repositorio.falhar).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ http: status }));
+    if (status === 429) expect(m.repositorio.falhar).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ naoAntesDe: '2026-11-07T12:10:00.000Z' }));
+    expect(m.pedidos).toHaveLength(1); expect(m.sonos).toEqual([]);
+    expect(m.repositorio.publicarPagamentos).not.toHaveBeenCalled(); expect(m.repositorio.publicar).not.toHaveBeenCalled();
+  });
+  it('fuso forjado é recusado antes do token/transporte', async () => {
+    const m = montar(), t = tarefaPagamentos(); t.fuso = 'UTC';
+    expect(await executarTarefaAnalytics(t, m)).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(m.transporte).not.toHaveBeenCalled();
+  });
+  it('falha de persistência marginal não é tratada como falha do fornecedor', async () => {
+    const m = montar([json(marginal())]);
+    vi.mocked(m.repositorio.publicarPagamentos).mockRejectedValue(new Error('fixture de commit'));
+    await expect(executarTarefaAnalytics(tarefaPagamentos(), m)).rejects.toThrow('fixture de commit');
+    expect(m.repositorio.falhar).not.toHaveBeenCalled();
+  });
+});
 
 describe('executor Analytics: cobertura e recibos', () => {
   it('guarda bytes originais em ordem e só publica depois da última página; identidade TEST não é convertida', async () => {

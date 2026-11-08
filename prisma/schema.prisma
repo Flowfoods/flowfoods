@@ -617,6 +617,7 @@ model ParceiroFlow {
   erpIntegracaoExecucoes      IntegracaoExecucao[]
   erpIntegracaoPayloads       IntegracaoPayload[]
   erpIntegracaoSnapshots      IntegracaoSnapshot[]
+  erpIntegracaoPagamentoSnapshots IntegracaoPagamentoSnapshot[]
   erpKpisIfoodDia             KpiIfoodDia[]
   erpIntegracaoFaturamentoDias IntegracaoFaturamentoDia[]
   erpIntegracaoFaturamentoFontes IntegracaoFaturamentoFonte[]
@@ -3095,10 +3096,12 @@ model IntegracaoExecucao {
   atualizadoEm       DateTime                @updatedAt @db.Timestamptz(3)
   payloads           IntegracaoPayload[]
   snapshots          IntegracaoSnapshot[]
+  pagamentoSnapshots IntegracaoPagamentoSnapshot[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, moduloId, dia, perfil])
   @@index([parceiroId, estado, naoAntesDe, prioridade])
+  @@index([parceiroId, perfil, iniciadaEm(sort: Desc)], map: "IExec_perfil_ultimo_inicio_idx")
 }
 
 // Corpo UTF-8 original recebido do transporte, sem headers. Imutável por geração/página.
@@ -3115,10 +3118,35 @@ model IntegracaoPayload {
   resposta      Json
   http          Int
   requestId     String?
+  // INT-1.8C: recibos legados permanecem NULL; pagamento liga request e normalizador v1.
+  versaoContrato Int?
   recebidoEm    DateTime           @default(now()) @db.Timestamptz(3)
+  pagamentoSnapshots IntegracaoPagamentoSnapshot[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, execucaoId, geracao, pagina])
+}
+
+// INT-1.8C: marginal imutável, sem grupos diários ou aplicação financeira.
+// SQL NULL em parcelas = agregado informado como nulo; [] = mapa informado vazio, não zero pedidos.
+model IntegracaoPagamentoSnapshot {
+  id             String @id @default(cuid())
+  parceiroId     String
+  parceiro       ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict, map: "IPagSnapshot_parceiro_fkey")
+  execucaoId     String
+  execucao       IntegracaoExecucao @relation(fields: [parceiroId, execucaoId], references: [parceiroId, id], onDelete: Restrict, map: "IPagSnapshot_execucao_fkey")
+  geracao        Int
+  paginaInicial  Int @default(1)
+  payloadInicial IntegracaoPayload @relation(fields: [parceiroId, execucaoId, geracao, paginaInicial], references: [parceiroId, execucaoId, geracao, pagina], onDelete: Restrict, map: "IPagSnapshot_payload_fkey")
+  versaoContrato Int
+  situacao       String
+  parcelas       Json?
+  hash           String
+  criadoEm       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([parceiroId, id], map: "IPagSnapshot_tenant_key")
+  @@unique([parceiroId, execucaoId, geracao], map: "IPagSnapshot_geracao_key")
+  @@index([parceiroId, execucaoId, situacao, geracao(sort: Desc)], map: "IPagSnapshot_exec_estado_geracao_idx")
 }
 
 // Versão imutável, inclusive vazio oficial. PENDENTE_PERIODO não substitui o último PUBLICADO.

@@ -24,6 +24,9 @@ function painel(alteracoes: Partial<DadosPainel> = {}): DadosPainel {
       { chave: B, nome: 'Cozinha anterior', marca: null, selecionada: false, ambigua: false, ativa: false }],
     cobertura: { completa: true, diasEsperados: 1, diasCompletos: 1, fontesSelecionadas: 1, paresEsperados: 1, paresCobertos: 1,
       dias: [{ dia: '2026-11-05', completo: true, fontes: [{ chave: A, estado: 'publicado', publicadaEm: '2026-11-06T12:00:00Z', revisaoPendente: true }] }] },
+    pagamentos: { cobertura: { completa: false, diasEsperados: 1, diasCompletos: 0, fontesSelecionadas: 1, paresEsperados: 1, paresCobertos: 0,
+      dias: [{ dia: '2026-11-05', completo: false, fontes: [{ chave: A, estado: 'ausente', publicadaEm: null, revisaoPendente: false }] }] },
+      distribuicao: { estado: 'sem-dado', motivo: 'cobertura-parcial' }, total: { estado: 'sem-dado', motivo: 'cobertura-parcial' } },
     resumo: r, serie: [{ dia: '2026-11-05', completo: true, indicadores: r.indicadores }], ...alteracoes };
 }
 function resultado(p = painel()): ResultadoDoPainelAnalytics {
@@ -112,12 +115,26 @@ describe('INT-1.8B · painel de snapshots em UI', () => {
     expect(h).toContain('overflow-wrap:anywhere'); expect(h).not.toContain('truncate'); expect(h).not.toMatch(/\d[eE][+]\d/);
     expect(h).toContain('o sinal foi preservado');
   });
-  it('pagamento, horário e primeiro pedido não usam métricas de valor nem fixture marginal inventada', () => {
+  it('pagamentos vêm da marginal própria, sem inferência do agrupado diário; horário e primeiro pedido continuam indisponíveis', () => {
     const r: ResumoDoPainelAnalytics = resumo();
     r.distribuicoes.pagamento = { estado: 'disponivel', valor: [{ valor: 'PAGAMENTO_NAO_SUPORTADO', pedidos: '667788' }] };
     const h = html(resultado(painel({ resumo: r })));
-    for (const t of ['Método de pagamento', 'Horário do pedido', 'Primeiro pedido do cliente', 'Indisponível', 'o valor pago não identifica o método']) expect(h).toContain(t);
+    for (const t of ['Formas de pagamento', 'Cobertura de pagamentos incompleta', 'Distribuição sem dado', 'Horário do pedido', 'Primeiro pedido do cliente', 'Indisponível']) expect(h).toContain(t);
     expect(h).not.toMatch(/PAGAMENTO_NAO_SUPORTADO|667788/);
+    expect(cartao(h, 'Pedidos observados')).toMatch(/>3</);
+    expect(cartao(h, 'GMV · todos os status')).toContain('R$ 110,00');
+  });
+  it('pagamentos completos continuam disponíveis quando a cobertura diária é parcial, com denominador próprio', () => {
+    const p = painel({ resumo: resumirPainelAnalytics(linhas, false) });
+    p.cobertura.completa = false;
+    p.pagamentos = { cobertura: { ...p.cobertura, completa: true }, total: { estado: 'disponivel', valor: '8' },
+      distribuicao: { estado: 'disponivel', valor: [{ metodo: 'PIX', ocorrencias: '2' }, { metodo: 'VOUCHER', ocorrencias: '6' }] } };
+    const h = html(resultado(p));
+    expect(cartao(h, 'Pedidos observados')).toContain('Sem dado');
+    expect(cartao(h, 'Total de ocorrências de pagamento')).toMatch(/>8</);
+    expect(h).toContain('Cobertura de pagamentos completa');
+    expect(h).toContain('25,0%'); expect(h).toContain('75,0%');
+    expect(h).not.toContain('66,7%');
   });
   it('TEST permanece visível com dados ou erro; erro não despeja DTO residual nem raw', () => {
     const h = html(resultado(painel({ ambiente: 'TEST' })));

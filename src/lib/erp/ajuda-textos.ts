@@ -1939,7 +1939,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['integracoes/analytics'],
     titulo: 'Painel iFood',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Escolha uma loja, as fontes e um período até ontem; sem datas, são consultados os últimos 30 dias.' },
       { texto: 'Os valores mostram vendas informadas pelo iFood, não repasse nem lucro.' },
@@ -1953,7 +1953,16 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'O GMV de todos os status inclui cancelados. O ticket usa somente o GMV e os pedidos concluídos.' },
           { texto: 'A taxa divide os cancelados pelo total observado; status não classificados deixam essa taxa sem dado.' },
-          { texto: 'Canal, status e logística descrevem os mesmos pedidos em distribuições separadas. A distribuição por pagamento ainda está indisponível.' },
+          { texto: 'Canal, status e logística descrevem os mesmos pedidos em distribuições separadas.' },
+        ],
+      },
+      {
+        id: 'pagamentos',
+        titulo: 'Métodos de pagamento',
+        blocos: [
+          { texto: 'Esta distribuição conta ocorrências de métodos informadas pelo iFood. Não representa pedidos únicos, valores pagos ou repasses.' },
+          { texto: 'Pagamentos têm leitura e cobertura próprias; completar os indicadores diários não completa essa distribuição. Uma revisão pendente preserva a publicação anterior.' },
+          { texto: 'O percentual usa somente o total de ocorrências dos métodos no período. Sem ocorrências, não há percentual; se o provedor não informou o agregado, ele permanece sem dado.' },
         ],
       },
     ],

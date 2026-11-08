@@ -9,6 +9,7 @@ import { diaAnalytics, dinheiroAnalytics, percentualAnalytics, quantidadeAnalyti
 import { FiltrosPainelAnalytics } from './painel-filtros';
 import { AUSENCIA_ANALYTICS, MedidaDoPainel } from './painel-medidas';
 import { SerieDoPainelAnalytics } from './painel-serie';
+import { PagamentosDoPainel } from './painel-pagamentos';
 
 export interface PropsPainelAnalytics {
   resultado: ResultadoDoPainelAnalytics;
@@ -108,9 +109,10 @@ export function PainelAnalytics({ resultado, base, baseSituacao, teste = false }
           <Distribuicao titulo="Logística" dimensao="logistica" medida={p.resumo.distribuicoes.logistica} />
         </div>
       </section>
+      <PagamentosDoPainel key={`${p.loja.id}:${p.periodo.inicio}:${p.periodo.fim}:${p.fontes.filter(f => f.selecionada).map(f => f.chave).join(',')}`} dados={p.pagamentos} fontes={p.fontes} />
       <Painel titulo="Distribuições ainda indisponíveis">
-        <dl className="grid gap-4 sm:grid-cols-3">{['Método de pagamento', 'Horário do pedido', 'Primeiro pedido do cliente'].map(titulo => <div key={titulo}><dt className="mb-1 text-[13px] font-medium text-texto">{titulo}</dt><dd className="text-[13px] text-suave">Indisponível</dd></div>)}</dl>
-        <p className="mt-4 text-[12px] leading-relaxed text-suave">Ainda não há leitura validada dessas distribuições neste painel. Ausência não equivale a zero; o valor pago não identifica o método de pagamento.</p>
+        <dl className="grid gap-4 sm:grid-cols-2">{['Horário do pedido', 'Primeiro pedido do cliente'].map(titulo => <div key={titulo}><dt className="mb-1 text-[13px] font-medium text-texto">{titulo}</dt><dd className="text-[13px] text-suave">Indisponível</dd></div>)}</dl>
+        <p className="mt-4 text-[12px] leading-relaxed text-suave">Ainda não há leitura validada dessas distribuições neste painel. Ausência não equivale a zero.</p>
       </Painel>
       {baseSituacao && <Link href={`${baseSituacao}?${new URLSearchParams({ loja: p.loja.id, dia: p.periodo.fim }).toString()}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Conferir a situação da integração no último dia do período</Link>}
     </>}

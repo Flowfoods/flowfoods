@@ -4,11 +4,12 @@ const d = vi.hoisted(() => ({
   ativo: true, pausada: false, parceiro: vi.fn(), modulo: vi.fn(), liberacao: vi.fn(), app: vi.fn(),
   adquirir: vi.fn(), renovar: vi.fn(), executar: vi.fn(), registrar: vi.fn(), reservar: vi.fn(), planejar: vi.fn(),
   token: vi.fn(), transporte: vi.fn(), financeiro: vi.fn(), confirmar: vi.fn(), bloqueadaAte: null as Date | null,
+  primeiraJanela: vi.fn(), contarJanelas: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({ prisma: { parceiroFlow: { findFirst: d.parceiro } } }));
 vi.mock('@/lib/erp/tenant', () => ({ doParceiro: () => ({
   liberacaoDeModulo: { findFirst: d.liberacao }, integracaoConexaoModulo: { findFirst: d.modulo },
-  integracaoExecucao: { findFirst: async () => null, count: async () => 0 },
+  integracaoExecucao: { findFirst: d.primeiraJanela, count: d.contarJanelas },
 }) }));
 vi.mock('@/lib/integracoes/core/cofre', () => ({ integracaoIfoodAtiva: () => d.ativo }));
 vi.mock('@/lib/integracoes/core/apps', () => ({ appPorId: d.app }));
@@ -40,8 +41,9 @@ describe('INT-1.6 · fronteira da rotina automática', () => {
     d.executar.mockResolvedValue({ estado: 'publicada', paginas: 1 });
     d.reservar.mockResolvedValue(0);
     d.renovar.mockResolvedValue(undefined);
+    d.primeiraJanela.mockReset().mockResolvedValue(null); d.contarJanelas.mockReset().mockResolvedValue(0);
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 
   it.each(['chave', 'pausa', 'cooldown'] as const)('desligado por %s não adquire nem chama o iFood', async motivo => {
     if (motivo === 'chave') d.ativo = false;
@@ -139,5 +141,31 @@ describe('INT-1.6 · fronteira da rotina automática', () => {
     await rodar(); await rodar(); await rodar();
     expect(d.parceiro.mock.calls.map(([q]) => q.where.id?.gt ?? 'inicio')).toEqual(['', 'a', 'b', 'inicio']);
     expect(d.executar).not.toHaveBeenCalled();
+  });
+  it('planeja dois históricos independentes, mas emite somente uma tarefa adquirida por rodada', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-07T14:00:00Z'));
+    d.primeiraJanela.mockImplementation(async q => q.where.perfil === 'diario'
+      ? { dia: new Date('2026-10-01T00:00:00Z'), fuso: 'America/Sao_Paulo', unidade: 'REAL' } : null);
+    const marginal = { ...tarefa, perfil: 'pagamentos' }; d.adquirir.mockResolvedValue(marginal);
+    await criarRotinaAnalytics(vi.fn())();
+    expect(d.primeiraJanela.mock.calls.map(([q]) => q.where.perfil)).toEqual(['diario', 'pagamentos']);
+    expect(d.contarJanelas.mock.calls.map(([q]) => q.where.perfil)).toEqual(['diario', 'pagamentos']);
+    const janelas = d.planejar.mock.calls.map(([, j]) => j);
+    expect(janelas).toHaveLength(35);
+    expect(janelas.find(j => j.perfil === 'diario' && j.tipo === 'HISTORICO').dia).toBe('2026-09-30');
+    expect(janelas.find(j => j.perfil === 'pagamentos' && j.tipo === 'HISTORICO').dia).toBe('2026-10-21');
+    expect(d.executar).toHaveBeenCalledTimes(1); expect(d.executar.mock.calls[0][0]).toBe(marginal);
+    expect(d.financeiro).toHaveBeenCalledTimes(1); expect(d.reservar).not.toHaveBeenCalled();
+  });
+  it('teto marginal não ocupa o limite do histórico diário e módulo AUTORIZADO só verifica acesso', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-07T14:00:00Z'));
+    d.contarJanelas.mockImplementation(async q => q.where.perfil === 'pagamentos' ? 20 : 0);
+    await criarRotinaAnalytics(vi.fn())();
+    const janelas = d.planejar.mock.calls.map(([, j]) => j);
+    expect(janelas.some(j => j.perfil === 'diario' && j.tipo === 'HISTORICO')).toBe(true);
+    expect(janelas.some(j => j.perfil === 'pagamentos' && j.tipo === 'HISTORICO')).toBe(false);
+    d.planejar.mockClear(); d.modulo.mockResolvedValue({ id: 'modulo', appId: 'app', estado: 'AUTORIZADO' });
+    await criarRotinaAnalytics(vi.fn())();
+    expect(d.planejar.mock.calls.map(([, j]) => j.tipo)).toEqual(['ACESSO']);
   });
 });

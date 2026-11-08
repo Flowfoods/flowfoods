@@ -793,6 +793,7 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
   it('outra conexão da mesma empresa não pode substituir a identidade persistida da tarefa', async () => {
     const m = await massa();
     const t = await adquirir(m);
+    if (t.perfil === 'pagamentos') throw new Error('Este controle legado exige a tarefa diária da fixture.');
     const loja = await cadastrarLoja(m.cliente, { nome: 'Segunda loja sintética' }, AUTOR);
     if (!loja.ok) throw new Error(JSON.stringify(loja));
     const merchantId = randomUUID();
@@ -801,7 +802,7 @@ describe.skipIf(!URL_TESTE)('INT-1.6 · publicação Analytics e isolamento no P
     const mod = await prepararModulo(m.cliente, c.id, m.appId, 'ANALYTICS', AUTOR);
     if (!mod.ok) throw new Error(JSON.stringify(mod));
     for (const acao of ['solicitar', 'autorizar', 'ativar'] as const) expect(await mudarModulo(m.cliente, mod.id, acao, AUTOR)).toMatchObject({ ok: true });
-    const alteracoes: Partial<TarefaAnalytics>[] = [
+    const alteracoes: Partial<Extract<TarefaAnalytics, { perfil: 'diario' | 'acesso' }>>[] = [
       { moduloId: mod.id }, { lojaId: loja.id }, { appId: randomUUID() },
       { identidade: { ...t.identidade, merchantId } }, { fuso: 'UTC' }, { unidade: { moeda: 'BRL', unidade: 'CENTAVO' } },
     ];

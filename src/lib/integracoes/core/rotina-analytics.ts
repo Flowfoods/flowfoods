@@ -55,15 +55,18 @@ export function criarRotinaAnalytics(log: Log, signal?: AbortSignal) {
       ultimoModulo.set(parceiro.id, modulo.id);
       const app = await appPorId(modulo.appId);
       if (!app || app.ambiente !== 'PRODUCAO' || app.estadoHomologacao !== 'HOMOLOGADO') return;
-      const [primeiro, pendentes] = await Promise.all([
+      const [primeiro, pendentes, primeiroPagamento, pagamentosPendentes] = await Promise.all([
         cliente.integracaoExecucao.findFirst({ where: { moduloId: modulo.id, perfil: 'diario' }, orderBy: { dia: 'asc' }, select: { dia: true, fuso: true, unidade: true } }),
-        cliente.integracaoExecucao.count({ where: { moduloId: modulo.id, tipo: 'HISTORICO', estado: { in: ['PLANEJADA', 'EXECUTANDO', 'AGUARDANDO'] } } }),
+        cliente.integracaoExecucao.count({ where: { moduloId: modulo.id, perfil: 'diario', tipo: 'HISTORICO', estado: { in: ['PLANEJADA', 'EXECUTANDO', 'AGUARDANDO'] } } }),
+        cliente.integracaoExecucao.findFirst({ where: { moduloId: modulo.id, perfil: 'pagamentos' }, orderBy: { dia: 'asc' }, select: { dia: true, fuso: true, unidade: true } }),
+        cliente.integracaoExecucao.count({ where: { moduloId: modulo.id, perfil: 'pagamentos', tipo: 'HISTORICO', estado: { in: ['PLANEJADA', 'EXECUTANDO', 'AGUARDANDO'] } } }),
       ]);
       const janelas = planejarAnalytics(Date.now(), {
         moduloId: modulo.id, ativo: modulo.estado === 'ATIVO',
         // O cadastro atual só atende o fuso da operação no Rio. A identidade da janela o torna explícito e imutável.
-        fuso: primeiro?.fuso ?? 'America/Sao_Paulo', unidade: primeiro?.unidade === 'CENTAVO' ? 'CENTAVO' : 'REAL',
+        fuso: primeiro?.fuso ?? primeiroPagamento?.fuso ?? 'America/Sao_Paulo', unidade: (primeiro ?? primeiroPagamento)?.unidade === 'CENTAVO' ? 'CENTAVO' : 'REAL',
         primeiroDiaPlanejado: primeiro?.dia.toISOString().slice(0, 10), historicosPendentes: pendentes,
+        pagamentos: { primeiroDiaPlanejado: primeiroPagamento?.dia.toISOString().slice(0, 10), historicosPendentes: pagamentosPendentes },
       });
       for (const janela of janelas) {
         if (!await posse.confirmar() || !integracaoIfoodAtiva()) return;

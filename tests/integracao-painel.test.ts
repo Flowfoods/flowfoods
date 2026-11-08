@@ -22,6 +22,7 @@ function fixture() {
       const sql = partes.join('?'); consultas.push(sql);
       if (sql.includes('current_setting')) return [{ repetivel: estado.repetivel, leitura: estado.leitura }];
       if (sql.includes('SELECT DISTINCT c.')) return estado.conflitos;
+      if (sql.includes('IntegracaoPagamentoSnapshot')) return [];
       if (sql.includes('DISTINCT ON')) return estado.versoes;
       if (sql.includes('FROM "KpiIfoodDia"')) return estado.linhas;
       throw new Error('Consulta não reconhecida.');
@@ -53,10 +54,14 @@ describe('Painel Analytics · gates e projeção do leitor', () => {
   it('perfil financeiro autorizado recebe DTO sem ids de execução/snapshot nem raw', async () => {
     const f = fixture(); const r = await lerPainelAnalytics(f.cliente, acesso(), contexto, entrada);
     expect(r).toMatchObject({ ok: true, painel: { cobertura: { completa: true, paresCobertos: 1 }, resumo: { indicadores: { gmv: { valor: '1000' } } } } });
+    expect(r).toMatchObject({ painel: { pagamentos: { cobertura: { completa: false, paresEsperados: 1, paresCobertos: 0 },
+      total: { estado: 'sem-dado', motivo: 'cobertura-parcial' }, distribuicao: { estado: 'sem-dado', motivo: 'cobertura-parcial' } } } });
     expect(f.transacao).toHaveBeenCalledWith(expect.any(Function), { repetivel: true, relatorio: {} });
     expect(JSON.stringify(r)).not.toMatch(/snapshot-interno|corpoOriginal|execucaoId|appId|leaseAte|requestId/);
     expect(f.consultas.filter(s => s.includes('KpiIfoodDia'))).toHaveLength(1);
     expect(f.consultas.find(s => s.includes('KpiIfoodDia'))).toContain('count(k.gmv) = count(*)');
+    expect(f.consultas.filter(s => s.includes('IntegracaoPagamentoSnapshot'))).toHaveLength(1);
+    expect(f.consultas.some(s => s.includes('jsonb_array_elements'))).toBe(false);
   });
   it('pendente nova conserva PUBLICADO anterior; ausência não vira zero', async () => {
     const f = fixture(); f.estado.versoes.push(versao({ id: 'pendente', situacao: 'PENDENTE_PERIODO', geracao: 2 }));

@@ -534,6 +534,126 @@ export async function conferirPonteAnalytics(db: Pick<PrismaClient, '$queryRaw'>
   return erros;
 }
 
+export const FUNCOES_DOS_PAGAMENTOS_ANALYTICS: readonly [string, string, string, boolean, string, number][] = [
+  ['erp_integracao_pagamento_json_valido', 'json, integer', 'boolean', false, 'i', 1],
+  ['erp_integracao_pagamento_normalizar', 'text', 'jsonb', false, 'i', 0],
+  ['erp_integracao_pagamento_conferir_corpo', 'text, text, integer, jsonb', 'void', true, 'v', 0],
+  ...['erp_integracao_pagamento_snapshot_confere', 'erp_integracao_pagamento_execucao_guard', 'erp_integracao_pagamento_final', 'erp_integracao_payload_confere']
+    .map(nome => [nome, '', 'trigger', true, 'v', 0] as [string, string, string, boolean, string, number]),
+];
+
+/** INT-1.8C: somente catálogo. Ausente antes de 57; instalação parcial nunca passa como legado. */
+export async function conferirPagamentosAnalytics(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
+  const erros: string[] = [], tabela = 'IntegracaoPagamentoSnapshot';
+  const [marcas] = await db.$queryRaw<{ tabela: boolean; coluna: boolean; funcao: boolean; prisma: boolean }[]>`
+    SELECT to_regclass(${`"${tabela}"`}) IS NOT NULL AS tabela,
+      EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='IntegracaoPayload' AND column_name='versaoContrato') AS coluna,
+      EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=current_schema() AND p.proname='erp_integracao_pagamento_final') AS funcao,
+      to_regclass('_prisma_migrations') IS NOT NULL AS prisma`;
+  let instalada = !!(marcas?.tabela || marcas?.coluna || marcas?.funcao);
+  if (!instalada && marcas?.prisma) {
+    const [m] = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "_prisma_migrations" WHERE migration_name='20261126000000_erp_integracao_pagamentos' AND rolled_back_at IS NULL`;
+    instalada = (m?.n ?? 0) > 0;
+  }
+  if (!instalada) return erros;
+  const canonico = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim();
+  const meta = await db.$queryRaw<{ nome: string; rls: boolean; forcada: boolean; leitura: boolean; inclusao: boolean; proibidos: boolean; publica: boolean }[]>`
+    SELECT c.relname AS nome,c.relrowsecurity AS rls,c.relforcerowsecurity AS forcada,
+      coalesce(has_table_privilege(r.oid,c.oid,'SELECT'),false) AS leitura,coalesce(has_table_privilege(r.oid,c.oid,'INSERT'),false) AS inclusao,
+      coalesce(has_table_privilege(r.oid,c.oid,'UPDATE') OR has_table_privilege(r.oid,c.oid,'DELETE') OR has_table_privilege(r.oid,c.oid,'TRUNCATE') OR has_table_privilege(r.oid,c.oid,'REFERENCES') OR has_table_privilege(r.oid,c.oid,'TRIGGER'),false) AS proibidos,
+      EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee=0) AS publica
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_roles r ON r.rolname='erp_tenant'
+    WHERE n.nspname=current_schema() AND c.relname=ANY(${[tabela, 'Loja']}) AND c.relkind='r'`;
+  const base = meta.find(t => t.nome === 'Loja'), marginal = meta.find(t => t.nome === tabela);
+  if (!base || !marginal || marginal.rls !== base.rls || marginal.forcada !== base.rls
+    || marginal.leitura !== base.rls || marginal.inclusao !== base.rls || marginal.proibidos || marginal.publica) erros.push(`INT-1.8C: ${tabela} ausente ou com RLS/ACL incompatíveis.`);
+  const policies = await db.$queryRaw<{ nome: string; comando: string; permissiva: boolean; papel: boolean; usando: string | null; gravando: string | null }[]>`
+    SELECT p.polname AS nome,p.polcmd::text AS comando,p.polpermissive AS permissiva,
+      p.polroles=ARRAY[(SELECT oid FROM pg_roles WHERE rolname='erp_tenant')] AS papel,
+      pg_get_expr(p.polqual,p.polrelid) AS usando,pg_get_expr(p.polwithcheck,p.polrelid) AS gravando
+    FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relname=${tabela}`;
+  const regra = `("parceiroId" = NULLIF(current_setting('app.parceiro_id'::text, true), ''::text))`;
+  if (base?.rls ? policies.length !== 1 || !policies.some(p => p.nome === 'IPagSnapshot_do_parceiro' && p.comando === '*' && p.permissiva && p.papel && canonico(p.usando) === regra && canonico(p.gravando) === regra) : policies.length !== 0) erros.push('INT-1.8C: policy IPagSnapshot_do_parceiro incompatível ou acesso adicional.');
+  const colunas = await db.$queryRaw<{ tabela: string; nome: string; tipo: string; precisao: number | null; nula: string; padrao: string | null }[]>`
+    SELECT table_name AS tabela,column_name AS nome,data_type AS tipo,datetime_precision AS precisao,is_nullable AS nula,column_default AS padrao
+    FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=ANY(${[tabela, 'IntegracaoPayload']})`;
+  const campos: [string, string, string, string | null][] = [
+    ...['id', 'parceiroId', 'execucaoId', 'situacao', 'hash'].map(n => [n, 'text', 'NO', null] as [string, string, string, null]),
+    ['geracao', 'integer', 'NO', null], ['paginaInicial', 'integer', 'NO', '1'], ['versaoContrato', 'integer', 'NO', null],
+    ['parcelas', 'jsonb', 'YES', null], ['criadoEm', 'timestamp with time zone', 'NO', 'CURRENT_TIMESTAMP'],
+  ];
+  for (const [nome, tipo, nula, padrao] of campos) if (!colunas.some(c => c.tabela === tabela && c.nome === nome && c.tipo === tipo && c.nula === nula && c.padrao === padrao && (nome !== 'criadoEm' || c.precisao === 3))) erros.push(`INT-1.8C: ${tabela}.${nome} incompatível.`);
+  if (!colunas.some(c => c.tabela === 'IntegracaoPayload' && c.nome === 'versaoContrato' && c.tipo === 'integer' && c.nula === 'YES' && c.padrao === null)) erros.push('INT-1.8C: IntegracaoPayload.versaoContrato deve ser nullable sem default.');
+  const constraints = await db.$queryRaw<{ tabela: string; nome: string; tipo: string; validado: boolean; expressao: string | null; destino: string | null; mesmoSchema: boolean; de: string[]; para: string[]; excluir: string; atualizar: string }[]>`
+    SELECT t.relname AS tabela,c.conname AS nome,c.contype::text AS tipo,c.convalidated AS validado,pg_get_expr(c.conbin,c.conrelid) AS expressao,
+      ref.relname AS destino,ref.relnamespace=t.relnamespace AS "mesmoSchema",c.confdeltype::text AS excluir,c.confupdtype::text AS atualizar,
+      ARRAY(SELECT a.attname FROM unnest(c.conkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.num ORDER BY k.ord) AS de,
+      ARRAY(SELECT a.attname FROM unnest(c.confkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.num ORDER BY k.ord) AS para
+    FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace LEFT JOIN pg_class ref ON ref.oid=c.confrelid
+    WHERE n.nspname=current_schema() AND t.relname=ANY(${[tabela, 'IntegracaoExecucao', 'IntegracaoPayload']})`;
+  // Literais e parênteses são preservados: CHECK(true), regex em maiúsculas e OR alargado falham.
+  const checks: [string, string, string][] = [
+    [tabela, 'IPagSnapshot_identidade', `((geracao > 0) AND ("paginaInicial" = 1) AND ("versaoContrato" = 1) AND (hash ~ '^[0-9a-f]{64}$'::text))`],
+    [tabela, 'IPagSnapshot_estado', `(situacao = ANY (ARRAY['PUBLICADO'::text, 'PENDENTE_PERIODO'::text]))`],
+    [tabela, 'IPagSnapshot_parcelas', `((parcelas IS NULL) OR (jsonb_typeof(parcelas) = 'array'::text))`],
+    ['IntegracaoPayload', 'IntegracaoPayload_versao_contrato', `(("versaoContrato" IS NULL) OR ("versaoContrato" = 1))`],
+    ['IntegracaoExecucao', 'IntegracaoExecucao_perfil_tipo', `(((perfil = ANY (ARRAY['diario'::text, 'pagamentos'::text])) AND (tipo = ANY (ARRAY['D1'::text, 'REVISAO'::text, 'HISTORICO'::text]))) OR ((perfil = 'acesso'::text) AND (tipo = 'ACESSO'::text)))`],
+  ];
+  for (const [t, nome, expressao] of checks) if (!constraints.some(c => c.tabela === t && c.nome === nome && c.tipo === 'c' && c.validado && canonico(c.expressao) === expressao)) erros.push(`INT-1.8C: CHECK ${nome} ausente, NOT VALID ou incorreto.`);
+  if (!constraints.some(c => c.tabela === tabela && c.tipo === 'p' && c.validado && JSON.stringify(c.de) === '["id"]')) erros.push('INT-1.8C: chave primária marginal incompatível.');
+  const fks: [string, string, string[], string[]][] = [
+    ['IPagSnapshot_parceiro_fkey', 'ParceiroFlow', ['parceiroId'], ['id']],
+    ['IPagSnapshot_execucao_fkey', 'IntegracaoExecucao', ['parceiroId', 'execucaoId'], ['parceiroId', 'id']],
+    ['IPagSnapshot_payload_fkey', 'IntegracaoPayload', ['parceiroId', 'execucaoId', 'geracao', 'paginaInicial'], ['parceiroId', 'execucaoId', 'geracao', 'pagina']],
+  ];
+  for (const [nome, destino, de, para] of fks) if (!constraints.some(c => c.tabela === tabela && c.nome === nome && c.tipo === 'f' && c.validado && c.destino === destino && c.mesmoSchema && c.excluir === 'r' && c.atualizar === 'c' && JSON.stringify(c.de) === JSON.stringify(de) && JSON.stringify(c.para) === JSON.stringify(para))) erros.push(`INT-1.8C: FK ${nome} incompatível com tenant/geração/RESTRICT.`);
+  const indices = await db.$queryRaw<{ tabela: string; nome: string; valido: boolean; pronto: boolean; unico: boolean; parcial: boolean; expressao: boolean; chaves: number; atributos: number; colunas: string[]; opcoes: number[] }[]>`
+    SELECT t.relname AS tabela,c.relname AS nome,i.indisvalid AS valido,i.indisready AS pronto,i.indisunique AS unico,i.indpred IS NOT NULL AS parcial,i.indexprs IS NOT NULL AS expressao,
+      i.indnkeyatts::int AS chaves,i.indnatts::int AS atributos,
+      ARRAY(SELECT a.attname FROM unnest(i.indkey) WITH ORDINALITY k(num,ord) JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.num ORDER BY k.ord) AS colunas,
+      ARRAY(SELECT valor::int FROM unnest(i.indoption) valor) AS opcoes
+    FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid JOIN pg_class t ON t.oid=i.indrelid JOIN pg_namespace n ON n.oid=t.relnamespace
+    WHERE n.nspname=current_schema() AND t.relname=ANY(${[tabela, 'IntegracaoExecucao']})`;
+  const esperados: [string, string, string[], boolean, number[]][] = [
+    [tabela, 'IPagSnapshot_tenant_key', ['parceiroId', 'id'], true, [0, 0]],
+    [tabela, 'IPagSnapshot_geracao_key', ['parceiroId', 'execucaoId', 'geracao'], true, [0, 0, 0]],
+    [tabela, 'IPagSnapshot_exec_estado_geracao_idx', ['parceiroId', 'execucaoId', 'situacao', 'geracao'], false, [0, 0, 0, 3]],
+    ['IntegracaoExecucao', 'IExec_perfil_ultimo_inicio_idx', ['parceiroId', 'perfil', 'iniciadaEm'], false, [0, 0, 3]],
+  ];
+  for (const [t, nome, colunas, unico, opcoes] of esperados) if (!indices.some(i => i.tabela === t && i.nome === nome && i.valido && i.pronto && i.unico === unico && !i.parcial && !i.expressao && i.chaves === colunas.length && i.atributos === colunas.length && JSON.stringify(i.colunas) === JSON.stringify(colunas) && JSON.stringify(i.opcoes) === JSON.stringify(opcoes))) erros.push(`INT-1.8C: índice ${nome} incompatível.`);
+  const gatilhos = await db.$queryRaw<{ tabela: string; nome: string; funcao: string; schema: boolean; ligado: string; tipo: number; adiavel: boolean; adiado: boolean; condicionado: boolean; definicao: string }[]>`
+    SELECT c.relname AS tabela,t.tgname AS nome,p.proname AS funcao,p.pronamespace=c.relnamespace AS schema,t.tgenabled::text AS ligado,t.tgtype::int AS tipo,
+      t.tgdeferrable AS adiavel,t.tginitdeferred AS adiado,t.tgqual IS NOT NULL AS condicionado,pg_get_triggerdef(t.oid,false) AS definicao
+    FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid
+    WHERE n.nspname=current_schema() AND NOT t.tgisinternal AND c.relname=ANY(${[tabela, 'IntegracaoExecucao', 'IntegracaoPayload']})`;
+  const triggers: [string, string, string, number, boolean][] = [
+    [tabela, 'IPagSnapshot_confere', 'erp_integracao_pagamento_snapshot_confere', 7, false],
+    [tabela, 'IPagSnapshot_parceiro_imutavel', 'erp_parceiro_imutavel', 19, false],
+    [tabela, 'IPagSnapshot_imutavel', 'erp_integracao_so_inclusao', 27, false],
+    [tabela, 'IPagSnapshot_sem_truncate', 'erp_integracao_so_inclusao', 34, false],
+    [tabela, 'IPagSnapshot_completude', 'erp_integracao_pagamento_final', 5, true],
+    ['IntegracaoExecucao', 'IPagExec_guard', 'erp_integracao_pagamento_execucao_guard', 23, false],
+    ['IntegracaoExecucao', 'IPagExec_completude', 'erp_integracao_pagamento_final', 17, true],
+    ['IntegracaoPayload', 'IntegracaoPayload_confere', 'erp_integracao_payload_confere', 7, false],
+  ];
+  for (const [t, nome, funcao, tipo, adiado] of triggers) if (!gatilhos.some(g => g.tabela === t && g.nome === nome && g.funcao === funcao && g.schema && ['O', 'A'].includes(g.ligado) && g.tipo === tipo && g.adiavel === adiado && g.adiado === adiado && g.condicionado === (nome === 'IPagExec_completude'))) erros.push(`INT-1.8C: gatilho ${nome} ausente/desligado/incompatível.`);
+  const conclusao = gatilhos.find(g => g.nome === 'IPagExec_completude');
+  const condicao = conclusao?.definicao.match(/ WHEN \((.+)\) EXECUTE FUNCTION /)?.[1];
+  const quando = `((new.perfil = 'pagamentos'::text) AND (new.estado = ANY (ARRAY['SUCESSO'::text, 'PENDENTE_PERIODO'::text])))`;
+  if (canonico(condicao ?? null) !== quando) erros.push('INT-1.8C: condição de IPagExec_completude deve cobrir somente conclusões marginais.');
+  const funcoes = await db.$queryRaw<{ nome: string; argumentos: string; retorno: string; conjunto: boolean; definer: boolean; volatilidade: string; linguagem: string; padroes: number; padrao: string | null; config: string[] | null; caminho: string; publica: boolean; tenant: boolean }[]>`
+    SELECT p.proname AS nome,oidvectortypes(p.proargtypes) AS argumentos,format_type(p.prorettype,NULL) AS retorno,p.proretset AS conjunto,p.prosecdef AS definer,p.provolatile::text AS volatilidade,l.lanname AS linguagem,
+      p.pronargdefaults::int AS padroes,pg_get_expr(p.proargdefaults,0) AS padrao,p.proconfig AS config,format('search_path=%I, pg_temp',n.nspname) AS caminho,
+      EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0 AND a.privilege_type='EXECUTE') AS publica,coalesce(has_function_privilege(r.oid,p.oid,'EXECUTE'),false) AS tenant
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_language l ON l.oid=p.prolang LEFT JOIN pg_roles r ON r.rolname='erp_tenant'
+    WHERE n.nspname=current_schema() AND p.proname=ANY(${FUNCOES_DOS_PAGAMENTOS_ANALYTICS.map(f => f[0])})`;
+  for (const [nome, argumentos, retorno, definer, volatilidade, padroes] of FUNCOES_DOS_PAGAMENTOS_ANALYTICS) {
+    const encontradas = funcoes.filter(f => f.nome === nome), f = encontradas[0];
+    if (encontradas.length !== 1 || !f || f.argumentos !== argumentos || f.retorno !== retorno || f.conjunto || f.definer !== definer || f.volatilidade !== volatilidade || f.linguagem !== 'plpgsql' || f.padroes !== padroes || f.padrao !== (padroes ? '0' : null) || JSON.stringify(f.config) !== JSON.stringify([f.caminho]) || f.publica || f.tenant) erros.push(`INT-1.8C: função ${nome} com assinatura/segurança/EXECUTE incompatíveis.`);
+  }
+  return erros;
+}
+
 /** Os CHECKs que a 2.2a acrescentou em tabelas que já existiam (a tabela nova tem os dela de nascença). */
 export const CHECKS_DA_2_2A = [
   ['DreLinha', 'DreLinha_nome_curto'],
@@ -1256,6 +1376,7 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
   pendencias.push(...await conferirPipelineIntegracao(db));
   pendencias.push(...await conferirClientesDoFaturamento(db));
   pendencias.push(...await conferirPonteAnalytics(db));
+  pendencias.push(...await conferirPagamentosAnalytics(db));
   return pendencias;
 }
 

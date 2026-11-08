@@ -7,6 +7,7 @@ import type { PosseAnalytics } from '../core/posse-analytics';
 import { registrarEsperaAnalytics } from '../core/controle-analytics';
 import { mudarModulo } from '../core/conexoes';
 import { DIMENSOES_DIARIAS, METRICAS_DIARIAS, normalizarDiaAnalytics } from './analytics';
+import { normalizarPagamentosAnalytics } from './analytics-pagamentos';
 import { diaSeguinte } from './datas';
 import { classificar } from './respostas';
 import { sinalizarFaturamentoAnalytics } from './faturamento-pendencias';
@@ -43,23 +44,27 @@ function jsonPersistivel(valor: unknown): boolean {
 
 function tarefaDe(e: Execucao): TarefaAnalytics {
   const c = e.modulo.conexao;
-  return {
+  const base = {
     id: e.id, parceiroId: e.parceiroId, moduloId: e.moduloId, appId: e.modulo.appId,
-    lojaId: c.lojaId, geracao: e.geracao, dono: e.dono!, perfil: e.perfil as TarefaAnalytics['perfil'],
-    tipo: e.tipo as TipoJanela, fuso: e.fuso, unidade: { moeda: 'BRL', unidade: e.unidade as 'REAL' | 'CENTAVO' },
-    identidade: { ambiente: c.ambiente, merchantId: c.idExterno, dia: e.dia.toISOString().slice(0, 10), perfil: e.perfil === 'acesso' ? 'homologacao' : 'diario' },
+    lojaId: c.lojaId, geracao: e.geracao, dono: e.dono!,
+    tipo: e.tipo as TipoJanela, fuso: e.fuso, unidade: { moeda: 'BRL' as const, unidade: e.unidade as 'REAL' | 'CENTAVO' },
   };
+  const identidade = { ambiente: c.ambiente, merchantId: c.idExterno, dia: e.dia.toISOString().slice(0, 10) };
+  if (e.perfil === 'pagamentos') return { ...base, perfil: 'pagamentos', identidade: { ...identidade, perfil: 'pagamentos', fuso: e.fuso, versaoContrato: 1 } };
+  if (e.perfil !== 'acesso' && e.perfil !== 'diario') throw new ErroPipelineAnalytics('ENTRADA', 'Perfil de coleta desconhecido.');
+  return { ...base, perfil: e.perfil, identidade: { ...identidade, perfil: e.perfil === 'acesso' ? 'homologacao' : 'diario' } };
 }
 
 /** D1 e revisão usam a mesma identidade. Um novo ciclo não antecipa Retry-After nem interrompe uma tentativa. */
 export async function agendarJanela(cliente: ClienteDoParceiro, j: JanelaAnalytics): Promise<void> {
   if (!diaSeguinte(j.dia) || !diaSeguinte(j.ciclo) || !(j.tipo in PRIORIDADE)
-    || !['REAL', 'CENTAVO'].includes(j.unidade) || !j.moduloId || j.moduloId.length > 60) {
+    || !['REAL', 'CENTAVO'].includes(j.unidade) || !j.moduloId || j.moduloId.length > 60
+    || (j.perfil !== undefined && !['diario', 'pagamentos'].includes(j.perfil)) || (j.tipo === 'ACESSO' && j.perfil !== undefined)) {
     throw new ErroPipelineAnalytics('ENTRADA', 'Janela de coleta inválida.');
   }
   try { new Intl.DateTimeFormat('en-US', { timeZone: j.fuso }).format(); }
   catch { throw new ErroPipelineAnalytics('ENTRADA', 'Fuso da coleta inválido.'); }
-  const perfil = j.tipo === 'ACESSO' ? 'acesso' : 'diario';
+  const perfil = j.tipo === 'ACESSO' ? 'acesso' : j.perfil ?? 'diario';
   await cliente.transacao(async tx => {
     const acesso = await tx.sql<{ ok: boolean }>`SELECT erp_integracao_exigir_acesso(${tx.parceiroId}, ${j.moduloId}, NULL, ${perfil === 'acesso'}) AS ok`;
     if (!acesso[0]?.ok) throw new ErroPipelineAnalytics('ACESSO', 'Integração sem autorização para coletar.');
@@ -114,11 +119,13 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
       await confirmarPosse();
       return cliente.transacao(async tx => {
         // Leitura de candidatos não trava a fila antes das permissões (mesma ordem de locks da publicação).
-        const candidatos = await tx.sql<{ id: string; moduloId: string; perfil: string }>`SELECT id, "moduloId", perfil FROM "IntegracaoExecucao"
-          WHERE "parceiroId" = ${tx.parceiroId} AND "naoAntesDe" <= clock_timestamp()
-            AND (estado IN ('PLANEJADA','AGUARDANDO') OR (estado = 'EXECUTANDO' AND "leaseAte" < clock_timestamp() AND dono <> ${posse.id}))
-            AND erp_integracao_exigir_acesso(${tx.parceiroId}, "moduloId", ${posse.id}, perfil = 'acesso')
-          ORDER BY prioridade, "naoAntesDe", dia DESC, id LIMIT 30`;
+        const candidatos = await tx.sql<{ id: string; moduloId: string; perfil: string }>`SELECT e.id, e."moduloId", e.perfil FROM "IntegracaoExecucao" e
+          WHERE e."parceiroId" = ${tx.parceiroId} AND e."naoAntesDe" <= clock_timestamp()
+            AND (e.estado IN ('PLANEJADA','AGUARDANDO') OR (e.estado = 'EXECUTANDO' AND e."leaseAte" < clock_timestamp() AND e.dono <> ${posse.id}))
+            AND erp_integracao_exigir_acesso(${tx.parceiroId}, e."moduloId", ${posse.id}, e.perfil = 'acesso')
+          ORDER BY (SELECT max(h."iniciadaEm") FROM "IntegracaoExecucao" h WHERE h."parceiroId" = e."parceiroId" AND h.perfil = e.perfil) ASC NULLS FIRST,
+            CASE e.perfil WHEN 'acesso' THEN 0 WHEN 'diario' THEN 1 ELSE 2 END,
+            e.prioridade, e."naoAntesDe", e.dia DESC, e.id LIMIT 30`;
         for (const c of candidatos) {
           // A recusa não altera evidência nem passa para outra conexão sem repetir a verificação.
           const a = await tx.sql<{ ok: boolean }>`SELECT erp_integracao_exigir_acesso(${tx.parceiroId}, ${c.moduloId}, ${posse.id}, ${c.perfil === 'acesso'}) AS ok`;
@@ -148,7 +155,10 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
       if (bytes > 2 * 1024 * 1024 || !Number.isInteger(p.pagina) || p.pagina < 1 || p.pagina > 1000 || p.http !== 200) {
         throw new ErroPipelineAnalytics('LIMITE', 'Resposta fora dos limites da coleta.');
       }
-      let resposta: Prisma.InputJsonValue;
+      if (t.perfil === 'pagamentos' ? p.versaoContrato !== 1 : p.versaoContrato !== undefined) {
+        throw new ErroPipelineAnalytics('CORPO', 'Versão de recibo incompatível com o perfil.');
+      }
+      let resposta: unknown;
       try { resposta = JSON.parse(p.corpoOriginal); if (resposta === null || !jsonPersistivel(resposta)) throw new Error(); }
       catch { throw new ErroPipelineAnalytics('CORPO', 'Resposta não é JSON válido.'); }
       await cliente.transacao(async tx => {
@@ -174,8 +184,14 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
           }
           throw erro;
         }
-        await tx.integracaoPayload.create({ data: { parceiroId: tx.parceiroId, execucaoId: t.id, geracao: t.geracao,
-          pagina: p.pagina, corpoOriginal: p.corpoOriginal, resposta, sha256, http: p.http, requestId: idDeRequisicao(p.requestId) } });
+        // O serializer de Json do Prisma descarta chaves próprias como __proto__.
+        // Texto parametrizado mantém essas chaves no JSONB, depois da prova de fidelidade acima.
+        // Continua no portão tenant, na mesma TX/fence e sob os triggers/CHECKs do payload.
+        await tx.sql`INSERT INTO "IntegracaoPayload"
+          (id, "parceiroId", "execucaoId", geracao, pagina, "corpoOriginal", resposta, sha256, http, "requestId", "versaoContrato")
+          VALUES (${randomUUID()}, ${tx.parceiroId}, ${t.id}, ${t.geracao}::int, ${p.pagina}::int,
+            ${p.corpoOriginal}, ${p.corpoOriginal}::jsonb, ${sha256}, ${p.http}::int,
+            ${idDeRequisicao(p.requestId)}, ${p.versaoContrato ?? null}::int)`;
       });
     },
     async publicar(t: TarefaAnalytics): Promise<'publicada' | 'vazia' | 'sem-mudanca' | 'pendente-periodo'> {
@@ -220,6 +236,43 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
           ultimoHash: sha256, ...(!fechado ? { ultimaPublicacaoEm: new Date() } : {}),
         });
         return fechado ? 'pendente-periodo' : dia.estado === 'vazio-oficial' ? 'vazia' : 'publicada';
+      }, { timeout: 30_000 });
+    },
+    async publicarPagamentos(t: TarefaAnalytics): Promise<'publicada' | 'sem-mudanca' | 'pendente-periodo'> {
+      await confirmarPosse();
+      if (t.perfil !== 'pagamentos') throw new ErroPipelineAnalytics('ENTRADA', 'Esta tarefa não é uma distribuição de pagamentos.');
+      const paginas = await cliente.integracaoPayload.findMany({ where: { execucaoId: t.id, geracao: t.geracao }, orderBy: { pagina: 'asc' } });
+      for (const p of paginas) {
+        if (p.versaoContrato !== 1 || hash(p.corpoOriginal) !== p.sha256) throw new ErroPipelineAnalytics('CORPO', 'Versão ou hash do recibo marginal inválido.');
+      }
+      const normalizado = normalizarPagamentosAnalytics(t.identidade, paginas.map(p => ({
+        identidade: t.identidade, paginaSolicitada: p.pagina, versaoContrato: 1, corpoOriginal: p.corpoOriginal,
+      })));
+      // Fuso é parte da identidade persistida, mesmo quando o texto do dia é igual.
+      const sha256 = hash(JSON.stringify([t.identidade.ambiente, t.identidade.merchantId, t.identidade.dia,
+        t.identidade.fuso, t.identidade.perfil, normalizado.versaoContrato, normalizado.parcelas]));
+      return cliente.transacao(async tx => {
+        await travarParaEscrever(tx);
+        await conferir(tx, t);
+        const atuais = await tx.integracaoPayload.findMany({ where: { execucaoId: t.id, geracao: t.geracao }, orderBy: { pagina: 'asc' }, select: { pagina: true, sha256: true, versaoContrato: true } });
+        if (atuais.length !== paginas.length || atuais.some((p, i) => p.pagina !== paginas[i].pagina || p.sha256 !== paginas[i].sha256 || p.versaoContrato !== paginas[i].versaoContrato)) {
+          throw new ErroPipelineAnalytics('CORPO', 'A evidência marginal mudou durante a preparação.');
+        }
+        const anterior = await tx.integracaoPagamentoSnapshot.findFirst({ where: { execucaoId: t.id, situacao: 'PUBLICADO' }, orderBy: { geracao: 'desc' } });
+        if (anterior?.hash === sha256 && anterior.versaoContrato === normalizado.versaoContrato) {
+          await encerrar(tx, t, 'SUCESSO', { ultimoHash: sha256 });
+          return 'sem-mudanca';
+        }
+        const fechado = (await datasEmPeriodoFechado(tx, [t.identidade.dia])).has(t.identidade.dia);
+        await tx.integracaoPagamentoSnapshot.create({ data: {
+          parceiroId: tx.parceiroId, execucaoId: t.id, geracao: t.geracao, paginaInicial: 1,
+          versaoContrato: normalizado.versaoContrato, situacao: fechado ? 'PENDENTE_PERIODO' : 'PUBLICADO', hash: sha256,
+          parcelas: normalizado.parcelas === null ? Prisma.DbNull : normalizado.parcelas.map(p => ({ ...p })),
+        } });
+        await encerrar(tx, t, fechado ? 'PENDENTE_PERIODO' : 'SUCESSO', {
+          ultimoHash: sha256, ...(!fechado ? { ultimaPublicacaoEm: new Date() } : {}),
+        });
+        return fechado ? 'pendente-periodo' : 'publicada';
       }, { timeout: 30_000 });
     },
     async verificarAcesso(t: TarefaAnalytics): Promise<void> {
