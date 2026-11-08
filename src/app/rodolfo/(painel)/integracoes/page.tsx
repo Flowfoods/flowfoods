@@ -3,7 +3,7 @@
  * categoria, homologação, validade do token guardado), as últimas leituras de teste e, por parceiro, a liberação do módulo e
  * as lojas ligadas. O que é de cada parceiro é lido pelo portão dele (somente leitura, com RLS).
  *
- * Nada aqui chama o iFood. A saúde da sincronização (último D-1, atraso, 403, 429) entra quando a sincronização existir.
+ * Nada aqui chama o iFood. A situação persistida por loja e dia fica na página de cada parceiro; a coleta é do worker.
  */
 
 import Link from 'next/link';
@@ -48,9 +48,9 @@ export default async function CentralDeIntegracoesPage() {
     <div className="space-y-6">
       <PageHeader icone="canais" cor={COR.parceiros} titulo="Integrações" subtitulo="Nível 1 · apps no iFood, lojas ligadas e liberação por parceiro" />
 
-      <Aviso titulo="Nenhuma busca automática roda ainda">
-        Hoje a única chamada ao iFood é a leitura de teste, feita por comando no servidor. A busca diária dos números chega numa próxima etapa; até lá, nada
-        nesta tela chama o iFood.
+      <Aviso titulo="Coleta automática de produção">
+        A coleta de Analytics exige app homologado, acesso autorizado e integração liberada, além da coleta geral habilitada. Ela respeita pausas e limites;
+        abra o parceiro para conferir a situação por loja e dia. O ambiente TEST fica fora da rotina automática.
       </Aviso>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]">
