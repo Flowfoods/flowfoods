@@ -111,7 +111,7 @@ export function PainelAnalytics({ resultado, base, baseSituacao, teste = false }
         </div>
       </section>
       <PagamentosDoPainel key={`${p.loja.id}:${p.periodo.inicio}:${p.periodo.fim}:${p.fontes.filter(f => f.selecionada).map(f => f.chave).join(',')}`} dados={p.pagamentos} fontes={p.fontes} />
-      <ComplementaresDoPainel key={`${p.loja.id}:${p.periodo.inicio}:${p.periodo.fim}:${p.fontes.filter(f => f.selecionada).map(f => f.chave).join(',')}`} dados={p.complementares} fontes={p.fontes} />
+      <ComplementaresDoPainel key={`complementares:${p.loja.id}:${p.periodo.inicio}:${p.periodo.fim}:${p.fontes.filter(f => f.selecionada).map(f => f.chave).join(',')}`} dados={p.complementares} fontes={p.fontes} />
       {baseSituacao && <Link href={`${baseSituacao}?${new URLSearchParams({ loja: p.loja.id, dia: p.periodo.fim }).toString()}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Conferir a situação da integração no último dia do período</Link>}
     </>}
   </div>;

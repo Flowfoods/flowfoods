@@ -1,10 +1,12 @@
-import { createElement } from 'react';
+import { createElement, isValidElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { PainelAnalytics as DadosPainel, ResultadoDoPainelAnalytics, ResumoDoPainelAnalytics } from '@/lib/integracoes/ifood/painel-campos';
 import { deslocarDiaDoPainel } from '@/lib/integracoes/ifood/painel-campos';
 import { resumirPainelAnalytics, type LinhaAgregadaDoPainelAnalytics } from '@/lib/integracoes/ifood/painel-resumo';
 import { PainelAnalytics } from '@/components/erp/telas/integracoes/painel-analytics';
+import { PagamentosDoPainel } from '@/components/erp/telas/integracoes/painel-pagamentos';
+import { ComplementaresDoPainel } from '@/components/erp/telas/integracoes/painel-complementares';
 import { hrefDoPainelAnalytics } from '@/components/erp/telas/integracoes/painel-filtros';
 
 vi.mock('@/lib/db', () => { throw new Error('UI do painel não consulta banco.'); });
@@ -47,6 +49,30 @@ function cartao(h: string, titulo: string): string {
 }
 
 describe('INT-1.8B · painel de snapshots em UI', () => {
+  it('mantém identidades distintas das marginais e reinicia cada uma quando muda o recorte', () => {
+    function identidades(p: DadosPainel) {
+      const encontradas: Array<{ tipo: unknown; key: string | null }> = [];
+      function visitar(no: ReactNode): void {
+        if (Array.isArray(no)) { no.forEach(visitar); return; }
+        if (!isValidElement<{ children?: ReactNode }>(no)) return;
+        if (no.type === PagamentosDoPainel || no.type === ComplementaresDoPainel) encontradas.push({ tipo: no.type, key: no.key });
+        visitar(no.props.children);
+      }
+      visitar(PainelAnalytics({ ...props, resultado: resultado(p) }));
+      expect(encontradas.map(e => e.tipo)).toEqual([PagamentosDoPainel, ComplementaresDoPainel]);
+      expect(encontradas.every(e => typeof e.key === 'string' && e.key.length > 0)).toBe(true);
+      expect(new Set(encontradas.map(e => e.key)).size).toBe(2);
+      return encontradas.map(e => e.key);
+    }
+    const original = painel(), antes = identidades(original);
+    expect(identidades(painel())).toEqual(antes);
+    for (const depois of [
+      painel({ loja: { ...loja, id: 'loja-b' } }),
+      painel({ periodo: { ...original.periodo, inicio: '2026-11-04' } }),
+      painel({ periodo: { ...original.periodo, fim: '2026-11-06' } }),
+      painel({ fontes: original.fontes.map(f => ({ ...f, selecionada: f.chave === B })) }),
+    ]) identidades(depois).forEach((key, indice) => expect(key).not.toBe(antes[indice]));
+  });
   it('oráculo 2 concluídos e 1 cancelado separa GMV total, ticket dos concluídos e taxa ponderada', () => {
     const h = html();
     expect(cartao(h, 'GMV · todos os status')).toContain('R$ 110,00');
