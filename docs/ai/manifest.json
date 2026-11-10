@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "project_id": "flowfoods-erp",
+  "repository": "Flowfoods/flowfoods",
+  "current_delivery": "FT-FILTROS-UX",
+  "module": "fichas",
+  "baseline_commit": "a8d294a1ca34a81ed69bb5b9e4f18b058569e88c",
+  "source_revisions": {
+    "notion_ft": {
+      "revision": "2026-11-10T15:48:03.764Z",
+      "authority": "notion",
+      "fingerprint": "sha256:fb776c4b68a1e260b2e531a14d7cbaedb766cf825afaab6d4e9df7e7df89e016",
+      "classification": "publicable_technical_excerpt",
+      "approved_scope": "FT-FILTROS-UX: organizar busca, classificação, filtros avançados, resumo aplicado, contagem e Aplicar/Limpar. Preservar OR intragrupo, AND entre grupos, pares de canais, URL, retorno, paginação, permissões, fórmulas e Sem dados/Não ofertado/Faixas não configuradas. Fora matriz, novos canais, preços/metas/custos/schema e integrações. Não refazer 3A/3B/3C. Aceite responsivo 320–1920, temas, 200%, teclado/foco, toque 44px, estados vazios/arquivados, revisão e portão."
+    },
+    "golden_rules": {
+      "revision": "2026-11-10T15:47:34.367Z",
+      "authority": "notion",
+      "fingerprint": "sha256:a5b0c992b7c50255111ae9f8cf95da7a3991b0134edcc8fc3ecd0bf0be7b57e6",
+      "classification": "publicable_technical_excerpt",
+      "approved_scope": "Continuidade, autoridade por informação, três níveis, um dado/efeito, números honestos, dados preservados, compatibilidade, fatias completas, evidência por estágio, autonomia segura e publicação permanente após controles; atos reservados a Rodolfo, privacidade, testes isolados, identidade/UX, futuros não liberados e contexto econômico. Méier excluído."
+    },
+    "eng_ia": {
+      "revision": "2026-11-10T16:24:01.130Z",
+      "authority": "notion",
+      "fingerprint": "sha256:6ab44573d0f8da4b5f48889a96e2d30ec4a796997e12a35d7f2fb678e1f13ea9",
+      "classification": "publicable_technical_excerpt",
+      "approved_scope": "ENG-0/ENG-1 apenas: preservar regras, contexto técnico curto para FT-FILTROS-UX, AGENTS comum, CLAUDE importação única, índice/CURRENT/manifest/módulo/entrega, skill flow-contexto fonte .agents e espelho gerado .claude. Validar sessão limpa e cenários negativos. Sem novo backlog, exportação privada, sincronização bidirecional ou infraestrutura nova. Claude indisponível fica pendente; continuar trabalho independente autorizado."
+    }
+  },
+  "allowed_context": [
+    "AGENTS.md",
+    "docs/ai/INDEX.md",
+    "docs/ai/preservation.md",
+    "docs/modules/fichas.md",
+    "docs/work/FT-FILTROS-UX.md",
+    ".agents/skills/flow-contexto/SKILL.md",
+    "CLAUDE.md",
+    "docs/ai/CURRENT.md",
+    "docs/ai/manifest.json",
+    ".claude/skills/flow-contexto/SKILL.md",
+    "scripts/ai-context.mjs",
+    "tests/ai-context.node.mjs",
+    "package.json",
+    "src/components/erp/telas/fichas/filtros.tsx",
+    "src/components/erp/telas/fichas/lista.tsx",
+    "src/components/erp/telas/fichas/campos-classificacao.tsx",
+    "src/lib/erp/ficha-campos.ts",
+    "src/lib/erp/fichas.ts",
+    "src/lib/erp/canais.ts",
+    "tests/erp-ficha-3a-ui.test.ts",
+    "tests/erp-ficha-filtros-3a.db.test.ts",
+    "tests/erp-ficha-faixas-ui.test.ts",
+    "tests/erp-ficha-3a-busca.test.ts",
+    "tests/erp-ficha-foco.test.ts",
+    ".github/workflows/deploy.yml"
+  ],
+  "public_files": [
+    "AGENTS.md",
+    "docs/ai/INDEX.md",
+    "docs/ai/preservation.md",
+    "docs/modules/fichas.md",
+    "docs/work/FT-FILTROS-UX.md",
+    ".agents/skills/flow-contexto/SKILL.md",
+    "CLAUDE.md",
+    "docs/ai/CURRENT.md",
+    "docs/ai/manifest.json",
+    ".claude/skills/flow-contexto/SKILL.md",
+    "scripts/ai-context.mjs",
+    "tests/ai-context.node.mjs",
+    "package.json",
+    ".github/workflows/deploy.yml"
+  ],
+  "deliveries": {
+    "FT-FILTROS-UX": {
+      "path": "docs/work/FT-FILTROS-UX.md",
+      "module": "fichas"
+    }
+  }
+}
