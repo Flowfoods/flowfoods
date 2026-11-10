@@ -14,7 +14,7 @@ O plano vigente autoriza esta construção independente e estabelece tolerância
 - [Homologação Financial — guia oficial](https://developer.ifood.com.br/en-US/docs/food/guides/modules/financial/homologation): cada API tem seus dados e critérios; integração parcial não representa homologação completa.
 - [Reconciliation — guia oficial](https://developer.ifood.com.br/es-CO/docs/guides/modules/financial/api-reconciliation/): distingue lançamentos com impacto e apresenta um exemplo com tolerância fixa de R$ 0,01. Esse exemplo não substitui a tolerância percentual do plano FlowFoods.
 
-Consulta de 10/11/2026: os endereços diretos retornaram indisponibilidade/403; os detalhes acima foram obtidos do conteúdo oficial indexado. Não houve revalidação integral ao vivo dos schemas. Não há adaptador de payload do provedor neste recorte. Cada futuro adaptador Sales, Financial Events, Settlement, Anticipation e Reconciliation exige confirmação do contrato próprio; nenhum envelope, escala ou paginação é inferido de Analytics.
+Na primeira consulta de 10/11/2026, os guias diretos retornaram 403. O PR49 usou o conteúdo oficial indexado para o domínio de simulação. Na consulta seguinte, a referência de API do portal abriu no navegador. Foram inspecionados os parâmetros, o exemplo e o modelo expandido da resposta 200 das operações Financial Events e Settlements na versão 3.0. O recorte implementado está em [Leitura do Financial v3](#leitura-do-financial-v3).
 
 ## Entradas normalizadas da simulação
 
@@ -58,8 +58,29 @@ Saída em `bigint` não é JSON serializável diretamente. Um consumidor futuro 
 
 O plano de implementação fornecido registra uma diferença a confirmar nos futuros adaptadores: Sales por criação da venda e liquidações por apuração. Isso não foi revalidado integralmente nos contratos atuais nesta entrega. Não comparar períodos recentes só porque compartilham datas aparentes. Este contrato exige competência explícita e deixa apuração pendente sem concluir. Não altera preço, custo, taxa configurada, estimativa, receita, recebível, repasse, crédito bancário ou período do ERP.
 
-Pendências antes de adaptação real: schemas/nulabilidade e versões atuais de cada API, paginação/204 de Sales, campos/precisão de Settlement e Anticipation, identidade de eventos, cobertura temporal e contrato do CSV/on-demand; confirmação da base percentual. Simulação não substitui TEST oficial, homologação, grants nem autorização por loja.
+Para avançar à conciliação com dados reais, comprovar moeda, escopo do merchant, produto, cobertura temporal e encerramento da apuração para as duas fontes. Confirmar também a base percentual. Sales, Anticipation e Reconciliation têm contratos próprios a conferir. TEST oficial, homologação e autorização por loja seguem etapas específicas do plano.
+
+## Leitura do Financial v3
+
+Os adaptadores consultam Financial Events e Settlements por merchant com o transporte fornecido pelo chamador. O comando `npm run integracao:financial-simular` executa o percurso completo com respostas sintéticas em memória. Mostra os eventos de duas páginas e uma liquidação por apuração. Valores em centavos aparecem como strings decimais na saída JSON. A versão e os campos foram conferidos em 10/11/2026 na [referência oficial Financial v3.0](https://developer.ifood.com.br/es-CO/docs/references#financial).
+
+| Operação GET em `/financial/v3.0/merchants/{merchantId}` | Consulta e resposta observadas |
+| --- | --- |
+| `/financial-events` | O adaptador informa `beginDate`, `endDate`, `page` a partir de 1 e `size=100`. O intervalo inclui até 33 datas civis. A referência também documenta o filtro opcional `idSaldo`. O modelo `FinancialEventsResponse` exige `page`, `size`, `hasNextPage` e `financialEvents`. O leitor confere os metadados da página solicitada e conserva as ocorrências. |
+| `/settlements` | A consulta informa o par de datas de pagamento (`beginPaymentDate/endPaymentDate`) ou de apuração (`beginCalculationDate/endCalculationDate`). O modelo `ListTransferResponse` exige `beginDate`, `endDate`, `merchantId`, `balance` e `settlements`. O leitor verifica o merchant e as datas retornadas. |
+
+Em ambas as operações, o schema expandido apresenta um objeto. O exemplo 200 da mesma referência envolve esse objeto em uma lista. Os leitores identificam as duas representações e aceitam uma lista com exatamente um envelope. Uma lista vazia ou com vários envelopes produz erro de contrato. Cabe confirmar a forma retornada no ambiente TEST para cada consulta.
+
+Nos eventos, `amount.value` é texto decimal assinado e `hasTransferImpact` indica impacto no repasse. Competência e período conservam o significado recebido. O identificador de referência pode pertencer ao pedido. Ocorrências iguais permanecem distintas. A página final encerra a navegação da consulta. Identidade de negócio, moeda e encerramento do mês exigem evidência adicional.
+
+Em Settlements, `balance` e `amount` são números JSON. O leitor usa o literal numérico original antes de calcular centavos em `bigint`. Aceita decimais e notação exponencial quando representam exatamente centavos. Subcentavos significativos e valores além dos limites locais produzem erro. Campos opcionais sem valor permanecem nulos. O exemplo apresenta títulos diretos e grupos por datas de apuração com títulos em `closingItems`. A saída preserva saldo, grupos e títulos separadamente. O resumo de `consolidatedMerchants` indica se o envelope inclui outras lojas. A projeção descarta detalhes bancários, documentos e identificadores de transação.
+
+HTTP diferente de 200, falha de transporte, escopo divergente e paginação incompatível encerram a consulta com erro. O cliente só devolve a lista de eventos depois da última página. Há limites locais de 2 MiB por resposta, 32 níveis JSON e 100 páginas de 100 eventos por execução. O leitor conserva a precisão numérica com o contexto de origem de `JSON.parse`, disponível no Node 22 utilizado pelo projeto.
+
+O registro de um título `SUCCEED` descreve o estado enviado pelo provedor. A comparação com crédito bancário depende da evidência desse crédito. Para levar as leituras ao comparador do PR49, é preciso demonstrar a correspondência entre eventos, produto, competência, consolidação e saldo. Nesta entrega o comando exibe os valores recebidos na simulação e mantém essas verificações pendentes.
 
 ## Verificação
+
+Para conferir os dois leitores, a precisão do JSON e as consultas por transporte simulado, execute `npm test -- tests/ifood-financial-v3-consultas.test.ts tests/ifood-financial-v3-eventos.test.ts tests/ifood-financial-v3-liquidacoes.test.ts`. O comando cobre fronteiras de data e dinheiro, falha em página intermediária e preservação dos títulos. A demonstração pelo comando `integracao:financial-simular` usa as mesmas funções de consulta.
 
 `npm test -- tests/ifood-financial-dominio.test.ts` executa os casos sintéticos: precisão, negativos, ausência, limites, identidade/origem, fontes não intercambiáveis, impacto, ocorrências iguais, cobertura/apuração, fronteira de 0,01%, zero, valor grande e imutabilidade. Não necessita de banco nem rede. Esses testes não aprovam o portão ERP nem demonstram integração ou operação real.

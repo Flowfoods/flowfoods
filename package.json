@@ -25,6 +25,7 @@
     "integracao:ler-test": "tsx scripts/integracao-ler-test.ts",
     "integracao:validar-analytics-test": "tsx scripts/integracao-validar-analytics-test.ts",
     "integracao:analytics-controle": "tsx scripts/integracao-analytics-controle.ts",
+    "integracao:financial-simular": "tsx scripts/integracao-financial-simular.ts",
     "ai:generate": "node scripts/ai-context.mjs generate",
     "ai:check": "node scripts/ai-context.mjs check",
     "ai:context": "node scripts/ai-context.mjs context",
