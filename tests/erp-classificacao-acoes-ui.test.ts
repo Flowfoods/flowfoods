@@ -98,11 +98,15 @@ describe('classificação: criação visível junto ao campo', () => {
 });
 
 describe('classificação: filtros preservam criação separada da aplicação do recorte', () => {
-  it.each(['/erp/fichas', '/rodolfo/erp/casa/fichas'])('criação aparece antes dos campos no filtro %s e mantém o GET', base => {
+  it.each(['/erp/fichas', '/rodolfo/erp/casa/fichas'])('criação fica junto ao seletor, antes dos avançados, no filtro %s e mantém o GET', base => {
     const html = filtros({ base, filtros: lerFiltrosDeFicha({ q: 'Prato', cmv: ['IFOOD-acima'], faixaCmv: ['LOJA-favoravel'] }), verCustos: true });
     const nova = botao(html, 'Nova seção');
     expect(nova).toContain('type="button"'); expect(nova).toContain('aria-haspopup="dialog"');
-    expect(html.indexOf(nova)).toBeLessThan(html.indexOf(input(html, 'filtros-secao')));
+    // FT-FILTROS-UX prioriza a seleção e mantém a criação visível como ação secundária.
+    expect(html.indexOf(nova)).toBeGreaterThan(html.indexOf(input(html, 'filtros-secao')));
+    expect(html.indexOf(nova)).toBeLessThan(html.indexOf(input(html, 'filtros-subsecao')));
+    expect(html.indexOf(botao(html, 'Nova subseção'))).toBeGreaterThan(html.indexOf(input(html, 'filtros-subsecao')));
+    expect(html.indexOf(botao(html, 'Nova subseção'))).toBeLessThan(html.indexOf('<details'));
     expect(botao(html, 'Nova subseção')).toContain('disabled=""');
     expect(html).toContain('Escolha uma seção para filtrar ou criar uma subseção.');
     expect(html).toContain(`action="${base}"`);

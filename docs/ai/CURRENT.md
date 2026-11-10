@@ -15,8 +15,8 @@
 ## Etapas registradas
 
 - implementation_status: `passed`
-- local_tests_status: `pending`
-- independent_review_status: `pending`
+- local_tests_status: `passed`
+- independent_review_status: `passed`
 - user_validation_status: `pending`
 - merge_status: `pending`
 - deploy_status: `pending`
@@ -30,4 +30,4 @@ Não revalidado: comando local sem acesso ao Notion. Reconfirmar o escopo na fon
 
 ## Próximo passo
 
-Concluir a QA autenticada do patch corrigido e o portão completo do PR48; fechar parecer independente antes de integrar/publicar. Não reimplementar os filtros nem repetir 3A/3B/3C. Registrar publicação e limites da validação do usuário separadamente.
+Concluir o portão completo do PR48 após a correção da expectativa visual e integrar/publicar somente com revisão aprovada. Não reimplementar os filtros nem repetir 3A/3B/3C. Registrar publicação e limites da validação do usuário separadamente.

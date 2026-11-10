@@ -34,7 +34,7 @@ Busca/classificação primeiro; avançados recolhíveis; resumo de TODOS os filt
 320–1920 px, temas, teclado/foco, zoom 200%, textos longos, zero resultados, múltiplas seleções e perfil sem preços.
 
 Testes: [UI 3A](../../tests/erp-ficha-3a-ui.test.ts), [filtros com banco](../../tests/erp-ficha-filtros-3a.db.test.ts), [faixas UI](../../tests/erp-ficha-faixas-ui.test.ts), [busca](../../tests/erp-ficha-3a-busca.test.ts), [foco](../../tests/erp-ficha-foco.test.ts).
-Regressão desta entrega: [resumo, rascunho e remoção](../../tests/erp-ficha-filtros-ux.test.ts).
+Regressão desta entrega: [resumo, rascunho e remoção](../../tests/erp-ficha-filtros-ux.test.ts) e [criação junto aos seletores](../../tests/erp-classificacao-acoes-ui.test.ts).
 Banco exige `ERP_DB_TESTE` isolado; ausência produz skip, não aprovação.
 
 Origem: pacote técnico, revisão vigente e diagnóstico do card Fichas; mapeamento privado no Notion. Fórmulas/limites não tocados ficam nos donos acima; qualquer alteração exige localizar a decisão exata.
