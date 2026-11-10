@@ -56,6 +56,7 @@
     "tests/erp-ficha-3a-busca.test.ts",
     "tests/erp-ficha-foco.test.ts",
     "tests/erp-ficha-filtros-ux.test.ts",
+    "tests/erp-classificacao-acoes-ui.test.ts",
     ".github/workflows/deploy.yml"
   ],
   "public_files": [
@@ -76,6 +77,7 @@
     "src/components/erp/telas/fichas/filtros-resumo.ts",
     "src/components/erp/telas/fichas/criar-classificacao.tsx",
     "tests/erp-ficha-filtros-ux.test.ts",
+    "tests/erp-classificacao-acoes-ui.test.ts",
     ".github/workflows/deploy.yml"
   ],
   "deliveries": {

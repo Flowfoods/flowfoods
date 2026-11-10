@@ -11,8 +11,8 @@ assignee: /root
 reviewer: /root/retomada_limpa_revisao
 branch: codex/eng-ia-fichas-20261110
 implementation_status: passed
-local_tests_status: pending
-independent_review_status: pending
+local_tests_status: passed
+independent_review_status: passed
 user_validation_status: pending
 merge_status: pending
 deploy_status: pending
@@ -89,18 +89,20 @@ Piloto local em 10/11/2026, base acima + diff da branch, Windows/Node 24.15.0:
 | Portão inicial do piloto `5e71ac2` | [CI 42869997883](https://github.com/Flowfoods/flowfoods/actions/runs/42869997883): 5.427 testes/329 arquivos, build e fontes aprovados. Não cobre o diff UX posterior; deploy não executado por ser PR. |
 | UX implementada | Busca/classificação sempre visíveis, avançados recolhíveis, resumo derivado somente da URL aplicada, rascunho/descartar explícitos e remoção pelo serializador canônico. Sem alterar serviços, parser, schema, preços ou permissões. |
 | Regressão UX local | Autor: 79/79 em cinco arquivos antes dos ajustes finais. Revisor independente: 55/55 em cinco suítes no patch com Limpar local, quebra de texto e foco corrigidos; zero skips. Primeira tentativa do revisor não importou testes por EPERM no cache TEMP; repetição com TEMP isolado passou. |
-| Revisão UX | Corrigidos Limpar na URL inicial, quebra efetiva de nomes longos e foco após Descartar. Sem achados estáticos abertos; parecer completo depende da QA autenticada final. |
+| Revisão UX | Corrigidos Limpar na URL inicial, quebra efetiva de nomes longos e foco após Descartar. Parecer técnico aprovado em `435147c`; revisor também aprovou o ajuste posterior da expectativa visual, preservando contratos. Classificação + UX: 20/20 testes no ajuste, executados pela coordenação, zero skips. |
+| CI do primeiro patch UX `435147c` | [42874101942](https://github.com/Flowfoods/flowfoods/actions/runs/42874101942): 5.434 testes passaram e dois falharam por exigir Nova seção antes do seletor. Expectativa visual antiga adaptada à hierarquia autorizada, preservando GET, pares e permissões; build/fontes não executados nessa rodada. Nova rodada completa obrigatória. |
+| QA e revisão final do código UX `435147c` | Autor: 79/79 testes finais, zero skips; navegador autenticado: 10/10 grupos e suplemento 6/6, 41 capturas/medições, sem erros de página ou chamadas externas. Fichas/preços preservados; criação/arquivamento de classificação fictícia contabilizados separadamente. Revisor conferiu código/relatório e aprovou tecnicamente, com 55/55 testes independentes. |
 
 A primeira tentativa CLI não iniciou por restrição ao estado local; nova execução efêmera autorizada passou mantendo sandbox interno read-only. Claude permanece não testado.
 Medição inicial: AGENTS 51 linhas, CURRENT 34, módulo 40; registro antes destas evidências 86. Os oito Markdown de entrada somavam 22.792 bytes/2.710 palavras; sem ler monólitos de 1.295.200 bytes. Não é medição de economia.
 CLI reportou tokens agregados de entrada 591.808 (547.456 em cache), saída 5.152; incluem contexto do runtime e chamadas, não somente estes arquivos. Não há comparação equivalente antes/depois nem economia comprovada.
-Baseline autenticada e rodadas de QA usam exclusivamente dados sintéticos em PostgreSQL 16/porta 55438 e Next/porta 3110. A rodada final verifica 320/360/390/768/900/1024/1280/1366/1536/1920 nos dois temas, perfis e navegação. Reflow de 640 CSS px em DPR 2 representa a largura de 1280 a 200%; não é prova de zoom nativo do navegador. Artefatos privados ficam fora do repositório público. Merge/publicação e encerramento da QA funcional continuam pendentes neste commit.
+Baseline autenticada e rodadas de QA usam exclusivamente dados sintéticos em PostgreSQL 16/porta 55438 e Next/porta 3110. A rodada final verificou 320/360/390/768/900/1024/1280/1366/1536/1920 nos dois temas, perfis e navegação. Reflow de 640 CSS px em DPR 2 representa a largura de 1280 a 200%; não é prova de zoom nativo do navegador. Artefatos privados ficam fora do repositório público. QA funcional local encerrada; portão completo, merge e publicação continuam pendentes neste commit.
 
 ## Bloqueio e alternativa autorizada
 
 Sem bloqueio inicial para piloto local. Claude não verificado: registrar limite e validar Codex.
-QA autenticada/portão final ainda precisam do encerramento. Homologação/lojas iFood não bloqueiam este recorte.
+Repetir o portão após corrigir a expectativa visual antiga; QA autenticada passou. Homologação/lojas iFood não bloqueiam este recorte.
 
 ## Próximo passo
 
-Concluir a QA autenticada do patch corrigido e o portão completo do PR48; fechar parecer independente antes de integrar/publicar. Não reimplementar os filtros nem repetir 3A/3B/3C. Registrar publicação e limites da validação do usuário separadamente.
+Concluir o portão completo do PR48 após a correção da expectativa visual e integrar/publicar somente com revisão aprovada. Não reimplementar os filtros nem repetir 3A/3B/3C. Registrar publicação e limites da validação do usuário separadamente.
