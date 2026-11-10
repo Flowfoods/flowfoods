@@ -13,6 +13,7 @@ Não substitui autoridade de negócio nem libera funcionalidades futuras.
 - [fichas](../../src/lib/erp/fichas.ts): listagem, contagem e filtro no universo completo, tenant/permissões.
 - [canais](../../src/lib/erp/canais.ts): cálculo e fotografia CMV. Apresentação não cria outro motor.
 - [filtros](../../src/components/erp/telas/fichas/filtros.tsx): seleção local e formulário GET.
+- [resumo dos filtros](../../src/components/erp/telas/fichas/filtros-resumo.ts): apresenta a URL aplicada e cria remoções pelo serializador existente; não recalcula resultados.
 - [lista](../../src/components/erp/telas/fichas/lista.tsx): resultados/navegação; compartilhada por ERP e N1.
 - [classificação](../../src/components/erp/telas/fichas/campos-classificacao.tsx): seleção/criação. Seção não é CategoriaInsumo.
 
@@ -33,6 +34,7 @@ Busca/classificação primeiro; avançados recolhíveis; resumo de TODOS os filt
 320–1920 px, temas, teclado/foco, zoom 200%, textos longos, zero resultados, múltiplas seleções e perfil sem preços.
 
 Testes: [UI 3A](../../tests/erp-ficha-3a-ui.test.ts), [filtros com banco](../../tests/erp-ficha-filtros-3a.db.test.ts), [faixas UI](../../tests/erp-ficha-faixas-ui.test.ts), [busca](../../tests/erp-ficha-3a-busca.test.ts), [foco](../../tests/erp-ficha-foco.test.ts).
+Regressão desta entrega: [resumo, rascunho e remoção](../../tests/erp-ficha-filtros-ux.test.ts).
 Banco exige `ERP_DB_TESTE` isolado; ausência produz skip, não aprovação.
 
 Origem: pacote técnico, revisão vigente e diagnóstico do card Fichas; mapeamento privado no Notion. Fórmulas/limites não tocados ficam nos donos acima; qualquer alteração exige localizar a decisão exata.

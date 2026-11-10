@@ -51,15 +51,15 @@ export function CriarClassificacao({ nivel, secaoId, gerir, aoCriar, aoFechar }:
         <h2 id="criar-classificacao-titulo" className="font-display text-xl font-bold">Nova {rotulo}</h2>
         <button type="button" disabled={pendente} onClick={fechar} aria-label="Fechar criação" className={classeDeBotao('fantasma', 'h-11 w-11 px-0')}><X size={18} aria-hidden /></button>
       </div>
-      <p className="mb-4 text-sm text-suave">O nome ficará disponível para as fichas da rede. Depois de criar, clique em Filtrar para aplicar a seleção.</p>
+      <p className="mb-4 text-sm text-suave">O nome ficará disponível para as fichas da rede. Depois de criar, clique em Aplicar filtros para aplicar a seleção.</p>
       <form onSubmit={enviar} className="space-y-3">
         <input type="hidden" name="intencao" value="criar" /><input type="hidden" name="nivel" value={nivel} />
         {secaoId && <input type="hidden" name="secaoId" value={secaoId} />}
-        <label className="block"><span className={ROTULO}>Nome da {rotulo}</span><input ref={campo} name="nome" value={nome} onChange={e => setNome(e.target.value)} maxLength={LIMITE_NOME_CLASSIFICACAO} required disabled={pendente} className={CAMPO} aria-invalid={!!erros.nome} aria-describedby={erros.nome ? 'criar-classificacao-nome' : undefined} /></label>
+        <label className="block"><span className={ROTULO}>Nome da {rotulo}</span><input ref={campo} name="nome" value={nome} onChange={e => setNome(e.target.value)} maxLength={LIMITE_NOME_CLASSIFICACAO} required disabled={pendente} className={`${CAMPO} sm:!min-h-11`} aria-invalid={!!erros.nome} aria-describedby={erros.nome ? 'criar-classificacao-nome' : undefined} /></label>
         {Object.entries(erros).map(([chave, texto]) => <Erro key={chave} id={`criar-classificacao-${chave}`} texto={texto} />)}
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" disabled={pendente} onClick={fechar} className={classeDeBotao('secundario')}>Cancelar</button>
-          <button type="submit" disabled={pendente} className={classeDeBotao('primario')}>{pendente ? 'Criando…' : `Criar ${rotulo}`}</button>
+          <button type="button" disabled={pendente} onClick={fechar} className={classeDeBotao('secundario', 'sm:!min-h-11')}>Cancelar</button>
+          <button type="submit" disabled={pendente} className={classeDeBotao('primario', 'sm:!min-h-11')}>{pendente ? 'Criando…' : `Criar ${rotulo}`}</button>
         </div>
       </form>
   </dialog>;

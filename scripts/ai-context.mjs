@@ -14,6 +14,7 @@ const SKILL = '.agents/skills/flow-contexto/SKILL.md';
 const MIRROR = '.claude/skills/flow-contexto/SKILL.md';
 const STAGES = ['implementation_status', 'local_tests_status', 'independent_review_status',
   'user_validation_status', 'merge_status', 'deploy_status', 'operational_status'];
+const TECHNICAL_STAGES = ['implementation_status', 'local_tests_status', 'independent_review_status', 'merge_status', 'deploy_status'];
 const STATES = new Set(['planned', 'in_progress', 'blocked', 'completed']);
 const STAGE_STATES = new Set(['pending', 'in_progress', 'passed', 'failed', 'skipped', 'not_applicable', 'completed']);
 const NOTION = 'Não revalidado: comando local sem acesso ao Notion. Reconfirmar o escopo na fonte privada antes de executar; fingerprint não prova consulta ao vivo nem aprovação.';
@@ -123,16 +124,17 @@ function validateDelivery(manifest, delivery, id) {
   for (const stage of STAGES) {
     if (!STAGE_STATES.has(fields[stage])) fail(`Estado inválido: ${stage}`);
   }
-  // Uma declaração editorial de conclusão exige evidência registrada em cada etapa.
+  // Conclusão técnica exige as etapas técnicas; validação do usuário e adoção conservam estado próprio.
   // O comando valida coerência; não executa testes, revisão humana, deploy ou integração.
-  if (fields.execution_state === 'completed' && STAGES.some((stage) =>
+  if (fields.execution_state === 'completed' && TECHNICAL_STAGES.some((stage) =>
     !['passed', 'completed', 'not_applicable'].includes(fields[stage]))) {
-    fail('Delivery completed com etapa pendente, falha ou skipped; conclusão não comprovada.');
+    fail('Delivery completed com etapa técnica pendente, falha ou skipped; conclusão não comprovada.');
   }
   if (fields.execution_state === 'completed' &&
       (!['passed', 'completed'].includes(fields.implementation_status) ||
-       fields.local_tests_status !== 'passed' || fields.independent_review_status !== 'passed')) {
-    fail('Delivery completed exige implementação, testes passed e revisão independente passed; conclusão não comprovada.');
+       fields.local_tests_status !== 'passed' || fields.independent_review_status !== 'passed' ||
+       !['passed', 'completed'].includes(fields.merge_status))) {
+    fail('Delivery completed exige implementação e integração concluídas, testes passed e revisão independente passed; conclusão não comprovada.');
   }
   if (['passed', 'completed'].includes(fields.independent_review_status)) {
     const unknown = /^(pending|null|none|unknown|desconhecid[oa]|pendente|not_applicable|unassigned|n[aã]o (definid[oa]|informad[oa]))$/i;
@@ -148,7 +150,7 @@ function validateDelivery(manifest, delivery, id) {
 
 function nextAction(delivery) {
   return delivery.fields.execution_state === 'completed'
-    ? 'Não reimplementar. Conferir evidências e aguardar novo escopo autorizado.'
+    ? 'Não reimplementar. Conferir evidências e pendências de validação/adoção antes de selecionar novo escopo autorizado.'
     : delivery.next;
 }
 

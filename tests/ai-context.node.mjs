@@ -154,6 +154,30 @@ test('Notion offline permanece não revalidado mesmo com fingerprint válido', (
   assert.equal(result.recorded_stages.user_validation_status, 'pending');
 });
 
+test('conclusão técnica preserva validação do usuário e adoção pendentes', (t) => {
+  const f = fixture(t);
+  f.setFields({ execution_state: 'completed', implementation_status: 'completed', local_tests_status: 'passed',
+    independent_review_status: 'passed', merge_status: 'completed', deploy_status: 'completed' });
+  f.run('generate');
+  const result = f.run('context');
+  assert.equal(result.execution_state, 'completed');
+  assert.equal(result.recorded_stages.user_validation_status, 'pending');
+  assert.equal(result.recorded_stages.operational_status, 'pending');
+  assert.match(result.next_action, /pendências de validação\/adoção/);
+  assert.match(f.read(CURRENT), /user_validation_status: `pending`/);
+  assert.match(f.read(CURRENT), /operational_status: `pending`/);
+  assert.match(f.read(CURRENT), /pendências de validação\/adoção/);
+  f.setFields({ deploy_status: 'not_applicable' });
+  f.run('generate');
+  assert.equal(f.run('check').recorded_stages.deploy_status, 'not_applicable');
+  assert.equal(f.run('context').recorded_stages.user_validation_status, 'pending');
+  assert.equal(f.run('context').recorded_stages.operational_status, 'pending');
+  for (const mergeStatus of ['not_applicable', 'pending']) {
+    f.setFields({ merge_status: mergeStatus });
+    assert.throws(() => f.run('generate'), /conclusão não comprovada/);
+  }
+});
+
 for (const status of ['pending', 'skipped', 'failed', 'not_applicable']) {
   test(`testes ${status} nunca aparecem como aprovados ou permitem completed`, (t) => {
     const f = fixture(t);

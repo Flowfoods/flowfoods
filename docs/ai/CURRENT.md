@@ -14,7 +14,7 @@
 
 ## Etapas registradas
 
-- implementation_status: `in_progress`
+- implementation_status: `passed`
 - local_tests_status: `pending`
 - independent_review_status: `pending`
 - user_validation_status: `pending`
@@ -30,4 +30,4 @@ Não revalidado: comando local sem acesso ao Notion. Reconfirmar o escopo na fon
 
 ## Próximo passo
 
-Reproduzir a lista autenticada com dados sintéticos no ambiente isolado, registrar baseline e implementar a melhoria incremental dos filtros; depois validar contratos, acessibilidade e portão com revisão independente.
+Concluir a QA autenticada do patch corrigido e o portão completo do PR48; fechar parecer independente antes de integrar/publicar. Não reimplementar os filtros nem repetir 3A/3B/3C. Registrar publicação e limites da validação do usuário separadamente.

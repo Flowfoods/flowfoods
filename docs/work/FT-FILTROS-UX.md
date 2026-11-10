@@ -10,7 +10,7 @@ authorization_ref: AGENTS.md
 assignee: /root
 reviewer: /root/retomada_limpa_revisao
 branch: codex/eng-ia-fichas-20261110
-implementation_status: in_progress
+implementation_status: passed
 local_tests_status: pending
 independent_review_status: pending
 user_validation_status: pending
@@ -25,6 +25,7 @@ operational_status: pending
 
 Mesma entrega do pacote vigente, não nova tarefa. Primeiro mínimo ENG-0/ENG-1; depois filtros sem alterar regras/resultados.
 Notion governa escopo/aprovação/prioridade; Git comprova implementação/testes. Migração do acompanhamento técnico pendente de aceite; manter fluxo atual.
+`execution_state: completed` encerra o ciclo técnico, com implementação, testes, revisão e integração/publicação comprovadas (ou publicação explicitamente não aplicável). Validação do usuário e adoção operacional têm campos próprios e podem continuar pendentes; não usar `not_applicable` para esconder ausência de prova.
 
 ## Evidência existente / não refazer
 
@@ -79,23 +80,27 @@ Piloto local em 10/11/2026, base acima + diff da branch, Windows/Node 24.15.0:
 | Evidência | Resultado e limite |
 | --- | --- |
 | `ai:generate`, `ai:check`, `ai:context` | Aprovados; geração/identidade/links/hashes locais, sem consulta Notion implícita. |
-| `ai:test` | 21/21, zero skips; revisão executou suíte independentemente. Execução inicial no sandbox falhou em git init da fixture; rodada autorizada fora desse bloqueio passou. |
+| `ai:test` | Inicial 21/21, zero skips, também executados pelo revisor. Após separar conclusão técnica de adoção: 22/22, zero skips. Tentativas no sandbox falharam em git init da fixture antes das asserções; rodadas autorizadas fora desse bloqueio passaram, sem enfraquecer controles. |
 | Revisão do piloto | Corrigidas aprovação com reviewer pendente e próxima ação antiga em CURRENT concluído; regressões específicas aprovadas. Não substitui revisão UX final. |
 | Codex CLI efêmero | 0.167.0-alpha.3.2, read-only, sem esta conversa: encontrou/leu skill e instruções; identificou entrega, arquivos, limites e próximo passo. Notion offline e Git sujo/concorrência foram explicitados, sem mutação. |
 | Cenários de retomada | Revisor sem histórico respondeu corretamente a fonte alterada, entrega integrada, Git sujo, Notion offline, referência de outro projeto e teste skipped/não executado. |
 | Contrato de deploy | `node --test tests/deploy-confirmacao.node.mjs`: 43/43, zero skips; mesmos portões e condições de deploy. |
-| Lint/conteúdo | Lint sem erros e 64 avisos preexistentes; gate: 892 arquivos, seis arquivos de teste excluídos conforme regra existente. |
+| Lint/tipos/conteúdo | Lint sem erros e 64 avisos preexistentes; typecheck aprovado; gate: 892 arquivos, seis arquivos de teste excluídos conforme regra existente. |
+| Portão inicial do piloto `5e71ac2` | [CI 42869997883](https://github.com/Flowfoods/flowfoods/actions/runs/42869997883): 5.427 testes/329 arquivos, build e fontes aprovados. Não cobre o diff UX posterior; deploy não executado por ser PR. |
+| UX implementada | Busca/classificação sempre visíveis, avançados recolhíveis, resumo derivado somente da URL aplicada, rascunho/descartar explícitos e remoção pelo serializador canônico. Sem alterar serviços, parser, schema, preços ou permissões. |
+| Regressão UX local | Autor: 79/79 em cinco arquivos antes dos ajustes finais. Revisor independente: 55/55 em cinco suítes no patch com Limpar local, quebra de texto e foco corrigidos; zero skips. Primeira tentativa do revisor não importou testes por EPERM no cache TEMP; repetição com TEMP isolado passou. |
+| Revisão UX | Corrigidos Limpar na URL inicial, quebra efetiva de nomes longos e foco após Descartar. Sem achados estáticos abertos; parecer completo depende da QA autenticada final. |
 
 A primeira tentativa CLI não iniciou por restrição ao estado local; nova execução efêmera autorizada passou mantendo sandbox interno read-only. Claude permanece não testado.
 Medição inicial: AGENTS 51 linhas, CURRENT 34, módulo 40; registro antes destas evidências 86. Os oito Markdown de entrada somavam 22.792 bytes/2.710 palavras; sem ler monólitos de 1.295.200 bytes. Não é medição de economia.
 CLI reportou tokens agregados de entrada 591.808 (547.456 em cache), saída 5.152; incluem contexto do runtime e chamadas, não somente estes arquivos. Não há comparação equivalente antes/depois nem economia comprovada.
-Merge/publicação/QA funcional desta entrega continuam pendentes.
+Baseline autenticada e rodadas de QA usam exclusivamente dados sintéticos em PostgreSQL 16/porta 55438 e Next/porta 3110. A rodada final verifica 320/360/390/768/900/1024/1280/1366/1536/1920 nos dois temas, perfis e navegação. Reflow de 640 CSS px em DPR 2 representa a largura de 1280 a 200%; não é prova de zoom nativo do navegador. Artefatos privados ficam fora do repositório público. Merge/publicação e encerramento da QA funcional continuam pendentes neste commit.
 
 ## Bloqueio e alternativa autorizada
 
 Sem bloqueio inicial para piloto local. Claude não verificado: registrar limite e validar Codex.
-QA autenticado/portão final ainda precisam de prova. Homologação/lojas iFood não bloqueiam este recorte.
+QA autenticada/portão final ainda precisam do encerramento. Homologação/lojas iFood não bloqueiam este recorte.
 
 ## Próximo passo
 
-Reproduzir a lista autenticada com dados sintéticos no ambiente isolado, registrar baseline e implementar a melhoria incremental dos filtros; depois validar contratos, acessibilidade e portão com revisão independente.
+Concluir a QA autenticada do patch corrigido e o portão completo do PR48; fechar parecer independente antes de integrar/publicar. Não reimplementar os filtros nem repetir 3A/3B/3C. Registrar publicação e limites da validação do usuário separadamente.

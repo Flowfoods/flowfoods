@@ -43,6 +43,8 @@
     "tests/ai-context.node.mjs",
     "package.json",
     "src/components/erp/telas/fichas/filtros.tsx",
+    "src/components/erp/telas/fichas/filtros-resumo.ts",
+    "src/components/erp/telas/fichas/criar-classificacao.tsx",
     "src/components/erp/telas/fichas/lista.tsx",
     "src/components/erp/telas/fichas/campos-classificacao.tsx",
     "src/lib/erp/ficha-campos.ts",
@@ -53,6 +55,7 @@
     "tests/erp-ficha-faixas-ui.test.ts",
     "tests/erp-ficha-3a-busca.test.ts",
     "tests/erp-ficha-foco.test.ts",
+    "tests/erp-ficha-filtros-ux.test.ts",
     ".github/workflows/deploy.yml"
   ],
   "public_files": [
@@ -69,6 +72,10 @@
     "scripts/ai-context.mjs",
     "tests/ai-context.node.mjs",
     "package.json",
+    "src/components/erp/telas/fichas/filtros.tsx",
+    "src/components/erp/telas/fichas/filtros-resumo.ts",
+    "src/components/erp/telas/fichas/criar-classificacao.tsx",
+    "tests/erp-ficha-filtros-ux.test.ts",
     ".github/workflows/deploy.yml"
   ],
   "deliveries": {
