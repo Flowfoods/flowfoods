@@ -44,12 +44,19 @@ jobs:
       ERP_DB_TESTE: postgresql://ff:ff@localhost:5432/ff
     steps:
       - uses: actions/checkout@v4
+        with:
+          # ai:check confirma que a base registrada pertence à história de HEAD.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           # A imagem de produção é node:22; o CI usa a mesma versão.
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Contexto de execução (integridade e regressão)
+        run: |
+          npm run ai:check
+          npm run ai:test
       # Contrato de correlação/timeout com HTTP inteiramente simulado.
       - name: Contrato da confirmação de deploy
         run: node --test tests/deploy-confirmacao.node.mjs
