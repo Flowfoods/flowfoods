@@ -5,7 +5,7 @@
 - Repositório: `Flowfoods/flowfoods`
 - Delivery: [FT-FILTROS-UX](../work/FT-FILTROS-UX.md)
 - Módulo: `fichas`
-- Estado registrado: `in_progress`
+- Estado registrado: `completed`
 - Baseline: `a8d294a1ca34a81ed69bb5b9e4f18b058569e88c`
 - Revisão da fonte: `notion_ft`
 - Responsável: /root
@@ -18,8 +18,8 @@
 - local_tests_status: `passed`
 - independent_review_status: `passed`
 - user_validation_status: `pending`
-- merge_status: `pending`
-- deploy_status: `pending`
+- merge_status: `passed`
+- deploy_status: `passed`
 - operational_status: `pending`
 
 Esses campos são declarações do delivery; este comando não confirma evidência externa.
@@ -30,4 +30,4 @@ Não revalidado: comando local sem acesso ao Notion. Reconfirmar o escopo na fon
 
 ## Próximo passo
 
-Concluir o portão completo do PR48 após a correção da expectativa visual e integrar/publicar somente com revisão aprovada. Não reimplementar os filtros nem repetir 3A/3B/3C. Registrar publicação e limites da validação do usuário separadamente.
+Não reimplementar. Conferir evidências e pendências de validação/adoção antes de selecionar novo escopo autorizado.

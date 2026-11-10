@@ -3,7 +3,7 @@ id: FT-FILTROS-UX
 schema_version: 1
 project_id: flowfoods-erp
 module: fichas
-execution_state: in_progress
+execution_state: completed
 source_revision: notion_ft
 baseline_commit: a8d294a1ca34a81ed69bb5b9e4f18b058569e88c
 authorization_ref: AGENTS.md
@@ -14,8 +14,8 @@ implementation_status: passed
 local_tests_status: passed
 independent_review_status: passed
 user_validation_status: pending
-merge_status: pending
-deploy_status: pending
+merge_status: passed
+deploy_status: passed
 operational_status: pending
 ---
 
@@ -92,17 +92,19 @@ Piloto local em 10/11/2026, base acima + diff da branch, Windows/Node 24.15.0:
 | Revisão UX | Corrigidos Limpar na URL inicial, quebra efetiva de nomes longos e foco após Descartar. Parecer técnico aprovado em `435147c`; revisor também aprovou o ajuste posterior da expectativa visual, preservando contratos. Classificação + UX: 20/20 testes no ajuste, executados pela coordenação, zero skips. |
 | CI do primeiro patch UX `435147c` | [42874101942](https://github.com/Flowfoods/flowfoods/actions/runs/42874101942): 5.434 testes passaram e dois falharam por exigir Nova seção antes do seletor. Expectativa visual antiga adaptada à hierarquia autorizada, preservando GET, pares e permissões; build/fontes não executados nessa rodada. Nova rodada completa obrigatória. |
 | QA e revisão final do código UX `435147c` | Autor: 79/79 testes finais, zero skips; navegador autenticado: 10/10 grupos e suplemento 6/6, 41 capturas/medições, sem erros de página ou chamadas externas. Fichas/preços preservados; criação/arquivamento de classificação fictícia contabilizados separadamente. Revisor conferiu código/relatório e aprovou tecnicamente, com 55/55 testes independentes. |
+| Zoom real de 200% | Chromium isolado, dois temas, 2/2 grupos e 16 capturas finais: `getZoom=2`, janela externa 1280, largura CSS 1262→631, DPR 1→2, sem overflow. Teclado, foco e modal aprovados; dados preservados. As primeiras capturas tiveram recorte do screenshot, corrigido no suplemento final sem alteração do produto. Revisor conferiu JSON, modal e 44 hashes; coordenação também inspecionou imagens. |
+| Portão final do PR48 `80c99f3` | [42877832177](https://github.com/Flowfoods/flowfoods/actions/runs/42877832177): 5.436 testes/330 arquivos, contexto 22/22, contrato deploy 43/43, build/fontes aprovados, zero skips. Deploy não executado no evento PR. |
+| Integração e publicação | [PR48](https://github.com/Flowfoods/flowfoods/pull/48), merge `404afd7bd6f5e7468ffe364c092384238b0456f3`. [Master 42881827560](https://github.com/Flowfoods/flowfoods/actions/runs/42881827560): portão integral aprovado novamente e Dokploy `done` em 10/11/2026 às 19:28:56 UTC. Coordenação conferiu HTTP público: home/login 200, Fichas sem sessão 307; não comprova jornada autenticada em produção. |
 
 A primeira tentativa CLI não iniciou por restrição ao estado local; nova execução efêmera autorizada passou mantendo sandbox interno read-only. Claude permanece não testado.
 Medição inicial: AGENTS 51 linhas, CURRENT 34, módulo 40; registro antes destas evidências 86. Os oito Markdown de entrada somavam 22.792 bytes/2.710 palavras; sem ler monólitos de 1.295.200 bytes. Não é medição de economia.
 CLI reportou tokens agregados de entrada 591.808 (547.456 em cache), saída 5.152; incluem contexto do runtime e chamadas, não somente estes arquivos. Não há comparação equivalente antes/depois nem economia comprovada.
-Baseline autenticada e rodadas de QA usam exclusivamente dados sintéticos em PostgreSQL 16/porta 55438 e Next/porta 3110. A rodada final verificou 320/360/390/768/900/1024/1280/1366/1536/1920 nos dois temas, perfis e navegação. Reflow de 640 CSS px em DPR 2 representa a largura de 1280 a 200%; não é prova de zoom nativo do navegador. Artefatos privados ficam fora do repositório público. QA funcional local encerrada; portão completo, merge e publicação continuam pendentes neste commit.
+Baseline autenticada e rodadas de QA usam exclusivamente dados sintéticos em PostgreSQL 16/porta 55438 e Next/porta 3110. A rodada final verificou 320/360/390/768/900/1024/1280/1366/1536/1920 nos dois temas, perfis e navegação. O reflow equivalente inicial foi complementado por zoom real de página, confirmado pela API do Chromium e pelas capturas finais. Artefatos privados ficam fora do repositório público. Serviços locais encerrados após conferir identidade, com dados e logs preservados. Ciclo técnico encerrado; dispositivo físico, leitor de tela, validação de Rodolfo e adoção em produção não comprovados.
 
 ## Bloqueio e alternativa autorizada
 
-Sem bloqueio inicial para piloto local. Claude não verificado: registrar limite e validar Codex.
-Repetir o portão após corrigir a expectativa visual antiga; QA autenticada passou. Homologação/lojas iFood não bloqueiam este recorte.
+Sem bloqueio técnico aberto nesta entrega publicada. Claude não verificado: manter o limite; a retomada Codex foi validada. A aprovação do usuário, adoção real e aceite da migração de acompanhamento continuam separados e pendentes. Homologação/lojas iFood não condicionaram este recorte.
 
 ## Próximo passo
 
-Concluir o portão completo do PR48 após a correção da expectativa visual e integrar/publicar somente com revisão aprovada. Não reimplementar os filtros nem repetir 3A/3B/3C. Registrar publicação e limites da validação do usuário separadamente.
+Não reimplementar os filtros nem repetir 3A/3B/3C. Conferir no Notion a próxima fatia elegível e as pendências de validação/adoção, mantendo o acompanhamento atual até aceite da migração. A continuidade iFood tem escopo e pré-condições próprios; conclusão técnica de Fichas não autoriza ativações externas.
