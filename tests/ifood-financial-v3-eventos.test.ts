@@ -6,6 +6,15 @@ const pagina = (...eventos: unknown[]) => ({ ...pedido, hasNextPage: false, fina
 const ler = (corpo: unknown) => lerPaginaEventosV3(JSON.stringify(corpo), pedido);
 
 describe('leitura de uma página Financial Events v3', () => {
+  it('normaliza o UUID da loja da consulta e recusa um escopo inválido', () => {
+    const merchantId = 'abcdefab-1234-4234-8234-abcd01020304';
+    const corpo = JSON.stringify(pagina({ receiver: { merchantId } }));
+    const resultado = lerPaginaEventosV3(corpo, { ...pedido, merchantId: merchantId.toUpperCase() });
+    expect(resultado.eventos[0].recebedorForaDaLoja).toBeUndefined();
+    expect(() => lerPaginaEventosV3(corpo, { ...pedido, merchantId: 'invalido' }))
+      .toThrow(expect.objectContaining({ codigo: 'PEDIDO_INVALIDO' }));
+  });
+
   it('projeta só os campos financeiros necessários e mantém as ocorrências na ordem recebida', () => {
     const evento = {
       name: 'NOME_FUTURO', trigger: 'GATILHO_FUTURO', product: 'PRODUTO_NOVO', competence: '2024-02',

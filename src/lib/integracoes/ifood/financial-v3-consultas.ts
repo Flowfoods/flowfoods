@@ -61,7 +61,7 @@ export async function consultarEventosFinancialV3(entrada: Intervalo, transporta
   const eventos: ReturnType<typeof lerPaginaEventosV3>['eventos'][number][] = [];
   for (let page = 1; page <= limiteDePaginas; page++) {
     url.searchParams.set('page', String(page));
-    const pagina = lerPaginaEventosV3(corpo200(await chamar(transportar, url)), { page, size: tamanho });
+    const pagina = lerPaginaEventosV3(corpo200(await chamar(transportar, url)), { page, size: tamanho, merchantId: consulta.merchantId });
     if (pagina.hasNextPage && !pagina.eventos.length) {
       throw new ErroConsultaFinancialV3('PAGINACAO');
     }

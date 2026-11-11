@@ -1,3 +1,4 @@
+import { lerIdDaLojaIfood } from '../core/campos';
 import { diaDoPainelValido } from './painel-campos';
 import { decimalFinancialEmCentavos, ErroFinancialSimulado } from './financial-dominio';
 import { lerJsonFinancialV3, NumeroJsonFinancial } from './financial-v3-json';
@@ -8,6 +9,8 @@ const MAX_EVENTOS_POR_PAGINA_LOCAL = 10_000;
 const MAX_TEXTO_LOCAL = 256;
 
 export interface EventoV3 {
+  /** Preserva o conflito de escopo sem devolver o identificador do recebedor. */
+  readonly recebedorForaDaLoja?: true;
   readonly nome: string | null;
   readonly gatilho: string | null;
   readonly produto: string | null;
@@ -75,13 +78,17 @@ function lerValor(valor: unknown): bigint | null {
   }
 }
 
-function lerEvento(valor: unknown): EventoV3 {
+function lerEvento(valor: unknown, merchantId?: string): EventoV3 {
   if (!objeto(valor)) throw new ErroEventosV3('EVENTO_INVALIDO');
   const competencia = textoOpcional(valor.competence);
   if (competencia !== null && !/^(?!0000)\d{4}-(?:0[1-9]|1[0-2])$/.test(competencia)) throw new ErroEventosV3('EVENTO_INVALIDO');
   const impacto = valor.hasTransferImpact;
   if (impacto != null && typeof impacto !== 'boolean') throw new ErroEventosV3('EVENTO_INVALIDO');
+  const recebedor = valor.receiver;
+  if (merchantId && recebedor != null && !objeto(recebedor)) throw new ErroEventosV3('EVENTO_INVALIDO');
+  const idRecebedor = objeto(recebedor) ? recebedor.merchantId : null;
   return {
+    ...(merchantId && idRecebedor != null && lerIdDaLojaIfood(idRecebedor) !== merchantId ? { recebedorForaDaLoja: true } : {}),
     nome: textoOpcional(valor.name), gatilho: textoOpcional(valor.trigger), produto: textoOpcional(valor.product),
     competencia, periodo: lerPeriodo(valor.period), impactoNoRepasse: impacto ?? null, valorCentavos: lerValor(valor.amount),
   };
@@ -108,10 +115,12 @@ function inteiroPositivo(valor: unknown): number {
 }
 
 /** Lê uma resposta 200. A conclusão da apuração depende de evidência fora desta página. */
-export function lerPaginaEventosV3(textoJson: string, pedido: { page: number; size: number }): PaginaEventosV3 {
+export function lerPaginaEventosV3(textoJson: string, pedido: { page: number; size: number; merchantId?: string }): PaginaEventosV3 {
   if (!pedido || !Number.isSafeInteger(pedido.page) || pedido.page < 1 || !Number.isSafeInteger(pedido.size) || pedido.size < 1) {
     throw new ErroEventosV3('PEDIDO_INVALIDO');
   }
+  const loja = lerIdDaLojaIfood(pedido.merchantId);
+  if (pedido.merchantId !== undefined && !loja) throw new ErroEventosV3('PEDIDO_INVALIDO');
   let corpo: unknown;
   try { corpo = lerJsonFinancialV3(textoJson); } catch { throw new ErroEventosV3('JSON_INVALIDO'); }
   let pagina = corpo;
@@ -129,5 +138,5 @@ export function lerPaginaEventosV3(textoJson: string, pedido: { page: number; si
   if (page !== pedido.page || size !== pedido.size) throw new ErroEventosV3('PAGINACAO_DIVERGENTE');
   if (pagina.financialEvents.length > MAX_EVENTOS_POR_PAGINA_LOCAL) throw new ErroEventosV3('LIMITE_LOCAL');
   if (pagina.financialEvents.length > size) throw new ErroEventosV3('PAGINA_INVALIDA');
-  return { formato, page, size, hasNextPage: pagina.hasNextPage, eventos: pagina.financialEvents.map(lerEvento) };
+  return { formato, page, size, hasNextPage: pagina.hasNextPage, eventos: pagina.financialEvents.map(e => lerEvento(e, loja ?? undefined)) };
 }
