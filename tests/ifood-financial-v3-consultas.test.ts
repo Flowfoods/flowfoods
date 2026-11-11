@@ -160,12 +160,14 @@ describe('consulta de vendas Financial v3', () => {
     expect(get).toHaveBeenCalledTimes(parada);
   });
 
-  it.each([0, 1])('respeita resposta 200 vazia com pageCount %i, sem presumir cobertura', async pageCount => {
+  it.each([0, 1, 2])('respeita resposta 200 vazia com pageCount %i, sem presumir cobertura', async pageCount => {
     const get = vi.fn<Transporte>().mockResolvedValueOnce(resposta({ ...pagina(1, []), total: 0, pageCount }));
+    if (pageCount === 2) get.mockResolvedValueOnce(resposta({ ...pagina(2, []), total: 0, pageCount }));
+    const paginasLidas = Math.max(1, pageCount);
     expect(await consultarVendasFinancialV3(pedido, get)).toEqual({
-      estado: 'PAGINAS_LIDAS', consulta: pedido, cobertura: 'NAO_COMPROVADA', paginasLidas: 1, totalInformado: 0, vendas: [],
+      estado: 'PAGINAS_LIDAS', consulta: pedido, cobertura: 'NAO_COMPROVADA', paginasLidas, totalInformado: 0, vendas: [],
     });
-    expect(get).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledTimes(paginasLidas);
   });
 
   it('percorre páginas 200 parciais ou vazias e aceita size variável quando a contagem final fecha', async () => {
@@ -210,7 +212,7 @@ describe('consulta de vendas Financial v3', () => {
   });
 
   it.each([
-    { total: 3, pageCount: 1 }, { total: 0, pageCount: 2, sales: [] },
+    { total: 3, pageCount: 1 }, { total: 1, pageCount: 0, sales: [] },
     { size: 1 }, { total: 101, size: 1, pageCount: 101, sales: [venda(1)] },
     { total: 10_001, size: 10_001, pageCount: 1, sales: [venda(1)] },
   ])('recusa paginação incompatível ou maior que os limites locais sem buscar outra página', async alteracao => {

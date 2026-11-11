@@ -158,7 +158,7 @@ export function lerPaginaVendasV3(textoJson: string, pedido: PedidoPaginaVendas)
   const total = contador(corpo.total, 0);
   const pageCount = contador(corpo.pageCount, 0);
   if (page !== pedido.page || corpo.sales.length > size || corpo.sales.length > total
-    || (total === 0 ? page !== 1 || pageCount > 1 : page > pageCount)) {
+    || (pageCount === 0 ? page !== 1 || total !== 0 : page > pageCount)) {
     throw new ErroVendasV3('PAGINACAO');
   }
   let quantidade = corpo.sales.length;
