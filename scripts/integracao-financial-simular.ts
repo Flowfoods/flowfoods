@@ -1,6 +1,7 @@
 /** Ensaio local das consultas Financial com respostas fictícias independentes. */
 import { gzipSync } from 'node:zlib';
 import { lerArquivoConciliacaoV3 } from '../src/lib/integracoes/ifood/financial-v3-arquivo';
+import { compararConciliacaoEventosV3 } from '../src/lib/integracoes/ifood/financial-v3-comparacao';
 import {
   consultarAntecipacoesFinancialV3, consultarEventosFinancialV3, consultarLiquidacoesFinancialV3, consultarVendasFinancialV3,
   solicitarConciliacaoFinancialV3, acompanharConciliacaoFinancialV3,
@@ -9,20 +10,28 @@ import type { Transporte } from '../src/lib/integracoes/ifood/transporte';
 
 const intervalo = { merchantId: '00000000-0000-4000-8000-000000000001', inicio: '2026-02-02', fim: '2026-02-08' };
 const periodo = { beginDate: intervalo.inicio, endDate: intervalo.fim };
-const respostasFicticias: Transporte = async pedido => {
-  const url = new URL(pedido.url);
-  let corpo;
-  if (url.pathname.endsWith('/financial-events')) {
+const mes = { merchantId: intervalo.merchantId, inicio: '2026-02-01', fim: '2026-02-28' };
+
+function transporteEventos(credito: string): Transporte {
+  return async pedido => {
+    const url = new URL(pedido.url);
     const page = Number(url.searchParams.get('page'));
-    if (page !== 1 && page !== 2) throw new Error('Página fora do cenário.');
-    corpo = {
+    if (!url.pathname.endsWith('/financial-events') || (page !== 1 && page !== 2)) throw new Error('Página fora do cenário.');
+    const corpo = {
       page, size: 100, hasNextPage: page === 1, financialEvents: [{
         name: page === 1 ? 'ORDER_PAYMENT' : 'ORDER_COMMISSION', trigger: 'SALE_CONCLUDED',
         product: 'IFOOD', competence: '2026-02', period: periodo, hasTransferImpact: true,
-        amount: { value: page === 1 ? '30.00' : '-3.00' },
+        receiver: { merchantId: intervalo.merchantId }, amount: { value: page === 1 ? credito : '-3.00' },
       }],
     };
-  } else if (url.pathname.endsWith('/settlements')) {
+    return { status: 200, cabecalhos: {}, corpo: JSON.stringify(corpo) };
+  };
+}
+
+const respostasFicticias: Transporte = async pedido => {
+  const url = new URL(pedido.url);
+  let corpo;
+  if (url.pathname.endsWith('/settlements')) {
     corpo = [{ ...periodo, balance: 27, merchantId: intervalo.merchantId, settlements: [{
       startDateCalculation: intervalo.inicio, endDateCalculation: intervalo.fim,
       closingItems: [{ type: 'REPASSE', product: 'IFOOD', amount: 27, status: 'SUCCEED', paymentDate: '2026-02-18' }],
@@ -53,7 +62,7 @@ const respostasFicticias: Transporte = async pedido => {
   return { status: 200, cabecalhos: {}, corpo: JSON.stringify(corpo) };
 };
 
-async function simularProtocoloMensal() {
+async function simularProtocoloMensal(eventosDaSemana: Awaited<ReturnType<typeof consultarEventosFinancialV3>>) {
   const consulta = { merchantId: intervalo.merchantId, competencia: '2026-02' };
   const requestId = '00000000-0000-4000-8000-000000000002';
   const rota = '/financial/v3.0/merchants/' + consulta.merchantId + '/reconciliation/on-demand';
@@ -80,19 +89,36 @@ async function simularProtocoloMensal() {
     ['-3.00', consulta.competencia, 'pedido-simulado', consulta.merchantId, 'SIM'].join(';'),
     ['4.00', consulta.competencia, '', consulta.merchantId, 'NAO'].join(';'),
   ].join('\r\n');
-  const arquivo = await lerArquivoConciliacaoV3(acompanhamento, {
+  const arquivoInjetado = {
     protocolo: solicitacao.protocolo, bytes: gzipSync(csv), totaisInformados: { linhas: 3, pedidos: 1 },
-  });
-  return { solicitacao: solicitacao.estado, acompanhamento, esperasSimuladasMs, arquivo };
+  };
+  const arquivo = await lerArquivoConciliacaoV3(acompanhamento, arquivoInjetado);
+  const evidenciaArquivo = {
+    protocolo: solicitacao.protocolo, produto: 'IFOOD', moeda: 'BRL', coberturaCompleta: true, apuracaoEncerrada: true,
+  } as const;
+  function comparar(eventos: typeof eventosDaSemana, coberturaCompleta: boolean) {
+    return compararConciliacaoEventosV3({
+      origem: 'SIMULACAO', arquivo: arquivoInjetado, acompanhamento, eventos, evidenciaArquivo,
+      evidenciaEventos: { consulta: eventos.consulta, produto: 'IFOOD', moeda: 'BRL', coberturaCompleta, apuracaoEncerrada: true },
+    });
+  }
+  const eventosDoMes = await consultarEventosFinancialV3(mes, transporteEventos('30.00'));
+  const eventosComDiferenca = await consultarEventosFinancialV3(mes, transporteEventos('30.01'));
+  const comparacoes = {
+    mesCompleto: await comparar(eventosDoMes, true),
+    diferencaDeUmCentavo: await comparar(eventosComDiferenca, true),
+    somenteUmaSemana: await comparar(eventosDaSemana, false),
+  };
+  return { solicitacao: solicitacao.estado, acompanhamento, esperasSimuladasMs, arquivo, comparacoes };
 }
 
 async function executar() {
   if (process.argv.length > 2) throw new Error('Use npm run integracao:financial-simular sem argumentos.');
-  const eventos = await consultarEventosFinancialV3(intervalo, respostasFicticias);
+  const eventos = await consultarEventosFinancialV3(intervalo, transporteEventos('30.00'));
   const liquidacoes = await consultarLiquidacoesFinancialV3({ ...intervalo, filtro: 'APURACAO' }, respostasFicticias);
   const antecipacoes = await consultarAntecipacoesFinancialV3({ ...intervalo, filtro: 'PAGAMENTO_ANTECIPADO' }, respostasFicticias);
   const vendas = await consultarVendasFinancialV3(intervalo, respostasFicticias);
-  const conciliacao = await simularProtocoloMensal();
+  const conciliacao = await simularProtocoloMensal(eventos);
   console.log(JSON.stringify({ origem: 'SIMULACAO', moedaDoCenario: 'BRL', eventos, liquidacoes, antecipacoes, vendas, conciliacao },
     (_chave, valor) => typeof valor === 'bigint' ? valor.toString() : valor, 2));
 }

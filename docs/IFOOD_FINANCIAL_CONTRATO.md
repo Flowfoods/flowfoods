@@ -121,6 +121,18 @@ A soma usa o sinal de `valor` e a conversão decimal exata em centavos. O ensaio
 
 Os limites locais são 2 MiB compactados, 8 MiB descompactados, 100 mil lançamentos, 128 colunas e 65.536 unidades UTF-16 por campo na representação CSV interna às aspas. A integridade das contagens descreve apenas o arquivo recebido. A atualização do relatório inclui lançamentos até o dia anterior e uma semana de segunda a domingo fica completa na terça-feira. Para comparar a competência com Financial Events, ainda é preciso demonstrar cobertura e fechamento das duas fontes. [Periodicidade do relatório](https://developer.ifood.com.br/pt-BR/docs/food/guides/modules/financial/api-reconciliation-ondemand)
 
+### Comparação mensal do arquivo com Financial Events
+
+A simulação compara o total do arquivo conferido pelo leitor acima com os eventos da mesma loja, competência, produto e moeda. O identificador da loja vem do protocolo do arquivo e da consulta paginada. Cada evento precisa informar a competência e o produto do cenário. Quando o evento informa outra loja como recebedora, a comparação fica pendente. A projeção conserva somente o indicador de divergência. A competência do evento governa sua atribuição ao mês. O período de apuração de uma ocorrência pode atravessar a virada do mês. [Guia Financial Events](https://developer.ifood.com.br/es-CO/docs/guides/modules/financial/api-financial-events)
+
+O cenário fornece evidência separada para cada fonte. A do arquivo identifica o protocolo e a dos eventos identifica a consulta. Ambas informam o produto, a moeda, a cobertura e o encerramento da apuração. Produto do arquivo e moeda são declarações sintéticas vinculadas à fonte. A consulta deve abranger o mês civil inteiro. Mesmo quando todas as páginas chegaram e os totais coincidem, uma semana de consulta ou uma apuração em aberto deixa a comparação pendente.
+
+A diferença em centavos é **eventos com impacto menos arquivo com impacto**. A soma preserva todas as ocorrências e seus sinais. Com fontes comparáveis, zero produz `COINCIDENTE` e qualquer diferença produz `DIVERGENTE`. Um mês comprovadamente completo e encerrado pode ter zero eventos ou um arquivo com zero lançamentos e zero pedidos confirmados pelas contagens externas. A ausência da fonte mantém a comparação pendente.
+
+O resultado descreve a igualdade dos totais do relatório e dos eventos. O critério de 0,01% documentado para liquidações continua no comparador de liquidação. Em `PENDENTE`, os motivos são informados e ambos os totais comparáveis e a diferença ficam nulos.
+
+O comando `npm run integracao:financial-simular` exercita três cenários independentes de fevereiro de 2026. O relatório mensal soma R$ 27,00. Eventos de R$ 27,00 no mês fechado resultam em zero centavo de diferença. Eventos de R$ 27,01 resultam em mais um centavo. A consulta de uma semana continua pendente mesmo somando R$ 27,00. Os cenários usam dados em memória e conservam o resultado financeiro do ERP.
+
 ## Verificação
 
 Execute `npm test -- ifood-financial-v3` para conferir os leitores e as consultas por transporte simulado. A suíte inclui precisão do JSON, paginação de vendas e eventos, antecipações e liquidações, conflitos de protocolo, divergência de loja e competência e retomada após o prazo de consulta. A demonstração pelo comando `integracao:financial-simular` usa as mesmas funções de consulta.

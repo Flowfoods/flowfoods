@@ -10,6 +10,18 @@ const pagina = (page: number, hasNextPage: boolean) => ({ page, size: 100, hasNe
 const liquidacao = { merchantId: pedido.merchantId, beginDate: pedido.inicio, endDate: pedido.fim, balance: 0, settlements: [] };
 
 describe('clientes Financial v3 com transporte simulado', () => {
+  it('sinaliza o recebedor de outra loja, inclusive em página posterior, sem expor o identificador', async () => {
+    const outraLoja = 'aaaaaaaa-1111-4444-8888-aaaaaaaaaaaa';
+    const resultado = await consultarEventosFinancialV3(pedido, async requisicao => {
+      const page = Number(new URL(requisicao.url).searchParams.get('page'));
+      const receiver = { merchantId: page === 1 ? pedido.merchantId : outraLoja };
+      return resposta({ ...pagina(page, page === 1), financialEvents: [{ ...evento, receiver }] });
+    });
+    expect(resultado.eventos.map(e => e.recebedorForaDaLoja)).toEqual([undefined, true]);
+    expect(resultado.eventos[1]).not.toHaveProperty('receiver');
+    expect(Object.values(resultado.eventos[1])).not.toContain(outraLoja);
+  });
+
   it('lê páginas consecutivas da mesma loja e período e preserva ocorrências iguais', async () => {
     const get = vi.fn(async (p: PedidoHttp) => {
       const u = new URL(p.url);
