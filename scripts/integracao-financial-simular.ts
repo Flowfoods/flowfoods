@@ -2,6 +2,7 @@
 import { gzipSync } from 'node:zlib';
 import { lerArquivoConciliacaoV3 } from '../src/lib/integracoes/ifood/financial-v3-arquivo';
 import { compararConciliacaoEventosV3 } from '../src/lib/integracoes/ifood/financial-v3-comparacao';
+import { conciliarLiquidacaoMensalV3 } from '../src/lib/integracoes/ifood/financial-v3-liquidacao-mensal';
 import {
   consultarAntecipacoesFinancialV3, consultarEventosFinancialV3, consultarLiquidacoesFinancialV3, consultarVendasFinancialV3,
   solicitarConciliacaoFinancialV3, acompanharConciliacaoFinancialV3,
@@ -112,6 +113,45 @@ async function simularProtocoloMensal(eventosDaSemana: Awaited<ReturnType<typeof
   return { solicitacao: solicitacao.estado, acompanhamento, esperasSimuladasMs, arquivo, comparacoes };
 }
 
+async function simularLiquidacaoMensal() {
+  const identidade = {
+    parceiro: 'parceiro-simulado', loja: 'loja-simulada', merchant: mes.merchantId,
+    produto: 'IFOOD', moeda: 'BRL' as const, competencia: '2026-02',
+  };
+  const consulta = { ...mes, filtro: 'APURACAO' as const };
+  const evidenciaEventos = { identidade, consulta: mes, coberturaCompleta: true, apuracaoEncerrada: true };
+  const evidenciaLiquidacao = { identidade, consulta, coberturaCompleta: true, apuracaoEncerrada: true, saldoIntegralDaIdentidade: true };
+  function consultarSaldo(consolidatedMerchants: string[]) {
+    const transporte: Transporte = async pedido => {
+      const url = new URL(pedido.url);
+      if (!url.pathname.endsWith('/' + mes.merchantId + '/settlements')
+          || url.searchParams.get('beginCalculationDate') !== mes.inicio || url.searchParams.get('endCalculationDate') !== mes.fim) {
+        throw new Error('Liquidação fora do cenário mensal.');
+      }
+      const corpo = {
+        merchantId: mes.merchantId, beginDate: mes.inicio, endDate: mes.fim, balance: 10_000, consolidatedMerchants,
+        settlements: [{
+          startDateCalculation: intervalo.inicio, endDateCalculation: intervalo.fim,
+          closingItems: [{ type: 'REPASSE', product: 'IFOOD', amount: 10_000, status: 'SUCCEED', paymentDate: '2026-03-04' }],
+        }],
+      };
+      return { status: 200, cabecalhos: {}, corpo: JSON.stringify(corpo) };
+    };
+    return consultarLiquidacoesFinancialV3(consulta, transporte);
+  }
+  const liquidacoes = await consultarSaldo([mes.merchantId]);
+  // O transporte de Events também devolve o débito de R$ 3,00 na segunda página.
+  const eventos = await consultarEventosFinancialV3(mes, transporteEventos('10004.00'));
+  const entrada = { origem: 'SIMULACAO' as const, identidade, eventos, liquidacoes, evidenciaEventos, evidenciaLiquidacao };
+  const eventosAcima = await consultarEventosFinancialV3(mes, transporteEventos('10004.01'));
+  const comOutraLoja = await consultarSaldo([mes.merchantId, '00000000-0000-4000-8000-000000000003']);
+  return {
+    noLimite: conciliarLiquidacaoMensalV3(entrada),
+    acimaDoLimite: conciliarLiquidacaoMensalV3({ ...entrada, eventos: eventosAcima }),
+    consolidacaoDeDuasLojas: conciliarLiquidacaoMensalV3({ ...entrada, liquidacoes: comOutraLoja }),
+  };
+}
+
 async function executar() {
   if (process.argv.length > 2) throw new Error('Use npm run integracao:financial-simular sem argumentos.');
   const eventos = await consultarEventosFinancialV3(intervalo, transporteEventos('30.00'));
@@ -119,7 +159,8 @@ async function executar() {
   const antecipacoes = await consultarAntecipacoesFinancialV3({ ...intervalo, filtro: 'PAGAMENTO_ANTECIPADO' }, respostasFicticias);
   const vendas = await consultarVendasFinancialV3(intervalo, respostasFicticias);
   const conciliacao = await simularProtocoloMensal(eventos);
-  console.log(JSON.stringify({ origem: 'SIMULACAO', moedaDoCenario: 'BRL', eventos, liquidacoes, antecipacoes, vendas, conciliacao },
+  const conciliacaoDeLiquidacao = await simularLiquidacaoMensal();
+  console.log(JSON.stringify({ origem: 'SIMULACAO', moedaDoCenario: 'BRL', eventos, liquidacoes, antecipacoes, vendas, conciliacao, conciliacaoDeLiquidacao },
     (_chave, valor) => typeof valor === 'bigint' ? valor.toString() : valor, 2));
 }
 
