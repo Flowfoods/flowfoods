@@ -1,5 +1,6 @@
 /** Ensaio local das consultas Financial com respostas fictícias independentes. */
 import { gzipSync } from 'node:zlib';
+import { simularTaxasMensais } from './integracao-financial-taxas-simuladas';
 import { lerArquivoConciliacaoV3 } from '../src/lib/integracoes/ifood/financial-v3-arquivo';
 import { compararConciliacaoEventosV3 } from '../src/lib/integracoes/ifood/financial-v3-comparacao';
 import { conciliarLiquidacaoMensalV3 } from '../src/lib/integracoes/ifood/financial-v3-liquidacao-mensal';
@@ -160,7 +161,8 @@ async function executar() {
   const vendas = await consultarVendasFinancialV3(intervalo, respostasFicticias);
   const conciliacao = await simularProtocoloMensal(eventos);
   const conciliacaoDeLiquidacao = await simularLiquidacaoMensal();
-  console.log(JSON.stringify({ origem: 'SIMULACAO', moedaDoCenario: 'BRL', eventos, liquidacoes, antecipacoes, vendas, conciliacao, conciliacaoDeLiquidacao },
+  const comparacaoDeTaxas = await simularTaxasMensais();
+  console.log(JSON.stringify({ origem: 'SIMULACAO', moedaDoCenario: 'BRL', eventos, liquidacoes, antecipacoes, vendas, conciliacao, conciliacaoDeLiquidacao, comparacaoDeTaxas },
     (_chave, valor) => typeof valor === 'bigint' ? valor.toString() : valor, 2));
 }
 

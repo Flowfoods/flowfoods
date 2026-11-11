@@ -3,7 +3,7 @@ import { compararCentavosLiquidacaoSimulada, POLITICA_FINANCIAL_SIMULADA } from 
 import { identidadeFinancialSimuladaValida, type IdentidadeFinancialSimulada } from './financial-dominio';
 import type { consultarLiquidacoesFinancialV3, ConsultaLiquidacoesV3 } from './financial-v3-consultas';
 import {
-  janelaDaCompetencia, mesmaLoja, mesmoIntervalo, somarEventosMensaisV3, type EventosConsultados, type MotivoEventosMensaisV3,
+  janelaDaCompetencia, mesmaIdentidadeMensalV3, mesmaLoja, mesmoIntervalo, somarEventosMensaisV3, type EventosConsultados, type MotivoEventosMensaisV3,
 } from './financial-v3-eventos-mensais';
 import type { TituloLiquidacaoV3 } from './financial-v3-liquidacoes';
 import { diaDoPainelValido } from './painel-campos';
@@ -44,12 +44,6 @@ type Resultado = { origem: 'SIMULACAO'; politica: typeof POLITICA_FINANCIAL_SIMU
   | { estado: 'COMPATIVEL' | 'DIVERGENTE'; motivos: []; eventosComImpactoCentavos: bigint; saldoLiquidacaoCentavos: bigint; diferencaCentavos: bigint }
 );
 
-function mesmaIdentidade(esperada: IdentidadeFinancialSimulada, atestada: Evidencia<unknown>['identidade']) {
-  return !!esperada && !!atestada && mesmaLoja(esperada.merchant, atestada.merchant ?? undefined)
-    && esperada.parceiro === atestada.parceiro && esperada.loja === atestada.loja && esperada.produto === atestada.produto
-    && esperada.competencia === atestada.competencia && esperada.moeda === 'BRL' && atestada.moeda === 'BRL';
-}
-
 function conferirEvidencias(entrada: EntradaLiquidacaoMensalV3, motivos: Set<Motivo>) {
   const { evidenciaEventos: eventos, evidenciaLiquidacao: liquidacao } = entrada;
   if (!mesmoIntervalo(entrada.eventos?.consulta, eventos?.consulta) || (eventos?.consulta && 'filtro' in eventos.consulta))
@@ -57,8 +51,8 @@ function conferirEvidencias(entrada: EntradaLiquidacaoMensalV3, motivos: Set<Mot
   if (!mesmoIntervalo(entrada.liquidacoes?.liquidacoes, liquidacao?.consulta)
       || liquidacao?.consulta?.filtro !== entrada.liquidacoes?.filtro)
     motivos.add('VINCULO_EVIDENCIA_LIQUIDACAO');
-  if (!mesmaIdentidade(entrada.identidade, eventos?.identidade)) motivos.add('IDENTIDADE_EVENTOS_DIVERGENTE');
-  if (!mesmaIdentidade(entrada.identidade, liquidacao?.identidade)) motivos.add('IDENTIDADE_LIQUIDACAO_DIVERGENTE');
+  if (!mesmaIdentidadeMensalV3(entrada.identidade, eventos?.identidade)) motivos.add('IDENTIDADE_EVENTOS_DIVERGENTE');
+  if (!mesmaIdentidadeMensalV3(entrada.identidade, liquidacao?.identidade)) motivos.add('IDENTIDADE_LIQUIDACAO_DIVERGENTE');
   if (eventos?.coberturaCompleta !== true) motivos.add('COBERTURA_EVENTOS_NAO_COMPROVADA');
   if (liquidacao?.coberturaCompleta !== true) motivos.add('COBERTURA_LIQUIDACAO_NAO_COMPROVADA');
   if (eventos?.apuracaoEncerrada !== true) motivos.add('APURACAO_EVENTOS_NAO_ENCERRADA');

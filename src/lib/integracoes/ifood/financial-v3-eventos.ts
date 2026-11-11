@@ -1,6 +1,6 @@
 import { lerIdDaLojaIfood } from '../core/campos';
 import { diaDoPainelValido } from './painel-campos';
-import { decimalFinancialEmCentavos, ErroFinancialSimulado } from './financial-dominio';
+import { decimalFinancialEmCentavos, ErroFinancialSimulado, MAX_CARACTERES_DECIMAL_FINANCIAL } from './financial-dominio';
 import { lerJsonFinancialV3, NumeroJsonFinancial } from './financial-v3-json';
 
 /** Limite local de leitura em memória. A API define seus próprios tamanhos de página. */
@@ -18,6 +18,7 @@ export interface EventoV3 {
   readonly periodo: { readonly inicio: string | null; readonly fim: string | null } | null;
   readonly impactoNoRepasse: boolean | null;
   readonly valorCentavos: bigint | null;
+  readonly cobranca?: { readonly baseCentavos: bigint | null; readonly percentual: string | null };
 }
 
 export interface PaginaEventosV3 {
@@ -78,6 +79,22 @@ function lerValor(valor: unknown): bigint | null {
   }
 }
 
+function lerCobranca(nome: string | null, billing: unknown): EventoV3['cobranca'] {
+  if (!objeto(billing)) return undefined;
+  if (nome !== 'ORDER_COMMISSION' && nome !== 'PAYMENT_TRANSACTION_FEE' && billing.feePercentage == null) return undefined;
+  let baseCentavos: bigint | null = null;
+  try {
+    if (billing.baseValue != null) baseCentavos = decimalFinancialEmCentavos(billing.baseValue);
+  } catch (erro) {
+    // Uma base ilegível impede comparar a taxa. O valor do evento continua disponível para conciliar o repasse.
+    if (!(erro instanceof ErroFinancialSimulado)) throw erro;
+  }
+  const taxa = billing.feePercentage;
+  const percentual = typeof taxa === 'string' && taxa.length <= MAX_CARACTERES_DECIMAL_FINANCIAL
+    && /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(taxa) ? taxa : null;
+  return { baseCentavos, percentual };
+}
+
 function lerEvento(valor: unknown, merchantId?: string): EventoV3 {
   if (!objeto(valor)) throw new ErroEventosV3('EVENTO_INVALIDO');
   const competencia = textoOpcional(valor.competence);
@@ -87,9 +104,12 @@ function lerEvento(valor: unknown, merchantId?: string): EventoV3 {
   const recebedor = valor.receiver;
   if (merchantId && recebedor != null && !objeto(recebedor)) throw new ErroEventosV3('EVENTO_INVALIDO');
   const idRecebedor = objeto(recebedor) ? recebedor.merchantId : null;
+  const nome = textoOpcional(valor.name);
+  const cobranca = lerCobranca(nome, valor.billing);
   return {
+    ...(cobranca && { cobranca }),
     ...(merchantId && idRecebedor != null && lerIdDaLojaIfood(idRecebedor) !== merchantId ? { recebedorForaDaLoja: true } : {}),
-    nome: textoOpcional(valor.name), gatilho: textoOpcional(valor.trigger), produto: textoOpcional(valor.product),
+    nome, gatilho: textoOpcional(valor.trigger), produto: textoOpcional(valor.product),
     competencia, periodo: lerPeriodo(valor.period), impactoNoRepasse: impacto ?? null, valorCentavos: lerValor(valor.amount),
   };
 }
