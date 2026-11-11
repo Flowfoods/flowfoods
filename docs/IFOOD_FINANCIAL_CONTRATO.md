@@ -141,6 +141,18 @@ O comparador confere a lista de lojas consolidadas e o produto dos títulos. Uma
 
 A diferença é **eventos com impacto menos saldo da liquidação**, em centavos inteiros. A política já usada na simulação de liquidação admite diferença absoluta de até 0,01% do módulo do saldo. Com saldo sintético de R$ 10.000,00, R$ 10.001,00 de eventos ficam no limite e R$ 10.001,01 ultrapassam o limite em um centavo. O terceiro cenário envia o mesmo saldo em uma consulta consolidada com outra loja e registra a pendência. A atribuição do saldo e a base percentual para dados reais dependem de verificação no ambiente oficial.
 
+### Taxa configurada e taxa cobrada por loja e competência
+
+O simulador compara a comissão do pedido (`ORDER_COMMISSION`) e a taxa do pagamento (`PAYMENT_TRANSACTION_FEE`) separadamente. Para cada ocorrência, lê o percentual declarado em `billing.feePercentage`, a base em `billing.baseValue` e o movimento assinado em `amount.value`. Uma venda pode ter bases diferentes para as duas taxas. [Guia Financial Events](https://developer.ifood.com.br/es-CO/docs/guides/modules/financial/api-financial-events)
+
+O cadastro `CanalConfig` guarda comissão e taxa de pagamento em pontos-base por parceiro e canal. Na simulação, cada retrato da configuração identifica a loja, o merchant, o produto, a moeda, a competência e as datas de vigência. A fixture atesta a equivalência entre a base contratual de cada tipo e a base do evento. O mês precisa ter cobertura completa e apuração encerrada, com vigências identificáveis em todos os dias. Uma alíquota configurada de 0% é um valor válido. Uma linha criada só para a meta de CMV deixa a taxa pendente.
+
+Na venda, o cenário informa o dia contratual ou atesta que o período inteiro do evento pertence à mesma regra. Se a taxa mudar durante esse período, é preciso identificar o dia aplicável à ocorrência. Para um estorno, o cenário precisa identificar o dia da venda original. Um cálculo que produz fração de centavo fica pendente até haver uma regra de arredondamento comprovada.
+
+A diferença é o movimento cobrado menos o movimento previsto, ambos com o sinal do extrato. Um débito extra de R$ 1,00 aparece como −100 centavos. O percentual e o valor em dinheiro precisam coincidir em cada ocorrência. Duas divergências que se compensam no total continuam visíveis. O resultado por tipo informa os motivos de pendência e preserva o diagnóstico da outra taxa quando ela é comparável.
+
+Em `npm run integracao:financial-simular`, fevereiro de 2026 tem uma comissão de 12% sobre R$ 100,00 e uma taxa de pagamento de 3,2% sobre R$ 50,00. Os débitos de R$ 12,00 e R$ 1,60 conferem. No segundo cenário, a comissão cobrada sobe a 13% e os R$ 13,00 debitados excedem o previsto em R$ 1,00. Os outros dois cenários demonstram uma comissão sem base e um mês sem histórico de vigência. Todos os valores e vínculos comerciais são fictícios.
+
 ## Verificação
 
 Execute `npm test -- ifood-financial-v3` para conferir os leitores e as consultas por transporte simulado. A suíte inclui precisão do JSON, paginação de vendas e eventos, antecipações e liquidações, conflitos de protocolo, divergência de loja e competência e retomada após o prazo de consulta. A demonstração pelo comando `integracao:financial-simular` usa as mesmas funções de consulta.

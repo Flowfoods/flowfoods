@@ -45,6 +45,27 @@ describe('leitura de uma página Financial Events v3', () => {
     expect(ler(pagina())).toEqual({ formato: 'OBJETO', ...pedido, hasNextPage: false, eventos: [] });
   });
 
+  it('conserva a base em centavos e o percentual decimal declarado, inclusive zero e frações de ponto-base', () => {
+    const evento = (name: string, billing: unknown) => ({ name, billing });
+    const eventos = ler(pagina(
+      evento('ORDER_COMMISSION', { baseValue: '9007199254740993.57', feePercentage: '12.0010', description: 'descartar' }),
+      evento('PAYMENT_TRANSACTION_FEE', { baseValue: '0.00', feePercentage: '0' }),
+      evento('TAXA_FUTURA', { feePercentage: '1.5' }),
+      evento('ORDER_PAYMENT', { baseValue: '50.00' }),
+    )).eventos;
+    expect(eventos.map(e => e.cobranca)).toEqual([
+      { baseCentavos: 900719925474099357n, percentual: '12.0010' }, { baseCentavos: 0n, percentual: '0' },
+      { baseCentavos: null, percentual: '1.5' }, undefined,
+    ]);
+  });
+
+  it.each([[null, null], ['1.001', '1e1'], ['1,00', 12], [1, '-2'], ['1'.repeat(81), '1'.repeat(81)]])(
+    'mantém o repasse legível com dados de cobrança incompatíveis', (baseValue, feePercentage) => {
+      const [evento] = ler(pagina({ name: 'ORDER_COMMISSION', amount: { value: '-2' }, billing: { baseValue, feePercentage } })).eventos;
+      expect(evento).toMatchObject({ valorCentavos: -200n, cobranca: { baseCentavos: null, percentual: null } });
+    },
+  );
+
   it.each(['name', 'trigger', 'product'])('limita a retenção do campo %s sem truncar o texto recebido', campo => {
     const limite = 'A'.repeat(256);
     expect(Object.values(ler(pagina({ [campo]: limite })).eventos[0])).toContain(limite);

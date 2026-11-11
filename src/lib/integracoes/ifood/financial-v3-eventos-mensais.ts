@@ -1,4 +1,5 @@
 import { lerIdDaLojaIfood } from '../core/campos';
+import type { IdentidadeFinancialSimulada } from './financial-dominio';
 import { conferirEscopoConciliacaoV3, type ProtocoloConciliacaoV3 } from './financial-v3-conciliacao-resposta';
 import type { consultarEventosFinancialV3 } from './financial-v3-consultas';
 import { diaDoPainelValido } from './painel-campos';
@@ -25,6 +26,14 @@ export function mesmaLoja(a: string | undefined, b: string | undefined): boolean
 
 export function mesmoIntervalo(a?: Consulta | null, b?: Consulta | null): boolean {
   return !!a && !!b && mesmaLoja(a.merchantId, b.merchantId) && a.inicio === b.inicio && a.fim === b.fim;
+}
+
+export function mesmaIdentidadeMensalV3(
+  esperada: IdentidadeFinancialSimulada, atestada?: Partial<Record<keyof IdentidadeFinancialSimulada, string | null>> | null,
+): boolean {
+  return !!esperada && !!atestada && mesmaLoja(esperada.merchant, atestada.merchant ?? undefined)
+    && esperada.parceiro === atestada.parceiro && esperada.loja === atestada.loja && esperada.produto === atestada.produto
+    && esperada.competencia === atestada.competencia && esperada.moeda === 'BRL' && atestada.moeda === 'BRL';
 }
 
 export function somarEventosMensaisV3(
