@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { consultarEventosFinancialV3, consultarLiquidacoesFinancialV3 } from '../src/lib/integracoes/ifood/financial-v3-consultas';
+import { consultarAntecipacoesFinancialV3, consultarEventosFinancialV3, consultarLiquidacoesFinancialV3 } from '../src/lib/integracoes/ifood/financial-v3-consultas';
 import { lerJsonFinancialV3, NumeroJsonFinancial } from '../src/lib/integracoes/ifood/financial-v3-json';
-import type { PedidoHttp } from '../src/lib/integracoes/ifood/transporte';
+import type { PedidoHttp, Transporte } from '../src/lib/integracoes/ifood/transporte';
 
 const pedido = { merchantId: '00000000-0000-4000-8000-000000000001', inicio: '2026-02-01', fim: '2026-02-28' };
 const resposta = (corpo: unknown, status = 200) => ({ status, cabecalhos: {}, corpo: JSON.stringify(corpo) });
@@ -79,6 +79,50 @@ describe('clientes Financial v3 com transporte simulado', () => {
       .rejects.toMatchObject({ codigo: 'TRANSPORTE', message: 'A consulta Financial v3 não foi concluída.' });
     await expect(consultarLiquidacoesFinancialV3({ ...pedido, filtro: 'PAGAMENTO' }, async () => resposta('sigilo-ficticio', 403)))
       .rejects.toMatchObject({ codigo: 'HTTP', status: 403, message: 'A consulta Financial v3 não foi concluída.' });
+  });
+});
+
+describe('consulta de antecipações Financial v3', () => {
+  const envelope = { merchantId: pedido.merchantId, beginDate: pedido.inicio, endDate: pedido.fim, balance: 0, settlements: [] };
+
+  it.each([
+    ['APURACAO', 'beginCalculationDate', 'endCalculationDate', 'OBJETO'],
+    ['PAGAMENTO_ANTECIPADO', 'beginAnticipatedPaymentDate', 'endAnticipatedPaymentDate', 'ARRAY_UNITARIO'],
+  ] as const)('consulta %s uma vez e mantém a cobertura pendente mesmo com lista vazia', async (filtro, inicio, fim, formato) => {
+    const get = vi.fn<Transporte>().mockResolvedValue(resposta(formato === 'OBJETO' ? envelope : [envelope]));
+    const resultado = await consultarAntecipacoesFinancialV3({ ...pedido, filtro }, get);
+    expect(get).toHaveBeenCalledTimes(1);
+    const [p] = get.mock.calls[0];
+    const url = new URL(p.url);
+    expect(p.metodo).toBe('GET');
+    expect(url.origin + url.pathname).toBe(`https://merchant-api.ifood.com.br/financial/v3.0/merchants/${pedido.merchantId}/anticipations`);
+    expect(url.searchParams.size).toBe(2);
+    expect(Object.fromEntries(url.searchParams)).toEqual({ [inicio]: pedido.inicio, [fim]: pedido.fim });
+    expect(p.cabecalhos).toEqual({ accept: 'application/json' });
+    expect(p.corpo).toBeUndefined();
+    expect(resultado).toMatchObject({ filtro, antecipacoes: { ...pedido, formato, saldoCentavos: 0n, grupos: [], cobertura: 'NAO_COMPROVADA' } });
+  });
+
+  it.each([{ merchantId: '00000000-0000-4000-8000-000000000002' }, { beginDate: '2026-02-02' }, { endDate: '2026-02-27' }])('recusa resposta de fora do escopo sem misturá-la com o pedido', async divergencia => {
+    const get = vi.fn(async () => resposta({ ...envelope, ...divergencia }));
+    await expect(consultarAntecipacoesFinancialV3({ ...pedido, filtro: 'PAGAMENTO_ANTECIPADO' }, get)).rejects.toThrow();
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it('recusa filtro de Settlement, loja e intervalo inválidos antes do transporte', async () => {
+    const get = vi.fn(async () => resposta(envelope));
+    const consulta = { ...pedido, filtro: 'APURACAO' as const };
+    for (const entrada of [{ ...consulta, filtro: 'PAGAMENTO' as 'APURACAO' }, { ...consulta, merchantId: '' },
+      { ...consulta, fim: '2026-02-29' }, { ...consulta, inicio: '2026-03-01' }]) {
+      await expect(consultarAntecipacoesFinancialV3(entrada, get)).rejects.toMatchObject({ codigo: 'CONSULTA_INVALIDA' });
+    }
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it.each([204, 403])('propaga o HTTP %d sem interpretar o corpo como lista de antecipações', async status => {
+    const get = vi.fn(async () => resposta(envelope, status));
+    await expect(consultarAntecipacoesFinancialV3({ ...pedido, filtro: 'APURACAO' }, get)).rejects.toMatchObject({ codigo: 'HTTP', status });
+    expect(get).toHaveBeenCalledTimes(1);
   });
 });
 
