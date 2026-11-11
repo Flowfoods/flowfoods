@@ -29,8 +29,8 @@ export function posicaoDoPainelFixo(botao: { left: number; bottom: number }, lar
  */
 export function ajusteParaCaber(painel: { esquerda: number; direita: number }, telaPx: number): number {
   if (painel.esquerda < 12) return 12 - painel.esquerda;
-  const sobra = painel.direita - (telaPx - 12);
-  return sobra > 0 ? -Math.min(sobra, painel.esquerda - 12) : 0;
+  const recuo = Math.min(painel.direita - (telaPx - 12), painel.esquerda - 12);
+  return recuo > 0 ? -recuo : 0;
 }
 
 /** No servidor não há layout para medir: o efeito de antes da pintura só existe no navegador. */
