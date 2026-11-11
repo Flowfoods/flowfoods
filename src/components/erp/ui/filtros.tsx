@@ -87,11 +87,11 @@ export function BuscaEmFormulario({
         type="search"
         defaultValue={valor ?? ''}
         placeholder={placeholder}
-        className="ff-transicao block min-h-11 min-w-0 flex-1 rounded-[7px] border border-linha-forte bg-campo px-3 text-sm text-texto placeholder:text-suave/70 hover:border-texto/30 sm:min-h-10"
+        className="ff-transicao block min-h-11 min-w-0 flex-1 rounded-campo border border-linha-forte bg-campo px-3 text-sm text-texto placeholder:text-suave/70 hover:border-texto/30 sm:min-h-10"
       />
       <button
         type="submit"
-        className="ff-transicao inline-flex min-h-11 shrink-0 items-center rounded-[7px] border border-linha-forte px-4 text-sm font-semibold text-texto hover:border-texto/35 hover:bg-texto/5 sm:min-h-10"
+        className="ff-transicao inline-flex min-h-11 shrink-0 items-center rounded-botao border border-linha-forte bg-painel px-4 text-sm font-semibold text-texto hover:border-texto/35 hover:bg-forte sm:min-h-10"
       >
         Buscar
       </button>

@@ -3,10 +3,15 @@
 /**
  * Diálogo nativo (`<dialog>` + `showModal`), o contrato do KitDialog do kit
  * Kairu: Escape fecha, clique no fundo fecha, o resto da página fica inerte
- * (o navegador cuida), a rolagem do fundo trava enquanto aberto e o foco
- * VOLTA para quem abriu. `gaveta` = menu do celular, à esquerda (`lado="direita"`:
- * a gaveta da ajuda, à direita); `sheet` = abaixo de 600 px vira folha presa
- * embaixo.
+ * e o Tab não sai do diálogo (o navegador cuida), a rolagem do fundo trava
+ * enquanto aberto e o foco VOLTA para quem abriu. `gaveta` = menu do celular,
+ * à esquerda (`lado="direita"`: a gaveta de detalhes e da ajuda, à direita);
+ * `sheet` = abaixo de 600 px vira folha presa embaixo, na largura disponível.
+ *
+ * Padrão aprovado em 09/11/2026 (regras em `tokens.css`): modal entra com
+ * opacidade + 7 px + escala 0,98; gaveta, com 28 px de deslocamento lateral;
+ * o fundo de bloqueio, só com opacidade; tudo em 220 ms. Fechar é imediato,
+ * sem animação de saída. Abrir, animar e fechar não gravam nem enviam nada.
  */
 
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
@@ -78,21 +83,21 @@ export function Dialogo({
       onClick={(e) => {
         if (e.target === e.currentTarget) fechar.current();
       }}
-      className={`ff-dialogo ${gaveta ? `ff-gaveta ${lado === 'direita' ? 'ff-gaveta-direita' : ''}` : 'rounded-[14px]'} ${sheet ? 'ff-sheet' : ''} ${className}`}
+      className={`ff-dialogo ${gaveta ? `ff-gaveta ${lado === 'direita' ? 'ff-gaveta-direita' : ''}` : ''} ${sheet ? 'ff-sheet' : ''} ${className}`}
     >
       {aberto && (
         <div className="flex h-full flex-col">
           <header
-            className={`flex items-center justify-between gap-3 border-b border-linha px-4 py-2 ${esconderTitulo ? 'sr-only' : ''}`}
+            className={`flex items-center justify-between gap-3 border-b border-linha py-2 pl-5 pr-3 ${esconderTitulo ? 'sr-only' : ''}`}
           >
-            <h2 data-ff-titulo tabIndex={-1} className="text-[15px] font-semibold outline-none">
+            <h2 data-ff-titulo tabIndex={-1} className="min-w-0 break-words font-display text-[20px] font-normal leading-tight tracking-[-0.01em] outline-none">
               {titulo}
             </h2>
             <button
               type="button"
               onClick={() => fechar.current()}
               aria-label="Fechar"
-              className="ff-transicao inline-grid h-11 w-11 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto"
+              className="ff-transicao inline-grid h-11 w-11 shrink-0 place-items-center rounded-botao text-suave hover:bg-texto/5 hover:text-texto"
             >
               <X size={18} aria-hidden />
             </button>

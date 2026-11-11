@@ -10,13 +10,16 @@ import { describe, expect, it } from 'vitest';
 import { COR, itemAtivo, navegacaoDoParceiro, type ModuloNav } from '@/lib/erp/modulos';
 import { resolverAlcance } from '@/lib/erp/permissoes';
 import { NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
-import { NavLateral } from '@/components/erp/shell/NavLateral';
+import { AreasDoSeletor, NavLateral } from '@/components/erp/shell/NavLateral';
 import { CartaoModulo } from '@/components/erp/ui/hub';
 
 const navDoPerfil = (perfilBase: 'DONO' | 'OPERADOR') => navegacaoDoParceiro(resolverAlcance({
   perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [],
 }), NENHUM_MODULO_LIBERADO);
 const nav = navDoPerfil('DONO');
+// Áreas em uso (com tela) e o catálogo "Em breve" (10/11/2026) saem da mesma navegação, mas não se misturam.
+const emUso = nav.modulos.filter((m) => m.href);
+const emBreve = nav.modulos.filter((m) => !m.href);
 const cartao = (m: ModuloNav) => renderToStaticMarkup(createElement(CartaoModulo, {
   c: { ...m, abas: m.grupos.flatMap((g) => g.itens.map(({ rotulo, href }) => ({ rotulo, href }))) },
 }));
@@ -29,7 +32,8 @@ const atributo = (attrs: string, nome: string) => new RegExp(`${nome}="([^"]*)"`
 describe('Identidade central das áreas no hub e no menu', () => {
   it('cada card e sua entrada no menu recebem a mesma cor central, com destinos preservados', () => {
     const entradas = links(menu(null));
-    for (const m of nav.modulos) {
+    expect(emUso).toHaveLength(7);
+    for (const m of emUso) {
       const h = cartao(m);
       expect(h).toContain(`style="--cor-modulo:${m.cor}"`);
       expect(h).toContain(`href="${m.href}"`);
@@ -41,7 +45,7 @@ describe('Identidade central das áreas no hub e no menu', () => {
   });
 
   it('ativo continua anunciado em cada área, no menu aberto e recolhido, com o mesmo mapeamento', () => {
-    for (const m of nav.modulos) {
+    for (const m of emUso) {
       expect(itemAtivo(nav, m.href!)?.modulo.chave).toBe(m.chave);
       for (const recolhido of [false, true]) {
         const h = menu(m, recolhido);
@@ -56,12 +60,56 @@ describe('Identidade central das áreas no hub e no menu', () => {
 
   it('futuro mantém identidade e selo, mas não ganha link nem atalhos', () => {
     const h = renderToStaticMarkup(createElement(CartaoModulo, {
-      c: { chave: 'futuro', nome: 'Módulo futuro', subtitulo: 'Ainda em preparação', icone: 'compras', cor: COR.compras, href: null, fase: 'Futura' },
+      c: { chave: 'futuro', nome: 'Módulo futuro', subtitulo: 'Ainda em preparação', icone: 'compras', cor: COR.compras, href: null },
     }));
     expect(h).toContain('aria-disabled="true"');
     expect(h).toContain('Em breve');
     expect(h).toContain(`--cor-modulo:${COR.compras}`);
     expect(h).not.toContain('href=');
+  });
+
+  it('catálogo "Em breve": card neutro, com selo e sem controle; o menu lateral não ganha entrada para ele', () => {
+    expect(emBreve).toHaveLength(18);
+    const noMenu = menu(null);
+    for (const m of emBreve) {
+      const h = cartao(m);
+      // Neutro de propósito: a cor de área fica para o que já tem tela.
+      expect(m.cor).toBe(COR.futuro);
+      expect(h).toContain(`style="--cor-modulo:${COR.futuro}"`);
+      expect(h).toContain('aria-disabled="true"');
+      expect(h).toContain('Em breve');
+      expect(h).not.toMatch(/href=|<a[ >]|<button|tabindex/);
+      // A grade do menu é de destinos: módulo sem tela não entra nela (aberta nem recolhida).
+      expect(noMenu).not.toContain(m.nome);
+      expect(menu(null, true)).not.toContain(m.nome);
+    }
+    // Os únicos links do menu: a marca e o Início (os dois para o hub) e uma célula por área em uso.
+    expect(links(noMenu).map((a) => atributo(a[1], 'href'))).toEqual([nav.inicio.href, nav.inicio.href, ...emUso.map((m) => m.href)]);
+  });
+
+  it('seletor de áreas: em uso com link e a atual marcada; "Em breve" num grupo separado, com nome, finalidade e selo, sem link', () => {
+    const h = renderToStaticMarkup(createElement(AreasDoSeletor, { nav, atual: emUso[2], aoEscolher: () => {} }));
+    const [areas, futuros] = h.split(/<p id="[^"]*"[^>]*>Em breve<\/p>/);
+    expect(futuros, 'o grupo "Em breve" existe e vem depois das áreas').toBeTruthy();
+    // Em uso: um link por área (mais o Início), a atual com aria-current, cada uma com a cor dela.
+    expect(links(areas).map((a) => atributo(a[1], 'href'))).toEqual([nav.inicio.href, ...emUso.map((m) => m.href)]);
+    expect(links(areas).filter((a) => atributo(a[1], 'aria-current') === 'true').map((a) => atributo(a[1], 'href'))).toEqual([emUso[2].href]);
+    for (const m of emBreve) expect(areas).not.toContain(m.nome);
+    // Em breve: lista ligada ao rótulo do grupo; cada item é texto (nome, finalidade, selo), nunca controle.
+    expect(futuros).toMatch(/^<ul aria-labelledby="[^"]+">/);
+    expect(futuros).not.toMatch(/href=|<a[ >]|<button|tabindex/);
+    const itens = futuros.split('<li>').slice(1);
+    expect(itens).toHaveLength(18);
+    itens.forEach((item, n) => {
+      expect(item).toContain(emBreve[n].nome);
+      expect(item).toContain(emBreve[n].subtitulo);
+      expect(item).toContain('Em breve');
+      expect(item).toContain('aria-disabled="true"');
+      expect(item.includes('Bloqueado.')).toBe(emBreve[n].nome === 'CRM Time' || emBreve[n].nome === 'CRM Clube');
+    });
+    // Nomes inteiros: nada de corte por reticências no seletor nem na grade do menu.
+    expect(h).not.toMatch(/truncate|line-clamp/);
+    expect(menu(emUso[2])).not.toMatch(/ff-nav-rotulo[^"]*(truncate|line-clamp)/);
   });
 
   it('o operador continua sem Compras, DRE, Precificação e Integrações não liberadas', () => {

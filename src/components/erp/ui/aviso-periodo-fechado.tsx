@@ -61,7 +61,7 @@ export function AvisoDoPeriodoFechado({
     };
   }, [rolar]);
   return (
-    <div ref={caixa} id={id} role="status" data-aviso-periodo-fechado className={`flex items-start gap-3 text-sm ${dentro ? '' : 'rounded-[14px] border border-linha bg-painel px-4 py-3 sm:px-5'}`}>
+    <div ref={caixa} id={id} role="status" data-aviso-periodo-fechado className={`flex items-start gap-3 text-sm ${dentro ? '' : 'rounded-cartao border border-linha bg-painel px-4 py-3 sm:px-5'}`}>
       <span className="flex h-5 shrink-0 items-center">
         <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-atencao" />
       </span>

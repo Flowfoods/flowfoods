@@ -2,7 +2,8 @@
  * ERP 1.1 — shell único (/erp e /rodolfo), sem banco:
  *
  * - menu e hub mostram só os módulos que o alcance libera (Dono, Gerente,
- *   Operador, N3, perfil sem insumos) + os futuros desabilitados, sem link;
+ *   Operador, N3, perfil sem insumos) + o catálogo "Em breve" (10/11/2026):
+ *   apresentação igual para todos, sem link, aba, ação, busca nem rota;
  * - o nível 1 ganha o Barney antigo como módulos e o ERP do parceiro dentro
  *   do parceiro;
  * - visão (Rede Completa ↔ loja): cookie forjado/velho cai na primeira opção
@@ -57,9 +58,32 @@ const futuros = (a: Alcance) =>
   modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO)
     .filter((m) => !m.href)
     .map((m) => m.chave);
+// O catálogo "Em breve" é apresentação: o mesmo para qualquer alcance, sempre depois das áreas em uso.
+const CATALOGO_EM_BREVE = MODULOS_FUTUROS.map((f) => f.chave);
+// Os 18 nomes do catálogo conferidos em 10/11/2026, na ordem dele. Integração não está aqui: já tem tela, sob liberação.
+const NOMES_EM_BREVE = [
+  'CRM Time',
+  'CRM Clube',
+  'Divulgação em TVs',
+  'Atendimento com IA',
+  'Consultoria de Delivery',
+  'Pedidos Próprios',
+  'Equipe e RH',
+  'Freelancers',
+  'Pedidos na Cozinha (KDS)',
+  'Entregas',
+  'Monitoramento por Câmeras',
+  'Patrimônio e Dispositivos',
+  'Anúncios',
+  'Contratos e Royalties',
+  'Implantação',
+  'Rotinas e Inspeções',
+  'Supervisão da Rede',
+  'Página da Unidade',
+];
 
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
-  it('Dono: as abas de cada área (UX.9), as ações fora do menu; 3.4: nenhum módulo futuro (Etiquetas virou área)', () => {
+  it('Dono: as abas de cada área (UX.9), as ações fora do menu; os futuros são só o catálogo "Em breve" (Etiquetas é área desde a 3.4)', () => {
     const a = alcance({ perfilBase: 'DONO' });
     expect(modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => m.href).map((m) => m.nome)).toEqual([
       'Cadastros e Cardápio',
@@ -122,7 +146,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/dre/despesas/nova',
     ]);
     // 2.1: Faturamento e DRE saiu dos futuros e virou área com tela. 3.1: a Produção também. 3.4: e as Etiquetas.
-    expect(futuros(a)).toEqual([]);
+    // 10/11: os futuros são o catálogo "Em breve" inteiro, que não acrescenta aba nem ação (as listas acima não mudaram).
+    expect(futuros(a)).toEqual(CATALOGO_EM_BREVE);
+    for (const chave of ['cadastros', 'compras', 'estoque', 'producao', 'etiquetas', 'dre', 'rede']) expect(futuros(a)).not.toContain(chave);
   });
 
   it('Gerente: sem Equipe (não cuida da equipe); com Histórico (rede inteira)', () => {
@@ -148,7 +174,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     ]);
     // 3.1: o cozinheiro produz, então planejar a produção é a única ação dele.
     expect(hrefsDasAcoes(a)).toEqual(['/erp/producao/nova']);
-    expect(futuros(a)).toEqual([]);
+    // O catálogo "Em breve" é o mesmo do Dono: apresentação não depende de permissão nem a concede.
+    expect(futuros(a)).toEqual(CATALOGO_EM_BREVE);
   });
 
   it('Gerente de uma loja só (N3): Histórico some (exige a rede inteira)', () => {
@@ -176,15 +203,75 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     const mods = modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO);
     expect(mods.map((m) => m.chave)).not.toContain('cadastros');
     expect(hrefs(a)).toEqual(['/erp/lojas', '/erp/acesso']);
-    expect(futuros(a)).toEqual([]);
+    expect(futuros(a)).toEqual(CATALOGO_EM_BREVE);
   });
 
-  it('módulo futuro nunca tem link nem grupos, e traz a fase do plano (3.4: a lista ficou vazia)', () => {
-    for (const m of modulosDoParceiro(ALCANCE_FLOWFOODS, '/erp', NENHUM_MODULO_LIBERADO).filter((x) => !x.href)) {
-      expect(m.grupos).toEqual([]);
-      expect(m.fase).toMatch(/^\d\.\d$/);
+  it('catálogo "Em breve" (10/11): os 18 módulos, na ordem do catálogo, só com nome, finalidade, ícone e cadeado', () => {
+    expect(MODULOS_FUTUROS.map((f) => f.nome)).toEqual(NOMES_EM_BREVE);
+    expect(new Set(CATALOGO_EM_BREVE).size).toBe(18);
+    for (const f of MODULOS_FUTUROS) {
+      // Nada de rota, permissão, cor de área, fase ou data: só o que a apresentação mostra.
+      expect(Object.keys(f).filter((k) => k !== 'cadeado').sort(), f.nome).toEqual(['chave', 'icone', 'nome', 'subtitulo']);
+      expect(f.chave, f.nome).toMatch(/^[a-z]+(-[a-z]+)*$/);
+      expect(f.subtitulo.length, f.nome).toBeGreaterThan(10);
+      expect(f.subtitulo.length, f.nome).toBeLessThanOrEqual(70);
+      // Sem promessa de data ou fase, sem número, dinheiro nem percentual.
+      expect(`${f.nome} ${f.subtitulo}`, f.nome).not.toMatch(/\d|R\$|%|fase|trimestre|semestre|em 20|previs|lança|chega/i);
     }
-    expect(MODULOS_FUTUROS).toEqual([]);
+    // O cadeado previsto só em CRM Time e CRM Clube.
+    expect(MODULOS_FUTUROS.filter((f) => f.cadeado).map((f) => f.nome)).toEqual(['CRM Time', 'CRM Clube']);
+  });
+
+  it('módulo "Em breve" nunca tem link, abas, ações nem fase, para qualquer alcance e nos dois níveis', () => {
+    const alcances = [ALCANCE_FLOWFOODS, alcance({ perfilBase: 'DONO' }), alcance({ perfilBase: 'OPERADOR' }), alcance({ perfilBase: null, perfilProprio: [] })];
+    for (const a of alcances) {
+      for (const base of ['/erp', '/rodolfo/erp/valentins']) {
+        for (const liberados of [NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO]) {
+          const mods = modulosDoParceiro(a, base, liberados);
+          const emBreve = mods.filter((x) => !x.href);
+          expect(emBreve.map((m) => m.nome)).toEqual(NOMES_EM_BREVE);
+          // Sempre depois das áreas em uso (não se misturam com elas).
+          expect(mods.slice(-18)).toEqual(emBreve);
+          for (const m of emBreve) {
+            expect(m.href).toBeNull();
+            expect(m.grupos).toEqual([]);
+            expect(m.acoes).toEqual([]);
+            expect(m).not.toHaveProperty('fase');
+            expect(JSON.stringify(m), m.nome).not.toMatch(/\/erp|\/rodolfo|https?:/);
+          }
+        }
+      }
+    }
+  });
+
+  it('"Em breve" não duplica nem rebatiza área em uso; Integração segue como aba de Rede e Equipe, sob liberação', () => {
+    const dono = alcance({ perfilBase: 'DONO' });
+    const emUso = modulosDoParceiro(dono, '/erp', TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => m.href);
+    const nomesEmUso = [...emUso.map((m) => m.nome), ...emUso.flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.rotulo)))];
+    for (const nome of NOMES_EM_BREVE) expect(nomesEmUso, nome).not.toContain(nome);
+    expect(emUso.map((m) => m.chave).filter((c) => CATALOGO_EM_BREVE.includes(c))).toEqual([]);
+    // "Equipe e RH" (futuro) não substitui a aba Equipe; "CRM Time" não é a gestão de acessos.
+    expect(hrefs(dono)).toContain('/erp/equipe');
+    expect(hrefs(dono)).toContain('/erp/acesso');
+    // Integração: nem no catálogo "Em breve", nem liberada por ele. Continua aba de Rede e Equipe só com o módulo liberado.
+    expect(NOMES_EM_BREVE.some((n) => /integra/i.test(n))).toBe(false);
+    expect(hrefs(dono)).not.toContain('/erp/integracoes');
+    expect(hrefs(dono, '/erp', TODOS_OS_MODULOS_COM_LIBERACAO)).toContain('/erp/integracoes');
+  });
+
+  it('"Em breve" fica fora da busca, da trilha, do item ativo e do disco: nenhuma rota, tela ou ação foi criada para eles', () => {
+    const nav = navegacaoDoParceiro(alcance({ perfilBase: 'DONO' }), TODOS_OS_MODULOS_COM_LIBERACAO);
+    const naBusca = [...telasDaNavegacao(nav), ...acoesDaNavegacao(nav)];
+    for (const nome of NOMES_EM_BREVE) {
+      expect(naBusca.some((t) => t.rotulo === nome || t.modulo === nome), nome).toBe(false);
+    }
+    // Endereço adivinhado não acende nada: não há item de menu para um módulo sem tela.
+    for (const chave of CATALOGO_EM_BREVE) {
+      expect(itemAtivo(nav, `/erp/${chave}`), chave).toBeNull();
+      for (const raiz of [join('src', 'app', 'erp'), join('src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]'), join('src', 'app', 'api')]) {
+        expect(existsSync(join(raiz, chave)), `${raiz}/${chave}`).toBe(false);
+      }
+    }
   });
 
   it('3.4: a abertura de uma loja acende "Abrir embalagem"; a emissão e o papel acendem "Imprimir"', () => {

@@ -70,7 +70,7 @@ export function CampoDeSenha({ id, rotuloDoBotao = 'Mostrar senha', className = 
         aria-label={rotuloDoBotao}
         onMouseDown={(e) => e.preventDefault()}
         onClick={alternar}
-        className="ff-transicao absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[7px] text-suave hover:text-texto aria-pressed:text-texto"
+        className="ff-transicao absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-campo text-suave hover:text-texto aria-pressed:text-texto"
       >
         {visivel ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
       </button>

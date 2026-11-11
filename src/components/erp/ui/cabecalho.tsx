@@ -1,7 +1,8 @@
 /**
  * Cabeçalho de página (Ref.2) e o quadrado do ícone do módulo.
  *
- * Quadrado de 40 px com o ícone na cor do módulo · h1 grande em Gelasio ·
+ * Quadrado de 40 px com o ícone na cor do módulo · h1 editorial em Gelasio
+ * (29 px/1,2, peso regular: padrão aprovado em 09/11/2026; 25 px no celular) ·
  * subtítulo com contexto e contagem ("Rede Completa · 43 insumos") · a ação
  * principal à direita (uma por tela) · a caixa "Como funciona" (quando a
  * pessoa ainda não fechou) · busca e filtros logo abaixo. Um h1 por tela. A
@@ -61,7 +62,7 @@ export function PageHeader({
         <div className="flex min-w-0 items-center gap-3.5">
           <IconeDoModulo icone={icone} cor={cor} />
           <div className="min-w-0">
-            <h1 className="break-words font-display text-[26px] font-bold leading-tight tracking-[-0.01em] [text-wrap:balance] sm:text-[30px]">
+            <h1 className="break-words font-display text-[25px] font-normal leading-[1.2] tracking-[-0.02em] [text-wrap:balance] sm:text-[29px]">
               {titulo}
             </h1>
             {subtitulo && <p className="mt-0.5 break-words text-sm text-suave">{subtitulo}</p>}

@@ -156,7 +156,7 @@ export function CaixaDeAula({
           )}
         </summary>
         {/* Sem JavaScript: o texto abre aqui mesmo. Com JavaScript, quem abre é o card. */}
-        <div className="mt-2 rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
+        <div className="mt-2 rounded-cartao border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="max-w-prose space-y-1.5 text-[14px] leading-relaxed text-suave">
             {entrada.aula.map((t, n) => (
               <p key={n}>{t}</p>

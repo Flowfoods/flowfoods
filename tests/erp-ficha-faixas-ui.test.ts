@@ -75,7 +75,7 @@ describe('3B farol e meta independentes na apresentação', () => {
     ['naoOfertado', 'text-suave', false], ['faixasNaoConfiguradas', 'text-suave', false],
   ] satisfies [ResultadoDoFarol['faixa'], string, boolean][])('%s usa o tom aprovado e texto, sem exigir cor exclusiva', (faixa, tom, cheio) => {
     const h = render(SeloDaFaixa, { faixa }); expect(h).toContain(tom);
-    expect(h.includes('bg-ok/15')).toBe(cheio); expect(h).not.toContain('bg-erro/15');
+    expect(h.includes('bg-ok-fundo')).toBe(cheio); expect(h).not.toContain('bg-destaque');
     expect(h).toContain('whitespace-normal');
   });
   it('duas contas exibidas como 30,0% conservam faixas exatas diferentes e intervalos explicáveis', () => {

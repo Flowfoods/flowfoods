@@ -2,9 +2,9 @@
 
 /**
  * Botões do design system do ERP. Um único botão principal por contexto
- * (`acao`, #C41522: branco por cima dá ≈6:1; o #EA1D2C da marca não dá 4,5 em
- * texto de 14 px). Raio 7 px; 40 px no desktop, 44 px no celular. Estados:
- * hover, foco (anel do tokens.css), desabilitado e "em voo".
+ * (`acao`, #bc382e no claro e #b83d33 no escuro, com texto #fffdf8: 5,5:1).
+ * Raio 10 px; 40 px no desktop, 44 px no celular. Estados: hover, foco (anel
+ * do tokens.css), desabilitado e "em voo".
  *
  * React 19: o estado da action vem de `useActionState` do `react`; o envio
  * do formulário é acompanhado por `useFormStatus` do `react-dom`.
@@ -128,7 +128,7 @@ export function MensagemDeResposta({
   return (
     <p
       role="status"
-      className={`rounded-[7px] border px-3 py-2 text-[13px] ${
+      className={`rounded-campo border px-3 py-2 text-[13px] ${
         resposta.ok ? 'border-ok/35 text-ok' : 'border-atencao/40 text-atencao'
       } ${className}`}
     >

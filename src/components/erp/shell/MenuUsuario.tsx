@@ -48,7 +48,7 @@ export function MenuUsuario({
     <Popover
       rotulo={`Conta de ${usuario.nome}`}
       largura="w-72"
-      classeDoBotao="ff-transicao flex min-h-11 items-center gap-2.5 rounded-[7px] pl-1 pr-1 hover:bg-texto/5 aria-expanded:bg-texto/5 lg:pr-2.5"
+      classeDoBotao="ff-transicao flex min-h-11 items-center gap-2.5 rounded-botao pl-1 pr-1 hover:bg-texto/5 aria-expanded:bg-texto/5 lg:pr-2.5"
       conteudoDoBotao={
         <>
           <span

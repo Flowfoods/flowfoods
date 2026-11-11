@@ -194,7 +194,7 @@ describe('E5.1 · números de Leads como filtro', () => {
     const comLink = renderToStaticMarkup(createElement(Metrica, { rotulo: 'Novos', valor: 3, detalhe: 'ainda não contatados', href: '/rodolfo/leads?status=NOVO' }));
     const semLink = renderToStaticMarkup(createElement(Metrica, { rotulo: 'Novos', valor: 3, detalhe: 'ainda não contatados' }));
     expect(comLink).toMatch(/^<a [^>]*href="\/rodolfo\/leads\?status=NOVO"/);
-    expect(semLink).toMatch(/^<div class="flex min-w-0 flex-col rounded-\[14px\] border border-linha bg-painel px-4 py-3\.5 sm:px-5">/);
+    expect(semLink).toMatch(/^<div class="flex min-w-0 flex-col rounded-cartao border border-linha bg-painel px-4 py-3\.5 sm:px-5">/);
     expect(semLink).not.toContain('<a');
     // O conteúdo é o mesmo nos dois: só a caixa muda.
     const miolo = (h: string) => h.replace(/^<(a|div)[^>]*>/, '').replace(/<\/(a|div)>$/, '');

@@ -3,17 +3,25 @@
 /**
  * Conteúdo do menu lateral (o mesmo na barra fixa do desktop e na gaveta do
  * celular): marca, contexto, SELETOR DE ÁREA no topo, os grupos da área
- * (abrem e fecham; cada item é uma aba), item ativo com `aria-current` e o indicador na cor da área de
- * 2 px, e a versão no rodapé. Recolhido (desktop): só ícones, com nome
- * acessível e dica.
+ * (abrem e fecham; cada item é uma aba) e a versão no rodapé.
+ *
+ * Padrão aprovado em 09/11/2026: os itens formam uma GRADE compacta de ícone +
+ * nome, em duas colunas quando o nome cabe (a regra está em `tokens.css`,
+ * `.ff-nav-grade`). O nome nunca é cortado: quebra em linhas e a célula cresce.
+ * Item ativo = célula preenchida com contorno e peso, na cor da área, com
+ * `aria-current`. Recolhido (desktop): só ícones, com nome acessível e dica.
+ *
+ * O seletor lista as áreas em uso e, num grupo separado, o catálogo "Em breve":
+ * texto e selo, sem link, botão ou consulta.
  */
 
 import Link from 'next/link';
-import { useState, type CSSProperties } from 'react';
+import { useId, useState, type CSSProperties } from 'react';
 // avoid-ai-design-ignore: I3 — Check marca estado (opção escolhida, mensagem entregue), não é enfeite.
 import { Check, ChevronDown, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { COR, type ModuloNav, type Navegacao } from '@/lib/erp/modulos';
 import { IconeDoModulo } from '../ui/cabecalho';
+import { SeloEmBreve } from '../ui/em-breve';
 import { Marca } from '../ui/Marca';
 import { Icone } from './icones';
 import { Popover } from './Popover';
@@ -24,9 +32,12 @@ export interface EstadoDaNav {
   hrefAtivo: string | null;
 }
 
-// 44 px na gaveta (toque); 40 px na barra fixa do desktop (≥ 900 px).
-const ITEM =
-  'ff-nav-item ff-identidade-modulo ff-transicao flex min-h-11 min-[900px]:min-h-10 items-center gap-3 rounded-[5px] px-3 py-1.5 text-[14px] text-suave hover:text-texto';
+// Célula da grade: ícone em cima, nome embaixo; 64 px de altura mínima (alvo de toque com folga) e cresce com o nome.
+const ITEM = 'ff-nav-item ff-identidade-modulo ff-transicao flex w-full text-suave hover:text-texto';
+const ITEM_ABERTO = 'min-h-16 flex-col items-center justify-center gap-1.5 px-1 py-2 text-center';
+// Recolhido: 44 px na gaveta (toque); 40 px na barra fixa do desktop (≥ 900 px).
+const ITEM_RECOLHIDO = 'min-h-11 min-[900px]:min-h-10 items-center justify-center';
+const GRADE = 'ff-nav-grade';
 
 export function NavLateral({
   nav,
@@ -57,15 +68,16 @@ export function NavLateral({
         </Link>
       </div>
 
-      {!recolhido && <p className="truncate px-4 pt-3 text-[12px] text-suave">{contexto}</p>}
+      {/* O contexto (parceiro · situação) quebra em linhas: na lateral compacta, cortar o nome do parceiro esconderia onde a pessoa está. */}
+      {!recolhido && <p className="break-words px-4 pt-3 text-[12px] leading-snug text-suave">{contexto}</p>}
 
-      <div className={`shrink-0 ${recolhido ? 'px-2 pt-3' : 'px-3 pt-2'}`}>
+      <div className={`shrink-0 ${recolhido ? 'px-2 pt-3' : 'px-2.5 pt-2'}`}>
         <SeletorDeModulo nav={nav} atual={modulo} recolhido={recolhido} />
       </div>
 
-      <nav aria-label="Menu" className={`min-h-0 flex-1 overflow-y-auto pb-4 ${recolhido ? 'px-2' : 'px-3'}`}>
+      <nav aria-label="Menu" className={`min-h-0 flex-1 overflow-y-auto pb-4 ${recolhido ? 'px-2' : 'px-2.5'}`}>
         {noHub ? (
-          <ul className="mt-3 space-y-0.5">
+          <ul className={`${GRADE} mt-3`} data-recolhido={recolhido}>
             <li>
               <ItemDoMenu
                 href={nav.inicio.href}
@@ -89,7 +101,7 @@ export function NavLateral({
             // Grupo de um item só que repete o nome ("INSUMOS › Insumos"): fica só o item, sem o rótulo que abre e fecha. Se o rótulo diz
             // outra coisa ("RELATÓRIOS › Consumo e conciliação"), ele fica: é ele que mostra onde a tela mora.
             g.itens.length === 1 && g.itens[0].rotulo.toLowerCase() === g.rotulo.toLowerCase() ? (
-              <ul key={g.rotulo} className="mt-3 space-y-0.5">
+              <ul key={g.rotulo} className={`${GRADE} mt-3`} data-recolhido={recolhido}>
                 <li>
                   <ItemDoMenu
                     href={g.itens[0].href}
@@ -161,12 +173,12 @@ function ItemDoMenu({
       href={href}
       aria-current={ativo ? 'page' : undefined}
       title={recolhido ? rotulo : undefined}
-      className={`${ITEM} ${recolhido ? 'justify-center px-0' : ''}`}
+      className={`${ITEM} ${recolhido ? ITEM_RECOLHIDO : ITEM_ABERTO}`}
       style={{ '--cor-modulo': cor } as CSSProperties}
     >
-      <Icone nome={icone} size={18} className="ff-nav-icone shrink-0" />
-      {/* O nome de uma área é longo ("Estoque e Movimentações"): quebra em até 2 linhas em vez de cortar. */}
-      <span className={recolhido ? 'sr-only' : 'line-clamp-2 min-w-0 leading-snug'}>{rotulo}</span>
+      <Icone nome={icone} size={recolhido ? 18 : 20} className="ff-nav-icone shrink-0" />
+      {/* O nome de uma área é longo ("Estoque e Movimentações"): quebra em quantas linhas precisar, nunca corta. */}
+      <span className={recolhido ? 'sr-only' : 'ff-nav-rotulo block w-full min-w-0 leading-tight'}>{rotulo}</span>
     </Link>
   );
 }
@@ -193,7 +205,7 @@ function Grupo({
           <Icone nome={icone} size={13} aria-hidden className="ff-nav-icone" />
           <span className="sr-only">{rotulo}</span>
         </div>
-        <ul className="mt-1 space-y-0.5">{children}</ul>
+        <ul className={`${GRADE} mt-1`} data-recolhido>{children}</ul>
       </div>
     );
   }
@@ -203,14 +215,14 @@ function Grupo({
         type="button"
         aria-expanded={aberto}
         onClick={() => setAberto((v) => !v)}
-        className="ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[5px] px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-suave hover:text-texto min-[900px]:min-h-8"
+        className="ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[7px] px-1.5 text-[11px] font-semibold uppercase tracking-[0.11em] text-suave hover:text-texto min-[900px]:min-h-8"
       >
         <Icone nome={icone} size={13} aria-hidden className="ff-nav-icone shrink-0" />
         {/* avoid-ai-design-ignore: SD4 — grupo do menu em caixa alta é pedido do contrato do shell (só aqui e no hub). */}
         <span className="min-w-0 flex-1 py-1 text-left leading-snug">{rotulo}</span>
         <ChevronDown size={14} aria-hidden className={`shrink-0 transition-transform ${aberto ? '' : '-rotate-90'}`} />
       </button>
-      {aberto && <ul className="mt-1 space-y-0.5">{children}</ul>}
+      {aberto && <ul className={`${GRADE} mt-1`}>{children}</ul>}
     </div>
   );
 }
@@ -223,57 +235,88 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
     <Popover
       rotulo={`Área: ${nome}. Trocar de área`}
       alinhar="esquerda"
-      largura="w-[280px]"
-      classeDoBotao={`ff-seletor-modulo ff-transicao flex w-full items-center gap-3 rounded-[10px] border text-left ${
+      largura="w-[300px]"
+      classeDoBotao={`ff-seletor-modulo ff-transicao flex w-full items-center gap-2.5 rounded-nav border text-left ${
         recolhido ? 'justify-center p-1.5' : 'p-2'
       }`}
       conteudoDoBotao={
         <>
-          <IconeDoModulo icone={atual?.icone ?? 'inicio'} cor={atual?.cor ?? COR.inicio} tamanho={36} />
+          <IconeDoModulo icone={atual?.icone ?? 'inicio'} cor={atual?.cor ?? COR.inicio} tamanho={recolhido ? 36 : 32} />
           {!recolhido && (
             <>
-              <span className="min-w-0 flex-1">
-                <span className="line-clamp-2 block text-[14px] font-semibold leading-tight text-texto">{nome}</span>
-                <span className="block truncate text-[12px] text-suave">{sub}</span>
+              {/* Nome e resumo quebram em linhas (nunca cortam): a lateral é estreita e o nome da área é o que diz onde se está. */}
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                <span className="block text-[13px] font-semibold leading-tight text-texto">{nome}</span>
+                <span className="mt-0.5 block text-[12px] leading-tight text-suave">{sub}</span>
               </span>
-              <ChevronsUpDown size={16} aria-hidden className="shrink-0 text-suave" />
+              <ChevronsUpDown size={14} aria-hidden className="shrink-0 text-suave" />
             </>
           )}
         </>
       }
     >
-      {(fechar) => (
-        <ul aria-label="Áreas" className="max-h-[70vh] overflow-y-auto">
-          <li>
-            <OpcaoDeModulo
-              href={nav.inicio.href}
-              nome={nav.inicio.titulo}
-              sub="Todas as áreas"
-              icone="inicio"
-              cor={COR.inicio}
-              atual={!atual}
-              aoEscolher={fechar}
-            />
-          </li>
-          {nav.modulos.map((m) => (
-            <li key={m.chave}>
-              <OpcaoDeModulo
-                href={m.href}
-                nome={m.nome}
-                sub={m.href ? (m.resumo ?? m.subtitulo) : 'Em breve'}
-                icone={m.icone}
-                cor={m.cor}
-                atual={atual?.chave === m.chave}
-                aoEscolher={fechar}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+      {(fechar) => <AreasDoSeletor nav={nav} atual={atual} aoEscolher={fechar} />}
     </Popover>
     </div>
   );
 }
+
+/**
+ * O que o seletor de áreas lista: as áreas em uso (links, a atual marcada) e, num grupo separado e com nome próprio, o
+ * catálogo "Em breve" (texto e selo). A mesma fonte do hub: `nav.modulos`.
+ */
+export function AreasDoSeletor({ nav, atual, aoEscolher }: { nav: Navegacao; atual: ModuloNav | null; aoEscolher: () => void }) {
+  const emUso = nav.modulos.filter((m) => m.href);
+  const emBreve = nav.modulos.filter((m) => !m.href);
+  const idEmBreve = useId();
+  return (
+    <div className="max-h-[70vh] overflow-y-auto">
+      <ul aria-label="Áreas">
+        <li>
+          <OpcaoDeModulo
+            href={nav.inicio.href}
+            nome={nav.inicio.titulo}
+            sub="Todas as áreas"
+            icone="inicio"
+            cor={COR.inicio}
+            atual={!atual}
+            aoEscolher={aoEscolher}
+          />
+        </li>
+        {emUso.map((m) => (
+          <li key={m.chave}>
+            <OpcaoDeModulo
+              href={m.href!}
+              nome={m.nome}
+              sub={m.resumo ?? m.subtitulo}
+              icone={m.icone}
+              cor={m.cor}
+              atual={atual?.chave === m.chave}
+              aoEscolher={aoEscolher}
+            />
+          </li>
+        ))}
+      </ul>
+      {emBreve.length > 0 && (
+        <>
+          {/* avoid-ai-design-ignore: SD4 — rótulo de grupo em caixa alta, como os grupos do menu (contrato do shell). */}
+          <p id={idEmBreve} className="mt-1.5 border-t border-linha px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.11em] text-suave">
+            Em breve
+          </p>
+          <ul aria-labelledby={idEmBreve}>
+            {emBreve.map((m) => (
+              <li key={m.chave}>
+                <OpcaoEmBreve nome={m.nome} sub={m.subtitulo} icone={m.icone} cor={m.cor} cadeado={m.cadeado} />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+const OPCAO = 'ff-identidade-modulo ff-opcao-modulo flex min-h-11 w-full items-center gap-3 rounded-[8px] px-2 py-1.5 text-left';
 
 function OpcaoDeModulo({
   href,
@@ -284,7 +327,7 @@ function OpcaoDeModulo({
   atual,
   aoEscolher,
 }: {
-  href: string | null;
+  href: string;
   nome: string;
   sub: string;
   icone: Parameters<typeof Icone>[0]['nome'];
@@ -292,34 +335,51 @@ function OpcaoDeModulo({
   atual: boolean;
   aoEscolher: () => void;
 }) {
-  const corpo = (
-    <>
-      <IconeDoModulo icone={icone} cor={cor} tamanho={32} />
-      <span className="min-w-0 flex-1">
-        <span className={`block truncate text-[14px] text-texto ${atual ? 'font-semibold' : 'font-medium'}`}>{nome}</span>
-        <span className="block truncate text-[12px] text-suave">{sub}</span>
-      </span>
-      {atual && <Check size={16} aria-hidden className="shrink-0 text-texto" />}
-    </>
-  );
-  const classe = 'ff-identidade-modulo ff-opcao-modulo flex min-h-11 w-full items-center gap-3 rounded-[8px] px-2 py-1.5 text-left';
-  const identidade = { '--cor-modulo': cor } as CSSProperties;
-  if (!href) {
-    return (
-      <div aria-disabled="true" className={classe} style={identidade}>
-        {corpo}
-      </div>
-    );
-  }
   return (
     <Link
       href={href}
       onClick={aoEscolher}
       aria-current={atual ? 'true' : undefined}
-      className={`${classe} ff-transicao`}
-      style={identidade}
+      className={`${OPCAO} ff-transicao`}
+      style={{ '--cor-modulo': cor } as CSSProperties}
     >
-      {corpo}
+      <IconeDoModulo icone={icone} cor={cor} tamanho={32} />
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+        <span className={`block text-[14px] leading-snug text-texto ${atual ? 'font-semibold' : 'font-medium'}`}>{nome}</span>
+        <span className="block text-[12px] leading-snug text-suave">{sub}</span>
+      </span>
+      {atual && <Check size={16} aria-hidden className="shrink-0 text-texto" />}
     </Link>
+  );
+}
+
+/**
+ * Módulo do catálogo ainda sem tela: nome, finalidade e o selo, como texto. Não é link nem botão, não recebe foco e não
+ * dispara nada; `aria-disabled` e o selo dizem o estado.
+ */
+function OpcaoEmBreve({
+  nome,
+  sub,
+  icone,
+  cor,
+  cadeado,
+}: {
+  nome: string;
+  sub: string;
+  icone: Parameters<typeof Icone>[0]['nome'];
+  cor: string;
+  cadeado?: boolean;
+}) {
+  return (
+    <div aria-disabled="true" className={`${OPCAO} items-start`} style={{ '--cor-modulo': cor } as CSSProperties}>
+      <IconeDoModulo icone={icone} cor={cor} tamanho={32} />
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-[14px] font-medium leading-snug text-texto">{nome}</span>
+          <SeloEmBreve cadeado={cadeado} />
+        </span>
+        <span className="mt-0.5 block text-[12px] leading-snug text-suave">{sub}</span>
+      </span>
+    </div>
   );
 }

@@ -11,10 +11,11 @@
  * mesma estrutura e nunca divergem), ação ("Novo insumo", "Lançar nota"...) =
  * `acoes` da área: fora do menu e do hub, no cabeçalho da aba e no ⌘K.
  *
- * Módulos do plano que ainda não têm tela aparecem DESABILITADOS, com a fase
- * em que chegam, e nunca com link: não existe destino que leve a uma tela que
- * não existe. Só aparecem para quem vai poder usá-los (a permissão de ver já
- * está no catálogo da 0.4).
+ * Módulos do catálogo que ainda não têm tela aparecem como "Em breve": nome,
+ * finalidade e selo, nunca com link, rota, ação, busca ou consulta — não existe
+ * destino que leve a uma tela que não existe. É um catálogo de APRESENTAÇÃO:
+ * não concede acesso, não depende de permissão (nenhuma foi criada para eles)
+ * e não promete data nem fase.
  */
 
 import { pode, type Alcance, type Permissao } from './permissoes';
@@ -60,7 +61,26 @@ export type ChaveIcone =
   | 'relatorio'
   // L.3: comparar fornecedores (duas colunas) e comparar períodos (setas nos dois sentidos).
   | 'comparar'
-  | 'periodos';
+  | 'periodos'
+  // Catálogo "Em breve" (10/11): só o desenho de cada módulo futuro; nenhum tem tela.
+  | 'crm-time'
+  | 'crm-clube'
+  | 'tvs'
+  | 'atendimento'
+  | 'consultoria'
+  | 'pedidos'
+  | 'rh'
+  | 'freelancers'
+  | 'cozinha'
+  | 'entregas'
+  | 'cameras'
+  | 'patrimonio'
+  | 'anuncios'
+  | 'contratos'
+  | 'implantacao'
+  | 'rotinas'
+  | 'supervisao'
+  | 'unidade';
 
 export interface ItemNav {
   href: string;
@@ -101,10 +121,10 @@ export interface ModuloNav {
   icone: ChaveIcone;
   /** Identidade central da área: ícone, card e menu (decisão visual de 29/10). */
   cor: string;
-  /** Primeira tela do módulo; null = ainda não construído. */
+  /** Primeira tela do módulo; null = "Em breve" (sem tela, sem abas e sem ações). */
   href: string | null;
-  /** Fase do plano em que chega (só nos não construídos). */
-  fase?: string;
+  /** Só nos "Em breve": o cadeado previsto no catálogo acompanha o selo (CRM Time e CRM Clube). */
+  cadeado?: boolean;
   /** Abas: o que o menu lista (um item = uma aba da área). */
   grupos: GrupoNav[];
   /**
@@ -139,6 +159,8 @@ export const COR = {
   clientes: '#A16207',
   parceiros: '#57534E',
   inicio: '#57534E',
+  // "Em breve" é neutro de propósito: a cor de área fica para o que já tem tela.
+  futuro: '#57534E',
 } as const;
 
 export type ChaveDeCor = keyof typeof COR;
@@ -169,14 +191,17 @@ interface DefinicaoDeArea {
   acoes: Tela[];
 }
 
-interface ModuloFuturo {
-  chave: ChaveDeCor;
+/**
+ * Módulo do catálogo ainda sem tela: só o que a apresentação mostra. De propósito não tem rota, permissão, cor de área,
+ * fase nem data — nada aqui libera, promete ou consulta.
+ */
+export interface ModuloFuturo {
+  chave: string;
   nome: string;
+  /** Finalidade, numa linha. Sem número, R$ nem %. */
   subtitulo: string;
   icone: ChaveIcone;
-  fase: string;
-  /** Aparece para quem tiver qualquer uma (é a permissão de ver o módulo). */
-  ver: Permissao[];
+  cadeado?: boolean;
 }
 
 /**
@@ -709,8 +734,31 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
   ];
 }
 
-/** Do plano (Notion "FlowFoods Barney — ERP"), ainda sem tela. 3.4: Etiquetas virou área construída (a lista ficou vazia). */
-export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [];
+/**
+ * Catálogo "Em breve" conferido em 10/11/2026: os 18 módulos do plano ainda sem tela, na ordem do catálogo. Integração NÃO
+ * entra aqui: já tem aba em Rede e Equipe, sujeita à liberação por parceiro (`liberacao.ts`). "Equipe e RH" é outro módulo,
+ * não a aba Equipe que já existe; "CRM Time" não é a gestão de acessos.
+ */
+export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
+  { chave: 'crm-time', nome: 'CRM Time', subtitulo: 'Relacionamento, cultura e treinamento da equipe', icone: 'crm-time', cadeado: true },
+  { chave: 'crm-clube', nome: 'CRM Clube', subtitulo: 'Conhecer o cliente, ouvir e cuidar do relacionamento', icone: 'crm-clube', cadeado: true },
+  { chave: 'divulgacao-em-tvs', nome: 'Divulgação em TVs', subtitulo: 'Produtos, campanhas e a marca nas TVs da loja', icone: 'tvs' },
+  { chave: 'atendimento-com-ia', nome: 'Atendimento com IA', subtitulo: 'Atendimento com a identidade e os dados autorizados de cada loja', icone: 'atendimento' },
+  { chave: 'consultoria-de-delivery', nome: 'Consultoria de Delivery', subtitulo: 'Diagnóstico, desempenho e recomendações para o delivery', icone: 'consultoria' },
+  { chave: 'pedidos-proprios', nome: 'Pedidos Próprios', subtitulo: 'Canal próprio de catálogo e pedidos', icone: 'pedidos' },
+  { chave: 'equipe-e-rh', nome: 'Equipe e RH', subtitulo: 'Cadastro funcional, cargos, setores e organização da equipe', icone: 'rh' },
+  { chave: 'freelancers', nome: 'Freelancers', subtitulo: 'Serviços, presença e acertos de quem trabalha como freelancer', icone: 'freelancers' },
+  { chave: 'pedidos-na-cozinha', nome: 'Pedidos na Cozinha (KDS)', subtitulo: 'Fila e preparo dos pedidos na cozinha', icone: 'cozinha' },
+  { chave: 'entregas', nome: 'Entregas', subtitulo: 'Rotas, distribuição e acompanhamento das entregas', icone: 'entregas' },
+  { chave: 'monitoramento-por-cameras', nome: 'Monitoramento por Câmeras', subtitulo: 'Eventos da operação observados por câmera', icone: 'cameras' },
+  { chave: 'patrimonio-e-dispositivos', nome: 'Patrimônio e Dispositivos', subtitulo: 'Equipamentos e dispositivos: manutenção, garantia e estado', icone: 'patrimonio' },
+  { chave: 'anuncios', nome: 'Anúncios', subtitulo: 'Campanhas de anúncios nas plataformas de mídia', icone: 'anuncios' },
+  { chave: 'contratos-e-royalties', nome: 'Contratos e Royalties', subtitulo: 'Parâmetros e histórico do contrato de cada unidade', icone: 'contratos' },
+  { chave: 'implantacao', nome: 'Implantação', subtitulo: 'A jornada de implantação das unidades', icone: 'implantacao' },
+  { chave: 'rotinas-e-inspecoes', nome: 'Rotinas e Inspeções', subtitulo: 'Checklists do dia a dia e inspeções por visita', icone: 'rotinas' },
+  { chave: 'supervisao-da-rede', nome: 'Supervisão da Rede', subtitulo: 'Visitas, pendências e ações das unidades', icone: 'supervisao' },
+  { chave: 'pagina-da-unidade', nome: 'Página da Unidade', subtitulo: 'O histórico de cada unidade reunido num só lugar', icone: 'unidade' },
+];
 
 /** "Seu acesso": da própria pessoa (senha, rosto, o que ela pode). Sem permissão. */
 export function telaSeuAcesso(base = '/erp'): ItemNav {
@@ -725,9 +773,9 @@ function liberada(alcance: Alcance, t: Tela) {
 /**
  * Áreas do ERP do parceiro para este alcance: as construídas com só as abas e
  * as ações que a pessoa pode (área sem nenhuma aba permitida some, e com ela
- * as ações: ação só existe dentro de uma área visível) e os módulos futuros
- * que ela vai poder ver, desabilitados. A entrada da área é a primeira aba
- * permitida.
+ * as ações: ação só existe dentro de uma área visível) e, depois delas, o
+ * catálogo "Em breve" (apresentação igual para todos: sem link, aba ou ação).
+ * A entrada da área é a primeira aba permitida.
  */
 export function modulosDoParceiro(alcance: Alcance, base: string, liberados: ReadonlySet<ModuloComLiberacao>): ModuloNav[] {
   const construidos: ModuloNav[] = [];
@@ -756,18 +804,22 @@ export function modulosDoParceiro(alcance: Alcance, base: string, liberados: Rea
       acoes: m.acoes.filter((t) => liberada(alcance, t) && (!t.modulo || liberados.has(t.modulo))).map(({ permissao: _p, tambem: _t, entradaPara: _e, modulo: _m, ...item }) => ({ ...item, area: m.nome })),
     });
   }
-  const futuros: ModuloNav[] = MODULOS_FUTUROS.filter((f) => f.ver.some((p) => pode(alcance, p))).map((f) => ({
+  return [...construidos, ...modulosEmBreve()];
+}
+
+/** O catálogo "Em breve" como módulos de navegação: sempre sem destino, sem abas e sem ações. */
+export function modulosEmBreve(): ModuloNav[] {
+  return MODULOS_FUTUROS.map((f) => ({
     chave: f.chave,
     nome: f.nome,
     subtitulo: f.subtitulo,
     icone: f.icone,
-    cor: COR[f.chave],
+    cor: COR.futuro,
     href: null,
-    fase: f.fase,
+    ...(f.cadeado ? { cadeado: true } : {}),
     grupos: [],
     acoes: [],
   }));
-  return [...construidos, ...futuros];
 }
 
 /** Navegação do /erp (pessoa do parceiro). "Seu acesso" fica no menu do usuário e no hub. */

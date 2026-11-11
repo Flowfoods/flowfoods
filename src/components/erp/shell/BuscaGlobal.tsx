@@ -169,7 +169,7 @@ export function BuscaGlobal({
             type="button"
             onClick={() => setAberta(false)}
             aria-label="Fechar a busca"
-            className="ff-transicao inline-flex min-h-11 shrink-0 items-center rounded-[7px] px-2 text-[12px] text-suave hover:bg-texto/5 hover:text-texto"
+            className="ff-transicao inline-flex min-h-11 shrink-0 items-center rounded-botao px-2 text-[12px] text-suave hover:bg-texto/5 hover:text-texto"
           >
             {/* Tecla só onde há teclado; no celular, a palavra. */}
             <span className="hidden sm:inline [@media(pointer:coarse)]:!hidden">Esc</span>
@@ -190,7 +190,7 @@ export function BuscaGlobal({
               aria-selected={n === ativo}
               onMouseEnter={() => setAtivo(n)}
               onClick={() => abrir(r)}
-              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[8px] px-3 py-1.5 aria-selected:bg-forte"
+              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[8px] px-3 py-1.5 aria-selected:bg-destaque"
             >
               <span className="w-16 shrink-0 text-[12px] text-suave">{ROTULO_DO_TIPO[r.tipo]}</span>
               <span className="min-w-0 flex-1">
