@@ -4,6 +4,10 @@ import { lerPaginaEventosV3 } from './financial-v3-eventos';
 import { lerLiquidacoesV3 } from './financial-v3-liquidacoes';
 import { lerAntecipacoesV3 } from './financial-v3-antecipacoes';
 import { lerPaginaVendasV3, type PaginaVendasV3, type VendaV3 } from './financial-v3-vendas';
+import {
+  conferirEscopoConciliacaoV3, lerConsultaConciliacaoV3, lerProtocoloConciliacaoV3,
+  requestIdConciliacaoValido, ultimoRequestIdConciliacaoV3, type ProtocoloConciliacaoV3,
+} from './financial-v3-conciliacao-resposta';
 import type { RespostaHttp, Transporte } from './transporte';
 
 type Intervalo = Readonly<{ merchantId: string; inicio: string; fim: string }>;
@@ -30,9 +34,11 @@ function conferirIntervalo(p: Intervalo): Intervalo {
 }
 
 /** O transporte é fornecido pelo chamador. A entrada desta entrega usa somente fixtures. */
-async function obter(transportar: Transporte, url: URL): Promise<RespostaHttp> {
+async function chamar(transportar: Transporte, url: URL, pedido: { metodo: 'GET' } | { metodo: 'POST'; corpo: string } = { metodo: 'GET' }): Promise<RespostaHttp> {
+  const cabecalhos: Record<string, string> = { accept: 'application/json' };
+  if (pedido.metodo === 'POST') cabecalhos['content-type'] = 'application/json';
   try {
-    return await transportar({ url: url.href, metodo: 'GET', cabecalhos: { accept: 'application/json' }, tempoMaximoMs: 15_000 });
+    return await transportar({ ...pedido, url: url.href, cabecalhos, tempoMaximoMs: 15_000 });
   } catch {
     throw new ErroConsultaFinancialV3('TRANSPORTE');
   }
@@ -55,7 +61,7 @@ export async function consultarEventosFinancialV3(entrada: Intervalo, transporta
   const eventos: ReturnType<typeof lerPaginaEventosV3>['eventos'][number][] = [];
   for (let page = 1; page <= limiteDePaginas; page++) {
     url.searchParams.set('page', String(page));
-    const pagina = lerPaginaEventosV3(corpo200(await obter(transportar, url)), { page, size: tamanho });
+    const pagina = lerPaginaEventosV3(corpo200(await chamar(transportar, url)), { page, size: tamanho });
     if (pagina.hasNextPage && !pagina.eventos.length) {
       throw new ErroConsultaFinancialV3('PAGINACAO');
     }
@@ -73,7 +79,7 @@ export async function consultarLiquidacoesFinancialV3(entrada: ConsultaLiquidaco
   const sufixo = filtro === 'APURACAO' ? 'CalculationDate' : 'PaymentDate';
   url.searchParams.set('begin' + sufixo, consulta.inicio);
   url.searchParams.set('end' + sufixo, consulta.fim);
-  const liquidacoes = lerLiquidacoesV3(corpo200(await obter(transportar, url)), consulta);
+  const liquidacoes = lerLiquidacoesV3(corpo200(await chamar(transportar, url)), consulta);
   return { filtro, liquidacoes };
 }
 
@@ -86,7 +92,7 @@ export async function consultarAntecipacoesFinancialV3(entrada: ConsultaAntecipa
   const sufixo = filtro === 'APURACAO' ? 'CalculationDate' : 'AnticipatedPaymentDate';
   url.searchParams.set('begin' + sufixo, consulta.inicio);
   url.searchParams.set('end' + sufixo, consulta.fim);
-  const antecipacoes = lerAntecipacoesV3(corpo200(await obter(transportar, url)), consulta);
+  const antecipacoes = lerAntecipacoesV3(corpo200(await chamar(transportar, url)), consulta);
   return { filtro, antecipacoes };
 }
 
@@ -108,7 +114,7 @@ export async function consultarVendasFinancialV3(entrada: Intervalo, transportar
   let paginacao: PaginacaoVendas | undefined;
   for (let page = 1; page <= limiteDePaginas; page++) {
     url.searchParams.set('page', String(page));
-    const resposta = await obter(transportar, url);
+    const resposta = await chamar(transportar, url);
     if (resposta.status === 204 && resposta.corpo === '') {
       return { estado: 'INCONCLUSIVO_204' as const, consulta, cobertura, paginaSemConteudo: page };
     }
@@ -133,4 +139,69 @@ export async function consultarVendasFinancialV3(entrada: Intervalo, transportar
     }
   }
   throw new ErroConsultaFinancialV3('PAGINACAO');
+}
+
+type EscopoConciliacao = Pick<ProtocoloConciliacaoV3, 'merchantId' | 'competencia'>;
+type SolicitacaoConciliacao =
+  | { estado: 'SOLICITADO' | 'REUTILIZADO'; protocolo: ProtocoloConciliacaoV3 }
+  | { estado: 'CONFLITO_SEM_PROTOCOLO'; consulta: EscopoConciliacao };
+
+function conferirProtocolo(protocolo: ProtocoloConciliacaoV3): ProtocoloConciliacaoV3 {
+  const escopo = conferirEscopoConciliacaoV3(protocolo);
+  if (!requestIdConciliacaoValido(protocolo.requestId)) throw new ErroConsultaFinancialV3('CONSULTA_INVALIDA');
+  return { ...escopo, requestId: protocolo.requestId };
+}
+
+function caminhoConciliacao(merchantId: string) {
+  return base + merchantId + '/reconciliation/on-demand';
+}
+
+/** Envia um POST. Um conflito só permite retomar o protocolo conhecido desta mesma loja e mês. */
+export async function solicitarConciliacaoFinancialV3(
+  entrada: EscopoConciliacao, transportar: Transporte, anterior?: ProtocoloConciliacaoV3,
+): Promise<SolicitacaoConciliacao> {
+  const consulta = conferirEscopoConciliacaoV3(entrada);
+  const conhecido = anterior === undefined ? undefined : conferirProtocolo(anterior);
+  if (conhecido && (conhecido.merchantId !== consulta.merchantId || conhecido.competencia !== consulta.competencia)) {
+    throw new ErroConsultaFinancialV3('CONSULTA_INVALIDA');
+  }
+  const resposta = await chamar(transportar, new URL(caminhoConciliacao(consulta.merchantId)), {
+    metodo: 'POST', corpo: JSON.stringify({ competence: consulta.competencia }),
+  });
+  if (resposta.status === 409) {
+    const informado = ultimoRequestIdConciliacaoV3(resposta.corpo, consulta);
+    if (conhecido && (informado === null || conhecido.requestId === informado)) {
+      return { estado: 'REUTILIZADO', protocolo: conhecido };
+    }
+    return { estado: 'CONFLITO_SEM_PROTOCOLO', consulta };
+  }
+  if (resposta.status !== 200 && resposta.status !== 202) throw new ErroConsultaFinancialV3('HTTP', resposta.status);
+  return { estado: 'SOLICITADO', protocolo: lerProtocoloConciliacaoV3(resposta.corpo, consulta) };
+}
+
+/** O primeiro GET é imediato. A espera segue o exemplo do guia e termina dentro da janela de 30 minutos. */
+export async function acompanharConciliacaoFinancialV3(
+  entrada: ProtocoloConciliacaoV3, transportar: Transporte, esperar: (ms: number) => Promise<void>,
+  agora: () => number = () => performance.now(),
+) {
+  const protocolo = conferirProtocolo(entrada);
+  const url = new URL(caminhoConciliacao(protocolo.merchantId) + '/' + encodeURIComponent(protocolo.requestId));
+  const janelaMs = 30 * 60_000;
+  const inicio = agora();
+  let intervaloMs = 30_000;
+  let esperaAcumuladaMs = 0;
+  // O ensaio pode simular a pausa sem avançar o relógio do processo.
+  const tempoDecorrido = () => Math.max(agora() - inicio, esperaAcumuladaMs);
+  for (let consultas = 1; ; consultas++) {
+    const resposta = await chamar(transportar, url);
+    if (resposta.status === 404) return { estado: 'PROTOCOLO_INDISPONIVEL' as const, protocolo, consultas };
+    if (resposta.status !== 200 && resposta.status !== 202) throw new ErroConsultaFinancialV3('HTTP', resposta.status);
+    const leitura = lerConsultaConciliacaoV3(resposta.status, resposta.corpo, protocolo);
+    const resultado = { ...leitura, protocolo, consultas };
+    if (leitura.estado !== 'PROCESSANDO' || tempoDecorrido() + intervaloMs >= janelaMs) return resultado;
+    await esperar(intervaloMs);
+    esperaAcumuladaMs += intervaloMs;
+    if (tempoDecorrido() >= janelaMs) return resultado;
+    intervaloMs = Math.min(60_000, intervaloMs * 1.5);
+  }
 }

@@ -1,6 +1,7 @@
 /** Ensaio local das consultas Financial com respostas fictícias independentes. */
 import {
   consultarAntecipacoesFinancialV3, consultarEventosFinancialV3, consultarLiquidacoesFinancialV3, consultarVendasFinancialV3,
+  solicitarConciliacaoFinancialV3, acompanharConciliacaoFinancialV3,
 } from '../src/lib/integracoes/ifood/financial-v3-consultas';
 import type { Transporte } from '../src/lib/integracoes/ifood/transporte';
 
@@ -50,13 +51,38 @@ const respostasFicticias: Transporte = async pedido => {
   return { status: 200, cabecalhos: {}, corpo: JSON.stringify(corpo) };
 };
 
+async function simularProtocoloMensal() {
+  const consulta = { merchantId: intervalo.merchantId, competencia: '2026-02' };
+  const requestId = '00000000-0000-4000-8000-000000000002';
+  const rota = '/financial/v3.0/merchants/' + consulta.merchantId + '/reconciliation/on-demand';
+  let leituras = 0;
+  const transporte: Transporte = async pedido => {
+    const caminho = new URL(pedido.url).pathname;
+    const eco = { merchantId: consulta.merchantId, competence: consulta.competencia };
+    if (pedido.metodo === 'POST' && caminho === rota) {
+      return { status: 200, cabecalhos: {}, corpo: JSON.stringify({ ...eco, requestId }) };
+    }
+    if (pedido.metodo !== 'GET' || caminho !== rota + '/' + requestId) throw new Error('Protocolo fora do cenário.');
+    if (++leituras === 1) return { status: 202, cabecalhos: {}, corpo: '' };
+    const corpo = leituras === 2 ? { ...eco, id: requestId, status: 'enqueue' }
+      : { ...eco, id: requestId, status: 'processed', downloadPath: 'https://example.invalid/conciliacao.csv.gz' };
+    return { status: 200, cabecalhos: {}, corpo: JSON.stringify(corpo) };
+  };
+  const solicitacao = await solicitarConciliacaoFinancialV3(consulta, transporte);
+  if (solicitacao.estado === 'CONFLITO_SEM_PROTOCOLO') throw new Error('Protocolo ausente no cenário.');
+  const esperasSimuladasMs: number[] = [];
+  const acompanhamento = await acompanharConciliacaoFinancialV3(solicitacao.protocolo, transporte, async ms => { esperasSimuladasMs.push(ms); });
+  return { solicitacao: solicitacao.estado, acompanhamento, esperasSimuladasMs };
+}
+
 async function executar() {
   if (process.argv.length > 2) throw new Error('Use npm run integracao:financial-simular sem argumentos.');
   const eventos = await consultarEventosFinancialV3(intervalo, respostasFicticias);
   const liquidacoes = await consultarLiquidacoesFinancialV3({ ...intervalo, filtro: 'APURACAO' }, respostasFicticias);
   const antecipacoes = await consultarAntecipacoesFinancialV3({ ...intervalo, filtro: 'PAGAMENTO_ANTECIPADO' }, respostasFicticias);
   const vendas = await consultarVendasFinancialV3(intervalo, respostasFicticias);
-  console.log(JSON.stringify({ origem: 'SIMULACAO', moedaDoCenario: 'BRL', eventos, liquidacoes, antecipacoes, vendas },
+  const conciliacao = await simularProtocoloMensal();
+  console.log(JSON.stringify({ origem: 'SIMULACAO', moedaDoCenario: 'BRL', eventos, liquidacoes, antecipacoes, vendas, conciliacao },
     (_chave, valor) => typeof valor === 'bigint' ? valor.toString() : valor, 2));
 }
 
