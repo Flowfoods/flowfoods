@@ -1,4 +1,6 @@
 /** Ensaio local das consultas Financial com respostas fictícias independentes. */
+import { gzipSync } from 'node:zlib';
+import { lerArquivoConciliacaoV3 } from '../src/lib/integracoes/ifood/financial-v3-arquivo';
 import {
   consultarAntecipacoesFinancialV3, consultarEventosFinancialV3, consultarLiquidacoesFinancialV3, consultarVendasFinancialV3,
   solicitarConciliacaoFinancialV3, acompanharConciliacaoFinancialV3,
@@ -72,7 +74,16 @@ async function simularProtocoloMensal() {
   if (solicitacao.estado === 'CONFLITO_SEM_PROTOCOLO') throw new Error('Protocolo ausente no cenário.');
   const esperasSimuladasMs: number[] = [];
   const acompanhamento = await acompanharConciliacaoFinancialV3(solicitacao.protocolo, transporte, async ms => { esperasSimuladasMs.push(ms); });
-  return { solicitacao: solicitacao.estado, acompanhamento, esperasSimuladasMs };
+  const csv = [
+    'valor;competencia;pedido_associado_ifood;loja_id;impacto_no_repasse',
+    ['30.00', consulta.competencia, 'pedido-simulado', consulta.merchantId, 'SIM'].join(';'),
+    ['-3.00', consulta.competencia, 'pedido-simulado', consulta.merchantId, 'SIM'].join(';'),
+    ['4.00', consulta.competencia, '', consulta.merchantId, 'NAO'].join(';'),
+  ].join('\r\n');
+  const arquivo = await lerArquivoConciliacaoV3(acompanhamento, {
+    protocolo: solicitacao.protocolo, bytes: gzipSync(csv), totaisInformados: { linhas: 3, pedidos: 1 },
+  });
+  return { solicitacao: solicitacao.estado, acompanhamento, esperasSimuladasMs, arquivo };
 }
 
 async function executar() {
