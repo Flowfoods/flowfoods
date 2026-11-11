@@ -2,10 +2,12 @@ import { lerIdDaLojaIfood } from '../core/campos';
 import { diaDoPainelValido } from './painel-campos';
 import { lerPaginaEventosV3 } from './financial-v3-eventos';
 import { lerLiquidacoesV3 } from './financial-v3-liquidacoes';
+import { lerAntecipacoesV3 } from './financial-v3-antecipacoes';
 import type { Transporte } from './transporte';
 
 type Intervalo = Readonly<{ merchantId: string; inicio: string; fim: string }>;
 export type ConsultaLiquidacoesV3 = Intervalo & { readonly filtro: 'APURACAO' | 'PAGAMENTO' };
+export type ConsultaAntecipacoesV3 = Intervalo & { readonly filtro: 'APURACAO' | 'PAGAMENTO_ANTECIPADO' };
 const base = 'https://merchant-api.ifood.com.br/financial/v3.0/merchants/';
 const tamanho = 100; // Tamanho padrão da referência v3 para Events.
 const limiteDePaginas = 100; // Limite local por execução.
@@ -69,4 +71,17 @@ export async function consultarLiquidacoesFinancialV3(entrada: ConsultaLiquidaco
   url.searchParams.set('end' + sufixo, consulta.fim);
   const liquidacoes = lerLiquidacoesV3(await obter(transportar, url), consulta);
   return { filtro, liquidacoes };
+}
+
+/** Uma resposta à consulta de antecipações. O contrato consultado não comprova cobertura do intervalo. */
+export async function consultarAntecipacoesFinancialV3(entrada: ConsultaAntecipacoesV3, transportar: Transporte) {
+  const consulta = conferirIntervalo(entrada);
+  const filtro = entrada.filtro;
+  if (filtro !== 'APURACAO' && filtro !== 'PAGAMENTO_ANTECIPADO') throw new ErroConsultaFinancialV3('CONSULTA_INVALIDA');
+  const url = new URL(base + consulta.merchantId + '/anticipations');
+  const sufixo = filtro === 'APURACAO' ? 'CalculationDate' : 'AnticipatedPaymentDate';
+  url.searchParams.set('begin' + sufixo, consulta.inicio);
+  url.searchParams.set('end' + sufixo, consulta.fim);
+  const antecipacoes = lerAntecipacoesV3(await obter(transportar, url), consulta);
+  return { filtro, antecipacoes };
 }

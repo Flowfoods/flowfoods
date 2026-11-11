@@ -2,9 +2,9 @@
 
 Recorte das INT-2.2/2.3: domínio, normalização monetária e comparação pura de eventos com impacto no repasse versus liquidação. Não encerra as INT-2.2–2.4, nem a integração Financial.
 
-As únicas entradas aceitas têm `origem: SIMULACAO`. Essa marca é uma exigência do contrato, não uma verificação da proveniência de qualquer dado que alguém forneça. Usar exclusivamente cenários sintéticos. Não importar dados reais.
+O comparador aceita entradas com `origem: SIMULACAO`. Os leitores v3 recebem o JSON do contrato de cada operação. O comando local exercita ambos os formatos de envelope com respostas sintéticas e identifica a saída como simulação.
 
-Os módulos não chamam HTTP, OAuth, banco, worker, UI, DRE ou Home. Não concedem acesso, homologam apps, ativam lojas, criam receita, substituem taxas nem alteram/reabrem períodos. A comparação pode ser compatível em uma simulação sem comprovar conciliação operacional, pagamento ou crédito bancário.
+O comparador opera em memória. As consultas v3 usam o transporte injetado pelo chamador, e a demonstração fornece respostas em memória. O acesso por loja, a homologação e a conciliação operacional dependem de etapas próprias.
 
 ## Autoridade e fontes
 
@@ -35,7 +35,7 @@ Não há ID único de evento comprovado neste recorte. Nome, gatilho e valor igu
 
 `decimalFinancialEmCentavos` aceita decimal textual assinado com ponto, sem espaços, expoente, vírgula, sinal `+` ou zeros inteiros à esquerda. Converte diretamente para `bigint`. Frações além de duas casas só são aceitas quando todas as casas extras são zero (`1.2300` → 123 centavos); `1.005` é recusado sem arredondar. Null/ausência não entram nessa função: os normalizadores conservam null.
 
-Limites defensivos locais: 80 caracteres por valor decimal e 10.000 eventos por cenário. Não são limites da API, teto comercial ou declaração de retenção. Não se usa o parser monetário numérico de Analytics. Percentuais de taxa também não são tratados como dinheiro: normalização/cálculo de taxas não fazem parte deste recorte.
+Limites defensivos locais: 80 caracteres por valor decimal e 10.000 eventos por cenário. Não são limites da API, teto comercial ou declaração de retenção. Não se usa o parser monetário numérico de Analytics. O comparador não calcula taxas. O leitor de antecipações preserva o percentual informado pelo provedor.
 
 Somente eventos com impacto explicitamente `true` são somados. `false` exclui o evento do repasse e preserva seu valor ausente, se houver. Impacto null ou valor null em evento com impacto tornam o total inelegível. Nomes futuros não são classificados por inferência.
 
@@ -58,18 +58,19 @@ Saída em `bigint` não é JSON serializável diretamente. Um consumidor futuro 
 
 O plano de implementação fornecido registra uma diferença a confirmar nos futuros adaptadores: Sales por criação da venda e liquidações por apuração. Isso não foi revalidado integralmente nos contratos atuais nesta entrega. Não comparar períodos recentes só porque compartilham datas aparentes. Este contrato exige competência explícita e deixa apuração pendente sem concluir. Não altera preço, custo, taxa configurada, estimativa, receita, recebível, repasse, crédito bancário ou período do ERP.
 
-Para avançar à conciliação com dados reais, comprovar moeda, escopo do merchant, produto, cobertura temporal e encerramento da apuração para as duas fontes. Confirmar também a base percentual. Sales, Anticipation e Reconciliation têm contratos próprios a conferir. TEST oficial, homologação e autorização por loja seguem etapas específicas do plano.
+Para avançar à conciliação com dados reais, comprovar moeda, escopo do merchant, produto, cobertura temporal e encerramento da apuração para as duas fontes. Confirmar também a base percentual. Sales e Reconciliation têm contratos próprios a conferir. TEST oficial, homologação e autorização por loja seguem etapas específicas do plano.
 
 ## Leitura do Financial v3
 
-Os adaptadores consultam Financial Events e Settlements por merchant com o transporte fornecido pelo chamador. O comando `npm run integracao:financial-simular` executa o percurso completo com respostas sintéticas em memória. Mostra os eventos de duas páginas e uma liquidação por apuração. Valores em centavos aparecem como strings decimais na saída JSON. A versão e os campos foram conferidos em 10/11/2026 na [referência oficial Financial v3.0](https://developer.ifood.com.br/es-CO/docs/references#financial).
+As consultas de Financial Events, Settlements e Anticipations recebem o transporte do chamador. O comando `npm run integracao:financial-simular` percorre duas páginas de eventos, uma liquidação por apuração e uma antecipação por data de pagamento antecipado. Os três cenários usam respostas sintéticas em memória. A saída JSON serializa centavos como strings de inteiros. Os parâmetros e campos foram conferidos na [referência oficial Financial v3.0](https://developer.ifood.com.br/es-CO/docs/references#financial).
 
 | Operação GET em `/financial/v3.0/merchants/{merchantId}` | Consulta e resposta observadas |
 | --- | --- |
 | `/financial-events` | O adaptador informa `beginDate`, `endDate`, `page` a partir de 1 e `size=100`. O intervalo inclui até 33 datas civis. A referência também documenta o filtro opcional `idSaldo`. O modelo `FinancialEventsResponse` exige `page`, `size`, `hasNextPage` e `financialEvents`. O leitor confere os metadados da página solicitada e conserva as ocorrências. |
 | `/settlements` | A consulta informa o par de datas de pagamento (`beginPaymentDate/endPaymentDate`) ou de apuração (`beginCalculationDate/endCalculationDate`). O modelo `ListTransferResponse` exige `beginDate`, `endDate`, `merchantId`, `balance` e `settlements`. O leitor verifica o merchant e as datas retornadas. |
+| `/anticipations` | Por apuração, usa `beginCalculationDate/endCalculationDate`. Por pagamento antecipado, usa `beginAnticipatedPaymentDate/endAnticipatedPaymentDate`. O modelo `ListAnticipationsResponse` exige `beginDate`, `endDate`, `merchantId`, `balance` e `settlements`. O leitor confere o merchant e o intervalo devolvidos. |
 
-Em ambas as operações, o schema expandido apresenta um objeto. O exemplo 200 da mesma referência envolve esse objeto em uma lista. Os leitores identificam as duas representações e aceitam uma lista com exatamente um envelope. Uma lista vazia ou com vários envelopes produz erro de contrato. Cabe confirmar a forma retornada no ambiente TEST para cada consulta.
+Nas três operações, o schema expandido apresenta um objeto. O exemplo 200 da mesma referência envolve esse objeto em uma lista. Os leitores identificam as duas representações e aceitam uma lista com exatamente um envelope. Uma lista vazia ou com vários envelopes produz erro de contrato. Cabe confirmar a forma retornada no ambiente TEST para cada consulta.
 
 Nos eventos, `amount.value` é texto decimal assinado e `hasTransferImpact` indica impacto no repasse. Competência e período conservam o significado recebido. O identificador de referência pode pertencer ao pedido. Ocorrências iguais permanecem distintas. A página final encerra a navegação da consulta. Identidade de negócio, moeda e encerramento do mês exigem evidência adicional.
 
@@ -79,8 +80,16 @@ HTTP diferente de 200, falha de transporte, escopo divergente e paginação inco
 
 O registro de um título `SUCCEED` descreve o estado enviado pelo provedor. A comparação com crédito bancário depende da evidência desse crédito. Para levar as leituras ao comparador do PR49, é preciso demonstrar a correspondência entre eventos, produto, competência, consolidação e saldo. Nesta entrega o comando exibe os valores recebidos na simulação e mantém essas verificações pendentes.
 
+### Antecipações
+
+Em `settlements[].closingItems[]`, cada título conserva seu tipo, estado, datas original e antecipada e os valores informados. `originalPaymentAmount`, `anticipatedPaymentAmount` e `feeAmount` são valores monetários e seguem a conversão exata para centavos. `feePercentage` é um percentual. A saída `taxaPercentual` preserva sua representação numérica original em texto, inclusive casas decimais e notação exponencial. Na simulação, a taxa de R$ 0,10 resulta em `taxaCentavos: "10"` e o percentual de 0,125% em `taxaPercentual: "0.125"`.
+
+A ausência de um valor fica explícita. Um grupo com lista vazia é distinguível de um grupo que omitiu os títulos. Saldo, grupos e valores dos títulos permanecem separados. O merchant do envelope identifica a consulta. A atribuição contábil do saldo a uma loja e a um produto depende de evidência adicional de consolidação e moeda. O cálculo de uma taxa efetiva depende da confirmação de sua base. Cada título conserva as datas do provedor, mesmo quando o período da consulta se refere a outra dimensão.
+
+A consulta lê uma resposta e informa `cobertura: "NAO_COMPROVADA"`. A referência v3 apresenta filtros de datas. O guia de homologação exige paginação e suporte a D+1 e D+7. O comportamento de paginação, a cobertura do período e os dois regimes aguardam verificação em TEST. [Critérios oficiais de homologação](https://developer.ifood.com.br/en-US/docs/food/guides/modules/financial/homologation)
+
 ## Verificação
 
-Para conferir os dois leitores, a precisão do JSON e as consultas por transporte simulado, execute `npm test -- tests/ifood-financial-v3-consultas.test.ts tests/ifood-financial-v3-eventos.test.ts tests/ifood-financial-v3-liquidacoes.test.ts`. O comando cobre fronteiras de data e dinheiro, falha em página intermediária e preservação dos títulos. A demonstração pelo comando `integracao:financial-simular` usa as mesmas funções de consulta.
+Para conferir os três leitores, a precisão do JSON e as consultas por transporte simulado, execute `npm test -- tests/ifood-financial-v3-consultas.test.ts tests/ifood-financial-v3-eventos.test.ts tests/ifood-financial-v3-liquidacoes.test.ts tests/ifood-financial-v3-antecipacoes.test.ts`. O comando cobre fronteiras de data e dinheiro, percentuais, falha em página intermediária de eventos e preservação dos títulos. A demonstração pelo comando `integracao:financial-simular` usa as mesmas funções de consulta.
 
 `npm test -- tests/ifood-financial-dominio.test.ts` executa os casos sintéticos: precisão, negativos, ausência, limites, identidade/origem, fontes não intercambiáveis, impacto, ocorrências iguais, cobertura/apuração, fronteira de 0,01%, zero, valor grande e imutabilidade. Não necessita de banco nem rede. Esses testes não aprovam o portão ERP nem demonstram integração ou operação real.
