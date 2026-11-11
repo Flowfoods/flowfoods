@@ -24,7 +24,7 @@ const erpEscuro = variaveis(tokens, ".ff-app[data-tema='escuro'] {", 'ff-');
 const erpSistema = variaveis(tokens, ".ff-app[data-tema='sistema'] {", 'ff-');
 const siteEscuro = variaveis(globais, 'body:has(.ff-site) {', 'site-');
 
-describe('decisão 476 · uma paleta escura só', () => {
+describe('decisão 476 (revista em 11/11/2026) · paletas escuras travadas: os dois escuros do ERP iguais, o site à parte', () => {
   it('o escuro escolhido e o escuro do sistema no ERP são iguais, variável por variável', () => {
     expect(Object.keys(erpEscuro).length).toBeGreaterThan(20);
     expect(erpSistema).toEqual(erpEscuro);

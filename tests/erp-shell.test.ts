@@ -392,6 +392,27 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
     expect(slugNoCaminho('/rodolfo/erp')).toBeNull();
   });
 
+  it('dentro de um parceiro, o seletor do nível 1 ganha o catálogo "Em breve" do ERP dele (a mesma fonte do hub); fora, não', () => {
+    const nav = navegacaoDoNivel1();
+    const parceiros = [{ slug: 'valentins', nome: "Grupo Valentin's" }];
+    // Fora de um parceiro: só Comercial, Clientes e Parceiros Flow, todos com tela.
+    expect(nav.modulos.every((m) => m.href)).toBe(true);
+    expect(comParceiroAtual(nav, '/rodolfo/leads', parceiros).modulos.filter((m) => !m.href)).toEqual([]);
+    for (const caminho of ['/rodolfo/erp/valentins', '/rodolfo/erp/valentins/insumos']) {
+      const dentro = comParceiroAtual(nav, caminho, parceiros);
+      expect(dentro.modulos.filter((m) => m.href).map((m) => m.chave)).toEqual(['comercial', 'clientes', 'parceiros']);
+      const emBreve = dentro.modulos.filter((m) => !m.href);
+      // O mesmo catálogo do hub do parceiro, na mesma ordem, sempre depois dos módulos com tela.
+      expect(emBreve).toEqual(modulosDoParceiro(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins', TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => !m.href));
+      expect(emBreve.map((m) => m.nome)).toEqual(NOMES_EM_BREVE);
+      expect(dentro.modulos.slice(-18)).toEqual(emBreve);
+      // Continuam fora da busca, das abas e do item ativo.
+      const naBusca = [...telasDaNavegacao(dentro), ...acoesDaNavegacao(dentro)];
+      for (const nome of NOMES_EM_BREVE) expect(naBusca.some((t) => t.rotulo === nome || t.modulo === nome), nome).toBe(false);
+      expect(itemAtivo(dentro, '/rodolfo/erp/valentins/crm-clube')?.item.rotulo).toBe('Áreas da Rede');
+    }
+  });
+
   it('item ativo é o de maior prefixo (detalhe acende a lista; tela do parceiro acende a do parceiro)', () => {
     const nav = navegacaoDoNivel1();
     expect(itemAtivo(nav, '/rodolfo/leads/abc')?.item.rotulo).toBe('Leads');

@@ -276,7 +276,7 @@ export function TelaContagem({
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar insumo"
           autoComplete="off"
-          className="ff-transicao block min-h-12 w-full rounded-[7px] border border-linha-forte bg-campo px-3 text-base text-texto placeholder:text-suave/70 hover:border-texto/30"
+          className="ff-transicao block min-h-12 w-full rounded-[7px] border border-linha-forte bg-campo px-3 text-base text-texto placeholder:text-suave hover:border-texto/30"
         />
         <div role="tablist" aria-label="O que mostrar" className="grid grid-cols-3 gap-1 rounded-[10px] border border-linha bg-painel p-1">
           {(
@@ -402,7 +402,7 @@ function ItemContavel({
   const erroSolto = l.erros.solto ?? (lido.ok ? undefined : lido.erros.solto);
   const descritores = [`${idBase}-conta`, erroEmb ? `${idBase}-erro-emb` : '', erroSolto ? `${idBase}-erro-solto` : ''].filter(Boolean).join(' ');
   const campo =
-    'ff-transicao block h-12 rounded-[7px] border border-linha-forte bg-campo px-3 text-right text-lg font-semibold tabular-nums text-texto placeholder:font-normal placeholder:text-suave/60 hover:border-texto/30 disabled:opacity-60 aria-[invalid=true]:border-erro';
+    'ff-transicao block h-12 rounded-[7px] border border-linha-forte bg-campo px-3 text-right text-lg font-semibold tabular-nums text-texto placeholder:font-normal placeholder:text-suave hover:border-texto/30 disabled:opacity-60 aria-[invalid=true]:border-erro';
   return (
     <li className="px-4 py-3.5">
       <div className="flex min-h-10 items-center justify-between gap-3">

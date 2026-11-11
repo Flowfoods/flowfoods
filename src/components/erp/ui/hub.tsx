@@ -54,9 +54,15 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
     </>
   );
   if (!c.href) {
+    // "Em breve": nome e finalidade inteiros em qualquer largura (quebram em linhas; nada de reticências nem de corte em 3
+    // linhas, que é só do card de área no celular, onde a área abre a tela que explica o resto).
     return (
       <div aria-disabled="true" className={CAIXA} style={identidade}>
-        {cabeca}
+        <IconeDoModulo icone={c.icone} cor={c.cor} tamanho={40} />
+        <span className="mt-3 block min-w-0">
+          <span className="block text-[14px] font-semibold leading-snug text-texto [overflow-wrap:anywhere] sm:text-[15px]">{c.nome}</span>
+          <span className="mt-0.5 block text-[13px] leading-snug text-suave [text-wrap:pretty]">{c.subtitulo}</span>
+        </span>
         <SeloEmBreve cadeado={c.cadeado} className="mt-3" />
       </div>
     );

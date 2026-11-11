@@ -185,6 +185,12 @@ describe('padrão visual · geometria', () => {
   it('os componentes compartilhados usam os raios nomeados', () => {
     expect(classeDeBotao('primario')).toContain('rounded-botao');
     expect(classeDeBotao('primario')).toContain('bg-acao text-sobre-acao');
+    // Sob o ponteiro o botão de perigo usa o par aprovado do vermelho (texto ≥ 4,5:1 onde quer que o botão esteja).
+    expect(classeDeBotao('perigo')).toContain('text-erro hover:bg-destaque');
+    expect(classeDeBotao('perigo')).not.toMatch(/bg-erro\//);
+    // Texto de exemplo do campo: a cor secundária inteira, nunca atenuada.
+    expect(CAMPO).toContain('placeholder:text-suave ');
+    expect(CAMPO).not.toMatch(/placeholder:text-suave\//);
     expect(CAMPO).toContain('rounded-campo');
     expect(renderToStaticMarkup(createElement(Painel, { titulo: 'Painel', children: 'x' }))).toMatch(/^<section class="min-w-0 rounded-cartao border border-linha bg-painel /);
     expect(regra('.ff-app dialog.ff-dialogo')).toContain('border-radius: var(--ff-raio-modal)');
@@ -213,14 +219,22 @@ describe('padrão visual · geometria', () => {
   it('grade lateral: no máximo duas colunas, coluna mínima em `em` (acompanha o texto) e nome que quebra em vez de cortar', () => {
     const grade = regra('.ff-app .ff-nav-grade');
     expect(grade).toContain('display: grid');
-    expect(grade).toMatch(/grid-template-columns: repeat\(auto-fill, minmax\(min\(100%, max\(8\.4em, calc\(50% - 3px\)\)\), 1fr\)\);/);
+    expect(grade).toMatch(/grid-template-columns: repeat\(auto-fill, minmax\(min\(100%, max\(8\.1em, calc\(50% - 3px\)\)\), 1fr\)\);/);
     expect(regra(".ff-app .ff-nav-grade[data-recolhido='true']")).toContain('grid-template-columns: minmax(0, 1fr)');
     expect(regra('.ff-app .ff-nav-rotulo')).toContain('overflow-wrap: anywhere');
-    // Ativo por forma (preenchido + contorno) e peso, além da cor da área.
+    // Ativo por forma (preenchido + contorno na tinta da área) e peso, além da cor.
     const ativo = regra(".ff-app .ff-nav-item[aria-current='page']");
     expect(ativo).toContain('background-color: var(--ff-modulo-realce)');
-    expect(ativo).toContain('border-color: var(--ff-modulo-borda)');
+    expect(ativo).toContain('border-color: var(--ff-modulo-tinta)');
     expect(ativo).toContain('font-weight: 600');
+    // O contorno é elemento essencial da seleção: ≥ 3:1 sobre a superfície da lateral, em toda área e nos dois temas.
+    for (const [tema, t] of [['claro', CLARO], ['escuro', ESCURO]] as const) {
+      const tinta = parseFloat(t['icone-tinta']) / 100;
+      for (const [nome, cor] of Object.entries(COR)) {
+        const contorno = hex(cor.toLowerCase()).map((n, i) => n * tinta + canais(t.texto)[i] * (1 - tinta)) as RGB;
+        expect(contraste(contorno, canais(t.lateral)), `${tema}/${nome}`).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 });
 
@@ -325,8 +339,10 @@ describe('padrão visual · selo "Em breve"', () => {
       expect(h).toContain('Em breve');
       expect(h).not.toMatch(/<a[ >]|<button|href=|tabindex|role=/);
     }
-    expect(simples).not.toContain('Bloqueado');
-    expect(comCadeado).toContain('<span class="sr-only">Bloqueado. </span>');
+    // O texto descreve o ícone; não afirma bloqueio de acesso (o catálogo não é falta de permissão nem de liberação).
+    expect(simples).not.toContain('cadeado');
+    expect(comCadeado).toContain('<span class="sr-only">Com cadeado. </span>');
+    expect(comCadeado).not.toMatch(/Bloqueado|Sem acesso|Não liberado/);
     expect(comCadeado).toContain('aria-hidden="true"');
   });
 });

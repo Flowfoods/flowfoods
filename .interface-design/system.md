@@ -75,8 +75,9 @@ alta só no rótulo de seção do hub e nos grupos do menu.
 
 ## Espaço e raio
 
-Base 4 px: 4 · 8 · 12 · 16 · 24 · 32. Conteúdo com 24 px de respiro (16 no
-celular); painel com 16/20. Raios nomeados (tokens `--ff-raio-*`, classes
+Base 4 px: 4 · 8 · 12 · 16 · 24 · 32. Conteúdo com 16/24/32 px de respiro
+(celular/tablet/desktop), a escala que as telas e as barras fixas dos
+formulários já usam; painel com 16/20. Raios nomeados (tokens `--ff-raio-*`, classes
 `rounded-cartao|modal|popover|nav|botao|campo`): cartão 16, modal e gaveta 19,
 popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 (quadrado do ícone 40, segmentado).
@@ -85,29 +86,36 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 
 - **Menu lateral** 232 px (68 recolhido), altura total, borda direita, na cor
   da superfície. Os itens formam uma **grade compacta** de ícone + nome
-  (12 px), em **duas colunas quando o nome cabe**: a coluna mínima é 8,4em
+  (12 px), em **duas colunas quando o nome cabe**: a coluna mínima é 8,1em
   (o maior nome sem partir palavra) e no máximo metade da largura, então a
   grade cai para uma coluna sozinha se o texto crescer. Nome nunca cortado
   (quebra em linhas; a célula cresce, mínimo 64 px). Ativo = célula preenchida
-  com contorno + peso 600, na tinta da área. A largura de 232 px ficou: a de
-  referência (142 px) não comporta os nomes reais das áreas sem partir palavra.
+  com contorno na tinta da área (≥ 3:1) + peso 600. A largura de 232 px ficou:
+  a de referência (142 px) só comporta duas colunas com nomes curtos; os nomes
+  reais das áreas ("Movimentações", 92 px) pediriam uma coluna só. Barra de
+  rolagem fina: as duas colunas cabem também com a barra clássica.
   Seletor de área no topo; grupos com botão `aria-expanded`; fase no rodapé.
   < 900 px: gaveta com a mesma grade.
 - **Seletor de áreas** lista as áreas em uso (links, a atual marcada) e, num
   grupo separado e nomeado, o catálogo **"Em breve"**: nome, finalidade e selo,
-  como texto. Nunca link, botão, foco, busca ou consulta.
+  como texto. Nunca link, botão, foco, busca ou consulta. Vale no `/erp` e no
+  nível 1 dentro de um parceiro (a mesma fonte do hub dele); fora de um
+  parceiro o seletor do nível 1 não lista futuros. Na gaveta do celular o
+  painel fica na largura dela.
 - **Barra superior** 64 px, na cor da superfície, borda inferior, sem blur.
 - **Botão** 40 px (44 no celular), padding 16, raio 10, 14 px/600. Um
   primário por tela. Variantes: primario (texto `sobre-acao`), secundario (na
-  cor da superfície), perigo, fantasma (`classeDeBotao`).
+  cor da superfície), perigo (sob o ponteiro, `destaque`), fantasma
+  (`classeDeBotao`).
 - **Campo** 42 px (44 no celular, fonte 16 px), raio 9, borda `linha-forte`,
   fundo `campo`, rótulo persistente 13 px/500, erro embaixo ligado por
-  `aria-describedby`.
+  `aria-describedby`. Texto de exemplo em `suave` inteiro (a 70 % caía a 3:1).
 - **Card** borda `linha`, raio 16, cabeçalho 48 px com título 14 px/600,
   corpo 16/20.
 - **Selo** sempre sobre a superfície (opaco: o contraste da palavra não
   depende de onde pousa); `cheio` usa o fundo do par (`ok-fundo`,
-  `atencao-fundo`, `destaque`).
+  `atencao-fundo`, `destaque`). Palavra de estado solta (`ok`, `atencao`) vai
+  sobre `fundo` ou `painel`, nunca sobre `forte` (4,4:1 e 4,2:1 no claro).
 - **Histórico** wrapper `HistoricoRecolhivel` sobre os registros já autorizados:
   fechado ao entrar, voltar, restaurar cache ou trocar pessoa/parceiro/visão/objeto;
   preserva expansão ao filtrar/atualizar a mesma consulta. `summary` nativo,
@@ -125,8 +133,9 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 - **Hub** grade 4 (≥ 1280) e 2 no tablet e no celular; card com ícone, nome
   15/600, subtítulo 13; no celular, compacto (nome 14, descrição em até 3
   linhas, sem os links das abas). O catálogo **"Em breve"** é a última seção,
-  depois das áreas e dos indicadores: card neutro e tracejado, com nome,
-  finalidade e o selo (mais o cadeado em CRM Time e CRM Clube), sem link. Com
+  depois das áreas e dos indicadores: card neutro e tracejado, com nome e
+  finalidade inteiros (sem reticências nem corte de linhas) e o selo (mais o
+  cadeado em CRM Time e CRM Clube, lido como "Com cadeado"), sem link. Com
   uma loja escolhida a Home analítica toma o lugar do hub e o catálogo fica só
   no seletor de áreas.
 - **Caixa "Como funciona"** dentro do `PageHeader`, entre o título e a busca
@@ -182,12 +191,12 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | Hub 2 colunas no celular | Ref.1 do plano vence o kit | 2026-10-21 |
 | Erro escuro #F5525A | #F2323F dava 4,42:1 na linha destacada | 2026-10-21 |
 | Máscara na borda do trilho de filtros no celular | indício de rolagem (funcional, não decorativa) | 2026-10-16 |
-| Paleta, raios e movimento do padrão aprovado em 09/11, só no `.ff-app` | decisão de Rodolfo após experimentar a prévia; site e Portal ficam fora | 2026-11-11 |
+| Paleta, raios e movimento do padrão aprovado em 09/11, só no `.ff-app` | decisão de Rodolfo após experimentar a prévia; site e Portal ficam fora (substitui, para o ERP, o cruzamento da decisão 476) | 2026-11-11 |
 | `suave` claro #686A61 e `farol-vermelho` escuro #F4656C | os aprovados davam 4,12:1 e 4,24:1 nas superfícies reais; ajuste mínimo, mesma matiz | 2026-11-11 |
-| Lateral em grade de 2 colunas mantendo 232 px | "Movimentações" a 12 px/600 pede 92 px; 142 px partiria palavras | 2026-11-11 |
+| Lateral em grade de 2 colunas mantendo 232 px (a confirmar com Rodolfo) | "Movimentações" a 12 px/600 pede 92 px; a 142 px os nomes reais só cabem em uma coluna | 2026-11-11 |
 | Assinatura `Marca` mantida | não há arquivo de logo oficial no repositório; a marca textual da prévia não a substitui | 2026-11-11 |
 | "Em breve" como catálogo de apresentação, igual para todo perfil | não existe permissão para módulo sem tela; mostrar não concede | 2026-11-11 |
-| Selo sem tinta fora do `cheio`; tinta só pelos pares aprovados | `ok` a 15 % dava 4,28:1 com a cor nova | 2026-11-11 |
+| Selo sobre superfície opaca; tinta só no `cheio`, pelos pares aprovados | `ok` a 15 % dava 4,28:1 com a cor nova; o fundo opaco tira o selo da conta de onde ele pousa | 2026-11-11 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,

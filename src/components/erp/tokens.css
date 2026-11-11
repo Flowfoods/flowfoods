@@ -246,8 +246,9 @@ html:has(.ff-app[data-tema='escuro']) {
  */
 .ff-app .ff-nav-grade {
   display: grid;
-  /* 8,4em = o maior nome sem quebra no meio da palavra ("Movimentações", 12 px/600); 50% − meia folga = no máximo duas colunas. */
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(8.4em, calc(50% - 3px))), 1fr));
+  /* 8,1em = o maior nome sem quebra no meio da palavra ("Movimentações", 12 px/600) mais a borda e a folga da célula;
+     50% − meia folga = no máximo duas colunas. Cabe também com a barra de rolagem clássica (17 px) na lateral de 232 px. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(8.1em, calc(50% - 3px))), 1fr));
   gap: 6px;
   font-size: 12px;
 }
@@ -274,10 +275,10 @@ html:has(.ff-app[data-tema='escuro']) {
   color: color-mix(in srgb, var(--cor-modulo) var(--ff-icone-tinta), rgb(var(--ff-texto)));
 }
 
-/* Ativo reconhecível por forma (célula preenchida com contorno), peso e aria-current, além da cor da própria área. */
+/* Ativo reconhecível por forma (célula preenchida com contorno na tinta da área, ≥ 3:1), peso e aria-current, além da cor. */
 .ff-app .ff-nav-item[aria-current='page'] {
   background-color: var(--ff-modulo-realce);
-  border-color: var(--ff-modulo-borda);
+  border-color: var(--ff-modulo-tinta);
   color: rgb(var(--ff-texto));
   font-weight: 600;
 }
@@ -505,12 +506,17 @@ html:has(.ff-app[data-tema='escuro']) {
     --ff-suave: 60 60 60;
     --ff-linha: rgb(0 0 0 / 0.25);
     --ff-linha-forte: rgb(0 0 0 / 0.45);
-    /* O papel não herda o tema escuro: estado, destaque e seus fundos voltam aos valores do claro. */
+    /* O papel não herda o tema escuro: estado, farol, destaque e seus fundos voltam aos valores do claro. */
     --ff-acento: 188 56 46;
     --ff-marca: 188 56 46;
     --ff-erro: 188 56 46;
     --ff-ok: 66 118 91;
     --ff-atencao: 146 102 38;
+    --ff-farol-azul: 47 93 138;
+    --ff-farol-verde: 22 101 52;
+    --ff-farol-amarelo: 111 99 0;
+    --ff-farol-laranja: 176 68 0;
+    --ff-farol-vermelho: 196 21 34;
     --ff-destaque: 255 255 255;
     --ff-ok-fundo: 255 255 255;
     --ff-atencao-fundo: 255 255 255;

@@ -104,8 +104,9 @@ describe('Identidade central das áreas no hub e no menu', () => {
       expect(item).toContain(emBreve[n].nome);
       expect(item).toContain(emBreve[n].subtitulo);
       expect(item).toContain('Em breve');
-      expect(item).toContain('aria-disabled="true"');
-      expect(item.includes('Bloqueado.')).toBe(emBreve[n].nome === 'CRM Time' || emBreve[n].nome === 'CRM Clube');
+      // Texto puro: sem papel de controle e sem estado ARIA de controle (não há o que desabilitar).
+      expect(item).not.toMatch(/aria-disabled|role=/);
+      expect(item.includes('Com cadeado.')).toBe(emBreve[n].nome === 'CRM Time' || emBreve[n].nome === 'CRM Clube');
     });
     // Nomes inteiros: nada de corte por reticências no seletor nem na grade do menu.
     expect(h).not.toMatch(/truncate|line-clamp/);

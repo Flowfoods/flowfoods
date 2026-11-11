@@ -1,6 +1,7 @@
 /**
  * Selo "Em breve" do catálogo de módulos futuros: o mesmo no hub e no seletor de áreas. Sempre com a palavra (cor não é
- * o sinal), sem data nem fase. Com `cadeado`, o cadeado previsto no catálogo acompanha o selo e é lido como "Bloqueado".
+ * o sinal), sem data nem fase. Com `cadeado`, o cadeado previsto no catálogo acompanha o selo e é lido como "Com cadeado":
+ * descreve o ícone, sem afirmar bloqueio de acesso (não é falta de permissão nem de liberação).
  * É só apresentação: não é link, botão nem controle.
  */
 
@@ -14,7 +15,7 @@ export function SeloEmBreve({ cadeado = false, className = '' }: { cadeado?: boo
       {cadeado && (
         <>
           <Lock size={12} aria-hidden />
-          <span className="sr-only">Bloqueado. </span>
+          <span className="sr-only">Com cadeado. </span>
         </>
       )}
       Em breve

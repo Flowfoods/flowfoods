@@ -362,7 +362,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
             </div>
           </header>
 
-          <main id="conteudo" className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-6 sm:px-6">
+          <main id="conteudo" className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
             <Suspense fallback={null}>
               <VoltarDaNavegacao nav={nav} chaveDoContexto={props.chaveDoContexto} visao={props.visao.modo === 'parceiro' ? props.visao.valor : undefined} />
             </Suspense>

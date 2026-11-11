@@ -34,7 +34,7 @@ export interface EstadoDaNav {
 
 // Célula da grade: ícone em cima, nome embaixo; 64 px de altura mínima (alvo de toque com folga) e cresce com o nome.
 const ITEM = 'ff-nav-item ff-identidade-modulo ff-transicao flex w-full text-suave hover:text-texto';
-const ITEM_ABERTO = 'min-h-16 flex-col items-center justify-center gap-1.5 px-1 py-2 text-center';
+const ITEM_ABERTO = 'min-h-16 flex-col items-center justify-center gap-1.5 px-0.5 py-2 text-center';
 // Recolhido: 44 px na gaveta (toque); 40 px na barra fixa do desktop (≥ 900 px).
 const ITEM_RECOLHIDO = 'min-h-11 min-[900px]:min-h-10 items-center justify-center';
 const GRADE = 'ff-nav-grade';
@@ -71,11 +71,12 @@ export function NavLateral({
       {/* O contexto (parceiro · situação) quebra em linhas: na lateral compacta, cortar o nome do parceiro esconderia onde a pessoa está. */}
       {!recolhido && <p className="break-words px-4 pt-3 text-[12px] leading-snug text-suave">{contexto}</p>}
 
-      <div className={`shrink-0 ${recolhido ? 'px-2 pt-3' : 'px-2.5 pt-2'}`}>
+      <div className={`shrink-0 ${recolhido ? 'px-2 pt-3' : 'px-1.5 pt-2'}`}>
         <SeletorDeModulo nav={nav} atual={modulo} recolhido={recolhido} />
       </div>
 
-      <nav aria-label="Menu" className={`min-h-0 flex-1 overflow-y-auto pb-4 ${recolhido ? 'px-2' : 'px-2.5'}`}>
+      {/* Barra de rolagem fina: com a barra clássica (Windows) ainda cabem as duas colunas quando o menu rola. */}
+      <nav aria-label="Menu" className={`min-h-0 flex-1 overflow-y-auto pb-4 [scrollbar-width:thin] ${recolhido ? 'px-2' : 'px-1.5'}`}>
         {noHub ? (
           <ul className={`${GRADE} mt-3`} data-recolhido={recolhido}>
             <li>
@@ -143,7 +144,7 @@ export function NavLateral({
             onClick={aoRecolher}
             aria-label={recolhido ? 'Abrir o menu' : 'Recolher o menu'}
             title={recolhido ? 'Abrir o menu' : 'Recolher o menu'}
-            className="ff-transicao inline-grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto"
+            className="ff-transicao inline-grid h-10 w-10 place-items-center rounded-botao text-suave hover:bg-texto/5 hover:text-texto"
           >
             {recolhido ? <PanelLeftOpen size={18} aria-hidden /> : <PanelLeftClose size={18} aria-hidden />}
           </button>
@@ -235,7 +236,8 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
     <Popover
       rotulo={`Área: ${nome}. Trocar de área`}
       alinhar="esquerda"
-      largura="w-[300px]"
+      // Na barra do desktop o painel pode passar da lateral (300 px); na gaveta do celular ele fica na largura dela, sem vazar.
+      largura="w-[300px] max-[899px]:w-full"
       classeDoBotao={`ff-seletor-modulo ff-transicao flex w-full items-center gap-2.5 rounded-nav border text-left ${
         recolhido ? 'justify-center p-1.5' : 'p-2'
       }`}
@@ -355,7 +357,7 @@ function OpcaoDeModulo({
 
 /**
  * Módulo do catálogo ainda sem tela: nome, finalidade e o selo, como texto. Não é link nem botão, não recebe foco e não
- * dispara nada; `aria-disabled` e o selo dizem o estado.
+ * dispara nada; quem diz o estado é o rótulo do grupo e a palavra do selo (não há controle para marcar como desabilitado).
  */
 function OpcaoEmBreve({
   nome,
@@ -371,7 +373,7 @@ function OpcaoEmBreve({
   cadeado?: boolean;
 }) {
   return (
-    <div aria-disabled="true" className={`${OPCAO} items-start`} style={{ '--cor-modulo': cor } as CSSProperties}>
+    <div className={`${OPCAO} items-start`} style={{ '--cor-modulo': cor } as CSSProperties}>
       <IconeDoModulo icone={icone} cor={cor} tamanho={32} />
       <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

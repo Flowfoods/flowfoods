@@ -87,7 +87,7 @@ export function BuscaEmFormulario({
         type="search"
         defaultValue={valor ?? ''}
         placeholder={placeholder}
-        className="ff-transicao block min-h-11 min-w-0 flex-1 rounded-campo border border-linha-forte bg-campo px-3 text-sm text-texto placeholder:text-suave/70 hover:border-texto/30 sm:min-h-10"
+        className="ff-transicao block min-h-11 min-w-0 flex-1 rounded-campo border border-linha-forte bg-campo px-3 text-sm text-texto placeholder:text-suave hover:border-texto/30 sm:min-h-10"
       />
       <button
         type="submit"

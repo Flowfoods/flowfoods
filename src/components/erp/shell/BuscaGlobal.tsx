@@ -163,7 +163,7 @@ export function BuscaGlobal({
                 abrir(resultados[ativo]);
               }
             }}
-            className="min-h-14 min-w-0 flex-1 bg-transparent text-[15px] text-texto ff-sem-anel outline-none placeholder:text-suave/80"
+            className="min-h-14 min-w-0 flex-1 bg-transparent text-[15px] text-texto ff-sem-anel outline-none placeholder:text-suave"
           />
           <button
             type="button"

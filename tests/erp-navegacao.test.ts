@@ -243,9 +243,11 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
       expect(c).toContain('aria-disabled="true"');
       expect(texto(c)).toContain('Em breve');
       expect(texto(c)).not.toMatch(/\d|R\$|%|fase/i);
+      // Nome e finalidade inteiros em qualquer largura: sem reticências nem corte de linhas.
+      expect(c).not.toMatch(/truncate|line-clamp/);
     });
     // O cadeado previsto acompanha o selo só em CRM Time e CRM Clube, com texto para leitor de tela.
-    expect(futuros.map((c) => c.includes('Bloqueado.'))).toEqual(FUTUROS.map((nome) => nome === 'CRM Time' || nome === 'CRM Clube'));
+    expect(futuros.map((c) => c.includes('Com cadeado.'))).toEqual(FUTUROS.map((nome) => nome === 'CRM Time' || nome === 'CRM Clube'));
     // A seção diz que não é falta de acesso nem de liberação (três situações, três textos).
     expect(texto(emBreve)).toContain('Não é falta de acesso nem de liberação.');
     // Nenhum futuro aparece entre as áreas em uso.

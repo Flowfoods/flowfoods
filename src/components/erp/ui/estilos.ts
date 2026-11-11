@@ -13,7 +13,8 @@ const VARIANTES: Record<Variante, string> = {
   primario: 'bg-acao text-sobre-acao hover:bg-acao-hover',
   // Sobre o fundo da página o botão é uma superfície (como na prévia aprovada); dentro de um painel, some na dele.
   secundario: 'border border-linha-forte bg-painel text-texto hover:border-texto/35 hover:bg-forte',
-  perigo: 'border border-erro/45 text-erro hover:bg-erro/10',
+  // Sob o ponteiro, a superfície de destaque (par aprovado do vermelho): a 10 % sobre o fundo da página o texto caía a 4,35:1.
+  perigo: 'border border-erro/45 text-erro hover:bg-destaque',
   fantasma: 'text-suave hover:bg-texto/5 hover:text-texto',
 };
 
