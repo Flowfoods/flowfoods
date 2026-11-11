@@ -79,7 +79,7 @@ Em Settlements, `balance` e `amount` são números JSON. O leitor usa o literal 
 
 Para Events, Settlements e Anticipations, HTTP diferente de 200 encerra a consulta com erro. O tratamento específico do 204 em Sales está abaixo. Falha de transporte, escopo divergente e paginação incompatível impedem usar o resultado. O cliente só devolve a lista de eventos depois da última página. Há limites locais de 2 MiB por resposta, 32 níveis JSON e 100 páginas de 100 eventos por execução. O leitor conserva a precisão numérica com o contexto de origem de `JSON.parse`, disponível no Node 22 utilizado pelo projeto.
 
-O registro de um título `SUCCEED` descreve o estado enviado pelo provedor. A comparação com crédito bancário depende da evidência desse crédito. Para levar as leituras ao comparador do PR49, é preciso demonstrar a correspondência entre eventos, produto, competência, consolidação e saldo. Nesta entrega o comando exibe os valores recebidos na simulação e mantém essas verificações pendentes.
+O registro de um título `SUCCEED` descreve o estado enviado pelo provedor. A comparação com crédito bancário depende da evidência desse crédito. A [conciliação mensal com Settlements](#conciliação-mensal-com-settlements) usa evidência sintética para vincular o saldo do envelope ao recorte de eventos.
 
 ### Antecipações
 
@@ -132,6 +132,14 @@ A diferença em centavos é **eventos com impacto menos arquivo com impacto**. A
 O resultado descreve a igualdade dos totais do relatório e dos eventos. O critério de 0,01% documentado para liquidações continua no comparador de liquidação. Em `PENDENTE`, os motivos são informados e ambos os totais comparáveis e a diferença ficam nulos.
 
 O comando `npm run integracao:financial-simular` exercita três cenários independentes de fevereiro de 2026. O relatório mensal soma R$ 27,00. Eventos de R$ 27,00 no mês fechado resultam em zero centavo de diferença. Eventos de R$ 27,01 resultam em mais um centavo. A consulta de uma semana continua pendente mesmo somando R$ 27,00. Os cenários usam dados em memória e conservam o resultado financeiro do ERP.
+
+### Conciliação mensal com Settlements
+
+O comando local compara duas consultas independentes, Financial Events e Settlements por data de apuração. O cenário declara parceiro, loja, merchant, produto, competência e moeda. Cada fonte recebe sua própria evidência de cobertura do mês e de encerramento da apuração, vinculada à consulta que a produziu. A evidência de Settlements declara também que o saldo do envelope corresponde integralmente a essa identidade. A data de pagamento de um título pode cair em outro mês.
+
+O comparador confere a lista de lojas consolidadas e o produto dos títulos. Uma lista que identifica outra loja, ou que não permite confirmar a loja exclusiva, deixa o resultado pendente. Um grupo com datas de apuração que atravessam a virada do mês também fica pendente. O guia de Reconciliation ilustra que a mesma semana pode conter lançamentos de duas competências. Nesses casos, os totais elegíveis e a diferença são nulos. O valor de referência no cenário elegível é o `balance` do envelope, usado uma única vez. Os títulos preservam seus valores e estados próprios. [Referência Financial v3](https://developer.ifood.com.br/es-CO/docs/references#financial) · [Exemplo de semana dividida entre competências](https://developer.ifood.com.br/es-CO/docs/guides/modules/financial/api-reconciliation/)
+
+A diferença é **eventos com impacto menos saldo da liquidação**, em centavos inteiros. A política já usada na simulação de liquidação admite diferença absoluta de até 0,01% do módulo do saldo. Com saldo sintético de R$ 10.000,00, R$ 10.001,00 de eventos ficam no limite e R$ 10.001,01 ultrapassam o limite em um centavo. O terceiro cenário envia o mesmo saldo em uma consulta consolidada com outra loja e registra a pendência. A atribuição do saldo e a base percentual para dados reais dependem de verificação no ambiente oficial.
 
 ## Verificação
 

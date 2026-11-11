@@ -31,6 +31,14 @@ export interface ConciliacaoFinancialSimulada {
 }
 
 const abs = (n: bigint) => n < 0n ? -n : n;
+
+export function compararCentavosLiquidacaoSimulada(eventosComImpactoCentavos: bigint, liquidacaoCentavos: bigint) {
+  const diferencaCentavos = eventosComImpactoCentavos - liquidacaoCentavos;
+  // 0,01% = 1/10000: comparação inteira, sem arredondar limite nem inventar piso de R$ 0,01.
+  const compativel = abs(diferencaCentavos) * 10_000n <= abs(liquidacaoCentavos);
+  return { estado: compativel ? 'COMPATIVEL' as const : 'DIVERGENTE' as const, diferencaCentavos };
+}
+
 const mesmaIdentidade = (a: IdentidadeFinancialSimulada, b: IdentidadeFinancialSimulada) =>
   a.parceiro === b.parceiro && a.loja === b.loja && a.merchant === b.merchant
   && a.produto === b.produto && a.competencia === b.competencia && a.moeda === b.moeda;
@@ -72,8 +80,5 @@ export function conciliarFinancialSimulado(eventosEntrada: unknown, liquidacaoEn
   if (motivos.size || eventosComImpactoCentavos === null || liquidacaoCentavos === null) {
     return { ...base, estado: 'PENDENTE', diferencaCentavos: null };
   }
-  const diferencaCentavos = eventosComImpactoCentavos - liquidacaoCentavos;
-  // 0,01% = 1/10000: comparação inteira, sem arredondar limite nem inventar piso de R$ 0,01.
-  const compativel = abs(diferencaCentavos) * 10_000n <= abs(liquidacaoCentavos);
-  return { ...base, estado: compativel ? 'COMPATIVEL' : 'DIVERGENTE', diferencaCentavos };
+  return { ...base, ...compararCentavosLiquidacaoSimulada(eventosComImpactoCentavos, liquidacaoCentavos) };
 }
