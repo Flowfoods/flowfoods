@@ -107,6 +107,15 @@ describe('Financial v3 • taxas configuradas e cobradas da loja por competênci
       .porTipo[comissao]).toMatchObject({ estado: 'DIVERGENTE', diferencaCentavos: -1600n });
   });
 
+  it('um estorno da competência não pode usar a configuração de uma venda do mês seguinte', async () => {
+    const estorno = { ...venda(comissao, '10', '100', '10'), trigger: 'SALE_CANCELLED',
+      period: { beginDate: '2024-02-26', endDate: '2024-03-03' } };
+    const entrada = await cenario([[estorno, taxaDePagamento]]);
+    const marco = { ...vigencia, inicio: '2024-03-01', fim: '2024-03-31', linha: { ...linha, taxaBp: 1000 } };
+    comissaoPendente({ ...entrada, vigencias: [vigencia, marco],
+      datasAplicaveis: new Map([[entrada.eventos.eventos[0], '2024-03-02']]) }, 'DATA_APLICAVEL_NAO_COMPROVADA');
+  });
+
   it('zero informado é verificável e preserva taxa e base; nenhuma ocorrência ou uma meta sozinha não comprova zero', async () => {
     const entrada = await cenario([[venda(comissao, '0', '0.00', '0.00'), taxaDePagamento]]);
     const taxaZero = { ...vigencia, linha: { ...linha, taxaBp: 0 } };

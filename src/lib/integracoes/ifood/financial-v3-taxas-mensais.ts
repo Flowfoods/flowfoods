@@ -148,7 +148,7 @@ function regraDaOcorrencia(entrada: EntradaTaxasMensaisV3, evento: EventoV3, reg
   }
   const dia = entrada.datasAplicaveis?.get(evento);
   if (dia !== undefined) {
-    if (!diaDoPainelValido(dia) || dia > fim || (natureza !== 'ESTORNO' && (dia < inicio || dia < consulta.inicio || dia > consulta.fim))) {
+    if (!diaDoPainelValido(dia) || dia > fim || dia > consulta.fim || (natureza !== 'ESTORNO' && (dia < inicio || dia < consulta.inicio))) {
       motivos.add('DATA_APLICAVEL_NAO_COMPROVADA');
       return null;
     }
