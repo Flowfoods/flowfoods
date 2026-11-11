@@ -47,11 +47,17 @@ export function SeletorDeItem({
 }) {
   const lista = useId();
   const escolhida = opcoes.find((o) => o.valor === valor) ?? (selecionada?.valor === valor ? selecionada : null);
-  const [aberto, setAberto] = useState(false);
+  const [expandido, setAberto] = useState(false);
+  if (expandido && desabilitado) setAberto(false);
+  const aberto = expandido && !desabilitado;
   const [texto, setTexto] = useState('');
   const [ativo, setAtivo] = useState(0);
   const caixa = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLInputElement>(null);
+  const painel = useRef<HTMLDivElement>(null);
+  const revelarAtivo = useRef(true);
+  const pressionandoLista = useRef(false);
+  const toque = useRef<{ id: number; x: number; y: number; opcao: HTMLButtonElement } | null>(null);
 
   const externa = !!buscaExterna;
   const { grupos, cortadas, total } = useMemo(
@@ -65,17 +71,30 @@ export function SeletorDeItem({
     const fora = (e: PointerEvent) => {
       if (caixa.current && !caixa.current.contains(e.target as Node)) setAberto(false);
     };
+    const soltar = () => { pressionandoLista.current = false; };
     document.addEventListener('pointerdown', fora);
-    return () => document.removeEventListener('pointerdown', fora);
+    document.addEventListener('pointerup', soltar);
+    document.addEventListener('pointercancel', soltar);
+    return () => {
+      soltar();
+      document.removeEventListener('pointerdown', fora);
+      document.removeEventListener('pointerup', soltar);
+      document.removeEventListener('pointercancel', soltar);
+    };
   }, [aberto]);
 
   useEffect(() => {
-    if (!aberto) return;
-    document.getElementById(`${lista}-op-${ativo}`)?.scrollIntoView({ block: 'nearest' });
+    if (!aberto || !revelarAtivo.current || !painel.current) return;
+    const opcao = document.getElementById(`${lista}-op-${ativo}`);
+    if (!opcao) return;
+    const area = painel.current;
+    const topo = opcao.getBoundingClientRect().top - area.getBoundingClientRect().top - area.clientTop;
+    area.scrollTop += topo < 0 ? topo : Math.max(0, topo + opcao.offsetHeight - area.clientHeight);
   }, [ativo, aberto, lista]);
 
   function abrir() {
     if (desabilitado) return;
+    revelarAtivo.current = true;
     setTexto('');
     buscaExterna?.aoBuscar('');
     const i = escolhida ? planas.findIndex((o) => o.valor === escolhida.valor) : -1;
@@ -87,28 +106,45 @@ export function SeletorDeItem({
     aoEscolher(o.valor);
     setAberto(false);
     setTexto('');
-    campo.current?.focus();
+    campo.current?.focus({ preventScroll: true });
+  }
+
+  // O toque pode terminar sem um clique de compatibilidade. Confirme somente
+  // na soltura, na mesma opção. Rolagem, pinça e cancelamento não escolhem.
+  function iniciarToque(e: React.TouchEvent<HTMLButtonElement>) {
+    const t = e.touches[0];
+    toque.current = e.touches.length === 1 ? { id: t.identifier, x: t.clientX, y: t.clientY, opcao: e.currentTarget } : null;
+  }
+  function moverToque(e: React.TouchEvent<HTMLButtonElement>) {
+    const inicio = toque.current, t = e.touches[0];
+    if (inicio && (e.touches.length !== 1 || Math.hypot(t.clientX - inicio.x, t.clientY - inicio.y) > 10)) toque.current = null;
+  }
+  function terminarToque(e: React.TouchEvent<HTMLButtonElement>, o: OpcaoDoSeletor) {
+    const inicio = toque.current, t = e.changedTouches[0];
+    toque.current = null;
+    if (!e.cancelable) return; // O botão ainda recebe a ativação nativa.
+    e.preventDefault(); // Não sintetizar outro clique sobre o formulário ao fechar a lista.
+    if (!inicio || e.touches.length || inicio.id !== t.identifier || inicio.opcao !== e.currentTarget) return;
+    if (Math.hypot(t.clientX - inicio.x, t.clientY - inicio.y) > 10) return;
+    if (e.currentTarget.contains(document.elementFromPoint(t.clientX, t.clientY))) escolher(o);
   }
 
   function teclar(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (!aberto) return abrir();
-      setAtivo((a) => Math.min(planas.length - 1, a + 1));
+      revelarAtivo.current = true;
+      setAtivo((a) => Math.max(0, Math.min(planas.length - 1, a + 1)));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      if (!aberto) return abrir();
+      revelarAtivo.current = true;
       setAtivo((a) => Math.max(0, a - 1));
     } else if (e.key === 'Enter') {
       if (aberto) {
         e.preventDefault();
         const o = planas[ativo];
         if (o) escolher(o);
-      }
-    } else if (e.key === 'Escape') {
-      if (aberto) {
-        e.preventDefault();
-        setAberto(false);
-        setTexto('');
       }
     } else if (e.key === 'Tab' && !buscaExterna?.temMais) {
       setAberto(false);
@@ -120,7 +156,16 @@ export function SeletorDeItem({
   let n = -1;
 
   return (
-    <div ref={caixa} className="relative" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { setAberto(false); setTexto(''); } }} onKeyDown={(e) => { if (e.key === 'Escape') { setAberto(false); setTexto(''); } }}>
+    <div ref={caixa} className="relative" onBlur={(e) => {
+      // O teclado pode soltar o foco sem destino entre pressionar a opção e ativá-la.
+      if (e.relatedTarget ? !e.currentTarget.contains(e.relatedTarget) : !pressionandoLista.current) setAberto(false);
+    }} onKeyDown={(e) => {
+      if (aberto && e.key === 'Escape') {
+        e.preventDefault();
+        campo.current?.focus({ preventScroll: true });
+        setAberto(false);
+      }
+    }}>
       <input type="hidden" name={name} value={valor} />
       <input
         ref={campo}
@@ -155,7 +200,7 @@ export function SeletorDeItem({
         <path d="M4 6l4 4 4-4" />
       </svg>
       {aberto && (
-        <div className={`absolute left-0 right-0 z-30 mt-1 max-h-[min(22rem,60vh)] overflow-y-auto rounded-[7px] border border-linha-forte bg-fundo py-1 shadow-lg ${buscaExterna ? '' : 'sm:right-auto sm:min-w-[22rem]'}`}>
+        <div ref={painel} onPointerDownCapture={() => { pressionandoLista.current = true; }} className={`absolute left-0 right-0 z-30 mt-1 max-h-[min(22rem,60vh)] overflow-y-auto rounded-[7px] border border-linha-forte bg-fundo py-1 shadow-lg ${buscaExterna ? '' : 'sm:right-auto sm:min-w-[22rem]'}`}>
         <div
           id={lista}
           role="listbox"
@@ -172,19 +217,26 @@ export function SeletorDeItem({
                 const i = n;
                 const marcado = o.valor === valor;
                 return (
-                  <div
+                  <button
                     key={o.valor}
                     id={`${lista}-op-${i}`}
+                    type="button"
+                    tabIndex={-1}
                     role="option"
                     aria-selected={marcado}
-                    onPointerDown={(e) => e.preventDefault()}
+                    onMouseDown={(e) => { if (e.button === 0) e.preventDefault(); }}
+                    onTouchStart={iniciarToque}
+                    onTouchMove={moverToque}
+                    onTouchCancel={() => { toque.current = null; }}
+                    onPointerCancel={() => { toque.current = null; }}
+                    onTouchEnd={(e) => terminarToque(e, o)}
                     onClick={() => escolher(o)}
-                    onPointerMove={() => setAtivo(i)}
-                    className={`flex min-h-11 cursor-pointer items-center gap-2 px-3 text-sm sm:min-h-9 ${i === ativo ? 'bg-forte' : ''} ${marcado ? 'font-semibold' : ''}`}
+                    onPointerEnter={(e) => { if (e.pointerType === 'mouse') { revelarAtivo.current = false; setAtivo(i); } }}
+                    className={`flex min-h-11 w-full cursor-pointer items-center gap-2 px-3 py-1 text-left text-sm ${i === ativo ? 'bg-forte' : ''} ${marcado ? 'font-semibold' : ''}`}
                   >
-                    <span className="min-w-0 flex-1 truncate">{o.nome}</span>
+                    <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">{o.nome}</span>
                     {o.detalhe && <span className="shrink-0 text-[12px] text-suave">{o.detalhe}</span>}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -197,7 +249,7 @@ export function SeletorDeItem({
         </div>
         {buscaExterna?.carregando && <p role="status" className="px-3 py-2 text-[13px] text-suave">Buscando…</p>}
         {buscaExterna?.temMais && (
-          <button type="button" disabled={buscaExterna.carregando} onClick={() => { buscaExterna.aoCarregarMais(); campo.current?.focus(); }} className="min-h-11 w-full px-3 py-2 text-left text-sm font-semibold text-texto underline underline-offset-4 disabled:opacity-50">
+          <button type="button" disabled={buscaExterna.carregando} onClick={() => { buscaExterna.aoCarregarMais(); campo.current?.focus({ preventScroll: true }); }} className="min-h-11 w-full px-3 py-2 text-left text-sm font-semibold text-texto underline underline-offset-4 disabled:opacity-50">
             Carregar mais
           </button>
         )}
