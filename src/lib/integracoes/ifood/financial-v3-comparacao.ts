@@ -75,7 +75,7 @@ function conferirEvidencias(entrada: EntradaComparacaoV3, motivos: Set<Motivo>) 
 
 function somarEventos(entrada: EntradaComparacaoV3, motivos: Set<Motivo>): bigint {
   const fonte = entrada.eventos;
-  if (!fonte) {
+  if (fonte == null) {
     motivos.add('EVENTOS_AUSENTES');
     return 0n;
   }
@@ -114,12 +114,17 @@ function somarEventos(entrada: EntradaComparacaoV3, motivos: Set<Motivo>): bigin
 export async function compararConciliacaoEventosV3(entrada: EntradaComparacaoV3): Promise<ResultadoComparacaoV3> {
   if (entrada?.origem !== 'SIMULACAO') throw new Error('Origem incompatível com a comparação simulada Financial v3.');
   const origem = entrada.origem;
+  const estadoArquivo = entrada.acompanhamento?.estado;
+  if (entrada.acompanhamento != null && estadoArquivo !== 'DISPONIVEL' && estadoArquivo !== 'SEM_LANCAMENTOS'
+      && estadoArquivo !== 'PROCESSANDO' && estadoArquivo !== 'PROTOCOLO_INDISPONIVEL') {
+    throw new Error('Estado de acompanhamento da conciliação Financial v3 inválido.');
+  }
   const motivos = new Set<Motivo>();
   // Consome eventos e atestados antes do await. O leitor captura protocolo, contagens e bytes antes de descompactar.
   conferirEvidencias(entrada, motivos);
   const eventosComImpactoCentavos = somarEventos(entrada, motivos);
   let arquivoComImpactoCentavos: bigint | null = null;
-  if (!entrada.arquivo || entrada.acompanhamento?.estado !== 'DISPONIVEL') {
+  if (entrada.arquivo == null || !entrada.acompanhamento || estadoArquivo !== 'DISPONIVEL') {
     motivos.add('ARQUIVO_INDISPONIVEL');
   } else {
     const resumo = await lerArquivoConciliacaoV3(entrada.acompanhamento, entrada.arquivo);

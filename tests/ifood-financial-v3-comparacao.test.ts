@@ -153,6 +153,10 @@ describe('Comparação sintética do CSV mensal com Financial Events v3', () => 
     const entrada = await cenario();
     const pendente = { ...entrada, evidenciaEventos: { ...entrada.evidenciaEventos, apuracaoEncerrada: false } };
     await expect(compararConciliacaoEventosV3({
+      // @ts-expect-error Estado estranho não é um dos estados indisponíveis que o GET projeta.
+      ...pendente, acompanhamento: { ...entrada.acompanhamento, estado: 'OUTRO' },
+    })).rejects.toThrow('Estado de acompanhamento');
+    await expect(compararConciliacaoEventosV3({
       ...pendente, arquivo: { ...entrada.arquivo, bytes: Uint8Array.of(1, 2) },
     })).rejects.toThrow('Gzip');
     await expect(compararConciliacaoEventosV3({
@@ -185,7 +189,7 @@ describe('Comparação sintética do CSV mensal com Financial Events v3', () => 
     entrada.arquivo.protocolo.competencia = '2024-03';
     entrada.arquivo.totaisInformados.linhas = 99;
     entrada.eventos.eventos.length = 0;
-    entrada.evidenciaEventos.apuracaoEncerrada = false;
+    entrada.evidenciaEventos.consulta.fim = '2024-02-10';
     entrada.evidenciaArquivo.moeda = 'EUR';
     expect(await resultado).toMatchObject({
       estado: 'COINCIDENTE', eventosComImpactoCentavos: 100n, arquivoComImpactoCentavos: 100n, diferencaCentavos: 0n,
