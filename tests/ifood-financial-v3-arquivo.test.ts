@@ -66,7 +66,8 @@ describe('Arquivo de conciliação sintético ligado ao acompanhamento mensal', 
       await expect(ler(csv, { linhas: invalido as number })).rejects.toMatchObject({ codigo: 'TOTAIS' });
     }
     for (const invalido of ['2', [], { totalLinhas: 2 }]) {
-      await expect(ler(csv, invalido as { linhas: number })).rejects.toMatchObject({ codigo: 'TOTAIS' });
+      // @ts-expect-error A fronteira também recusa metadados inválidos em tempo de execução.
+      await expect(ler(csv, invalido)).rejects.toMatchObject({ codigo: 'TOTAIS' });
     }
   });
 
