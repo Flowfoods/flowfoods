@@ -10,6 +10,11 @@ const ler = (campos: Record<string, unknown> = {}) => lerPaginaVendasV3(JSON.str
 const erro = (codigo: string) => expect.objectContaining({ name: 'ErroVendasV3', codigo });
 const identificada = { id: 'pedido/sintético:001', merchant: { id: merchantId.toUpperCase() } };
 const venda = (campos: Record<string, unknown> = {}) => ler({ total: 1, pageCount: 1, sales: [{ ...identificada, ...campos }] }).vendas[0];
+function numeroCurtoDoToken(token: string) {
+  const sales = [{ ...identificada, shortId: 41 }];
+  const bruto = JSON.stringify(envelope({ total: 1, pageCount: 1, sales })).replace('"shortId":41', '"shortId":' + token);
+  return lerPaginaVendasV3(bruto, pedido).vendas[0].numeroCurto;
+}
 
 describe('Página de vendas Financial v3', () => {
   it('lê uma página vazia em objeto e no exemplo em lista unitária', () => {
@@ -110,6 +115,21 @@ describe('Página de vendas Financial v3', () => {
     });
   });
 
+  it.each([
+    ['"00041"', '00041'], ['"AB-0041"', 'AB-0041'], ['41', '41'], ['41.0000', '41'],
+    ['900719925474099312345678', '900719925474099312345678'], ['9007199254740993123456780e-1', '900719925474099312345678'],
+    ['4.0123400e5', '401234'], ['0.0041E+4', '41'], ['0', '0'], ['-0.00e+20', '0'], ['1e255', '1' + '0'.repeat(255)],
+  ])('preserva o número curto textual ou normaliza o token inteiro %s sem arredondamento', (token, esperado) => {
+    expect(numeroCurtoDoToken(token)).toBe(esperado);
+  });
+
+  it.each([
+    ['-41', 'ESTRUTURA'], ['1.00000000000000000000001', 'ESTRUTURA'], ['1e-50000', 'ESTRUTURA'],
+    ['1e50000', 'LIMITE_LOCAL'], ['1e256', 'LIMITE_LOCAL'], ['1'.repeat(257), 'LIMITE_LOCAL'],
+  ])('recusa número curto negativo, fracionário ou além do limite em %s', (token, codigo) => {
+    expect(() => numeroCurtoDoToken(token)).toThrow(erro(codigo));
+  });
+
   it('mantém precisão de centavos maiores que Number e do token exponencial do exemplo numérico', () => {
     const sales = [{ ...identificada, saleGrossValue: { bag: 31, deliveryFee: '9007199254740993123.45', serviceFee: 51 } }];
     const texto = JSON.stringify(envelope({ total: 1, pageCount: 1, sales }))
@@ -143,7 +163,7 @@ describe('Página de vendas Financial v3', () => {
   it.each([
     [{ createdAt: '2026-10-06' }, 'ESTRUTURA'], [{ createdAt: '2026-10-06T15:00:00' }, 'ESTRUTURA'],
     [{ createdAt: '2026-02-30T05:00:00Z' }, 'ESTRUTURA'], [{ createdAt: '2026-10-06T24:00:00Z' }, 'ESTRUTURA'],
-    [{ shortId: 1 }, 'ESTRUTURA'], [{ type: 'x'.repeat(257) }, 'LIMITE_LOCAL'], [{ billingSummary: [] }, 'ESTRUTURA'],
+    [{ shortId: { literal: '1' } }, 'ESTRUTURA'], [{ type: 'x'.repeat(257) }, 'LIMITE_LOCAL'], [{ billingSummary: [] }, 'ESTRUTURA'],
     [{ saleGrossValue: { bag: {} } }, 'VALOR_MONETARIO'], [{ saleGrossValue: { serviceFee: '1e2' } }, 'VALOR_MONETARIO'],
     [{ billingSummary: { saleBalance: '0,01' } }, 'VALOR_MONETARIO'], [{ billingSummary: { billingEntries: false } }, 'ESTRUTURA'],
     [{ billingSummary: { billingEntries: [{ value: '1.001' }] } }, 'SUBCENTAVO'],

@@ -60,6 +60,22 @@ function texto(valor: unknown): string | null {
   return valor;
 }
 
+/** O schema exibe shortId textual. O guia também admite o número do pedido como inteiro JSON. */
+function numeroCurto(valor: unknown): string | null {
+  if (!(valor instanceof NumeroJsonFinancial)) return texto(valor);
+  if (valor.literal.length > MAX_TEXTO) throw new ErroVendasV3('LIMITE_LOCAL');
+  const [mantissa, expoente = '0'] = valor.literal.toLowerCase().split('e');
+  const [inteiro, fracao = ''] = mantissa.split('.');
+  const digitos = (inteiro + fracao).replace(/^-?0*/, '');
+  if (!digitos) return '0';
+  if (mantissa.startsWith('-')) throw new ErroVendasV3('ESTRUTURA');
+  const significativos = digitos.replace(/0+$/, '');
+  const zerosFinais = BigInt(expoente) - BigInt(fracao.length) + BigInt(digitos.length - significativos.length);
+  if (zerosFinais < 0n) throw new ErroVendasV3('ESTRUTURA');
+  if (BigInt(significativos.length) + zerosFinais > BigInt(MAX_TEXTO)) throw new ErroVendasV3('LIMITE_LOCAL');
+  return significativos + '0'.repeat(Number(zerosFinais));
+}
+
 function criacao(valor: unknown): string | null {
   const instante = texto(valor);
   if (instante === null) return null;
@@ -100,7 +116,7 @@ function lerVenda(valor: unknown, merchantId: string): VendaV3 {
   const resumo = venda.billingSummary == null ? null : objeto(venda.billingSummary);
   const pagamentos = venda.payments == null ? null : objeto(venda.payments);
   return {
-    id, numeroCurto: texto(venda.shortId), criadaEm: criacao(venda.createdAt), tipo: texto(venda.type),
+    id, numeroCurto: numeroCurto(venda.shortId), criadaEm: criacao(venda.createdAt), tipo: texto(venda.type),
     categoria: texto(venda.category), canal: texto(venda.salesChannel), estado: texto(venda.currentStatus),
     valorBruto: bruto && {
       itensCentavos: centavos(bruto.bag), entregaCentavos: centavos(bruto.deliveryFee), servicoCentavos: centavos(bruto.serviceFee),

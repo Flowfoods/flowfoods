@@ -41,7 +41,7 @@ const respostasFicticias: Transporte = async pedido => {
       saleGrossValue: { bag: '40.00', deliveryFee: 3.70, serviceFee: '0.00' },
       billingSummary: { saleBalance: '38.50', billingEntries: [{ name: 'COMISSAO_SIMULADA', value: '-1.50' }] },
       payments: { methods: [{ method: 'CREDIT', liability: 'IFOOD', currency: 'BRL', value: 43.70 }] },
-    } : { id: 'venda-simulada-2', shortId: '0013', currentStatus: 'CANCELLED', createdAt: '2026-02-06T11:00:00-03:00' };
+    } : { id: 'venda-simulada-2', shortId: 13, currentStatus: 'CANCELLED', createdAt: '2026-02-06T14:00:00Z' };
     corpo = {
       beginSalesDate: intervalo.inicio, endSalesDate: intervalo.fim, page, size: 1, total: 2, pageCount: 2,
       sales: [{ ...venda, merchant: { id: intervalo.merchantId } }],
