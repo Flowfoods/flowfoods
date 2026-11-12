@@ -7,14 +7,14 @@ import { diaAnalytics, instanteAnalytics } from './formato-analytics';
 type Consulta = Extract<ResultadoConferenciaFinancial, { ok: true }>;
 const taxa = (bp: number) => `${(bp / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
 
-export function RecibosFontesFinancial({ consulta, retorno }: { consulta: Consulta; retorno: string }) {
+export function RecibosFontesFinancial({ consulta, retorno, destaque }: { consulta: Consulta; retorno: string; destaque?: string }) {
   const { recibos, conexoes } = consulta;
   if (!recibos.total) return null;
   return <Painel id="recibos" titulo="Recibos de fontes" subtitulo="Por ordem de recebimento, com as taxas declaradas em cada envio."
     acessorio={<Contagem>{recibos.total} {recibos.total === 1 ? 'recibo' : 'recibos'}</Contagem>} semRespiro>
     <ul className="divide-y divide-linha">
       {recibos.itens.map(r => <li key={r.id} id={`recibo-${r.id}`}>
-        <details className="min-w-0">
+        <details className="min-w-0" open={r.id === destaque || undefined}>
           <summary className="min-h-11 cursor-pointer break-words px-4 py-3 text-sm font-semibold sm:px-5">
             {instanteAnalytics(r.recebidoEm.toISOString())} · {conexoes.find(c => c.id === r.conexaoId)?.nome ?? 'Conexão da loja'} · Produto {r.produto}
             <span className="ml-2 inline-block font-mono text-xs font-normal text-suave">Pacote {r.pacoteSha256.slice(0, 10)}</span>

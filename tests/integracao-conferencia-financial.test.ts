@@ -52,6 +52,7 @@ describe('conferência mensal Financial · leitura por loja', () => {
     { competencia: '0000-02' }, { competencia: '2026-02-01' }, { competencia: '2026-02 ' }, { competencia: null },
     { lojaId: ['loja-a', 'loja-a'] }, { lojaId: null }, { lojaId: '' }, { lojaId: ' loja-a' }, { lojaId: 'a'.repeat(129) },
     { paginaRecibos: '0' }, { paginaRecibos: null }, { paginaRecibos: ['1', '2'] }, { paginaRecibos: '1000000' },
+    { reciboId: ['', 'repetido'] }, { reciboId: 'com espaço' },
   ])('não usa valor padrão quando o parâmetro informado é inválido (%j)', async entrada => {
     const m = clienteDeTeste();
     expect(await lerConferenciaFinancial(m.cliente, acesso(), contexto, entrada)).toMatchObject({ ok: false, motivo: 'filtro-invalido' });

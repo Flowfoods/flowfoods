@@ -9,7 +9,7 @@ vi.mock('@/lib/erp/liberacao', () => ({ moduloLiberado: vi.fn() }));
 vi.mock('@/lib/integracoes/core/fontes-financial', () => ({ registrarFontesFinancial: vi.fn() }));
 const origem = 'https://erp.example';
 const url = origem + '/rodolfo/integracoes/sintetico/financial/fontes?loja=loj&conexao=con&competencia=2024-02';
-const ctx = { alcance: ALCANCE_FLOWFOODS, podeEscrever: true, bloqueio: null, parceiro: { status: 'ATIVO' }, cliente: {} } as ContextoDoParceiro;
+const ctx = { alcance: ALCANCE_FLOWFOODS, podeEscrever: true, bloqueio: null, parceiro: { status: 'ATIVO', slug: 'sintetico' }, cliente: {} } as ContextoDoParceiro;
 const registrar = vi.mocked(registrarFontesFinancial);
 const liberar = vi.mocked(moduloLiberado);
 
@@ -70,5 +70,20 @@ describe('recebimento HTTP das fontes mensais', () => {
     const r = await receberPacoteFinancial(requisicao(), ctx, origem);
     expect(r.status).toBe(422);
     expect(await r.json()).toEqual({ mensagem: 'Arquivo incompatível.' });
+  });
+
+  it('encaminha o POST nativo ao histórico ou ao erro do formulário por GET, inclusive antes da hidratação', async () => {
+    const nativo = () => requisicao(partes(), url, { accept: 'text/html,application/xhtml+xml,*/*;q=0.8' });
+    for (const reenvio of [false, true]) {
+      registrar.mockResolvedValueOnce({ ok: true, reciboId: 'recibo-fixture', reenvio });
+      const r = await receberPacoteFinancial(nativo(), ctx, origem);
+      expect(r.status).toBe(303);
+      expect(r.headers.get('location')).toBe('/rodolfo/integracoes/sintetico/financial?loja=loj&competencia=2024-02&recibo=recibo-fixture#recibo-recibo-fixture');
+    }
+    registrar.mockResolvedValueOnce({ ok: false, motivo: 'pacote-invalido', mensagem: 'Arquivo incompatível.' });
+    const erro = await receberPacoteFinancial(nativo(), ctx, origem);
+    expect(erro.status).toBe(303);
+    expect(erro.headers.get('location')).toBe('/rodolfo/integracoes/sintetico/financial?loja=loj&competencia=2024-02&erroEnvio=422#aviso-envio');
+    expect((await receberPacoteFinancial(nativo(), null, origem)).headers.get('location')).toBe('/rodolfo/login');
   });
 });

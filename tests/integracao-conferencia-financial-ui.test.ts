@@ -60,6 +60,11 @@ describe('tela de conferência Financial · fontes e navegação', () => {
     const tela = await html({ loja: loja.id, competencia: '2026-06', pagina: '1' });
     for (const texto of ['Recibos de fontes', 'Recebido para conferência', '13 recibos', 'Produto DELIVERY', '8,5%', '3,15%', recibo.arquivoSha256, 'pagina=2#recibos']) expect(tela).toContain(texto);
     expect(tela).not.toMatch(/Registrar recebimento|Baixar modelo do manifesto|R\$/);
+    const foco = await html({ recibo: recibo.id }, '/rodolfo/integracoes/qa');
+    expect(foco).toContain('Recibo disponível na consulta');
+    expect(foco).toMatch(/<details[^>]*\bopen/);
+    expect(await html({ recibo: 'inexistente' })).not.toContain('Recibo disponível na consulta');
+    expect(await html({ erroEnvio: '413' })).toContain('Cada arquivo pode ter até 2 MiB.');
     expect(await html({ exemplo: 'conforme' })).not.toContain(recibo.pacoteSha256);
   });
 

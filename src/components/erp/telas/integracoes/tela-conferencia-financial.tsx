@@ -21,6 +21,15 @@ type ContextoDaConferencia = Pick<ContextoDoParceiro, 'cliente' | 'alcance'> & {
   parceiro: Pick<ContextoDoParceiro['parceiro'], 'id' | 'homologacaoDeIntegracao'>;
 };
 
+const falhasDoEnvio: Record<string, string> = {
+  '400': 'Selecione a loja, a conexão e a competência e envie os dois arquivos preenchidos.',
+  '403': 'O envio exige acesso de escrita na central e liberação para esta loja.',
+  '409': 'Confira se a conexão e o módulo Financial continuam disponíveis para esta loja.',
+  '413': 'Cada arquivo pode ter até 2 MiB.',
+  '415': 'Escolha o CSV.gz e o manifesto JSON no formulário da central.',
+  '422': 'Confira a identificação, as contagens, as páginas de eventos e as vigências do manifesto com o arquivo mensal.',
+};
+
 function conexoesParaEnvio(consulta: Consulta, parceiroId: string): ConexaoParaEnvio[] {
   const { loja, competencia, ambiente } = consulta;
   if (!loja) return [];
@@ -84,7 +93,8 @@ export async function TelaConferenciaFinancial({ ctx, central, busca, permitirEn
   const base = `${central}/financial`;
   const consulta = await lerConferenciaFinancial(ctx.cliente, ctx.alcance,
     { parceiroId: ctx.parceiro.id, homologacaoDeIntegracao: ctx.parceiro.homologacaoDeIntegracao },
-    { lojaId: busca.loja, competencia: busca.competencia, ...(busca.pagina !== undefined && { paginaRecibos: busca.pagina }) });
+    { lojaId: busca.loja, competencia: busca.competencia, ...(busca.pagina !== undefined && { paginaRecibos: busca.pagina }),
+      ...(ctx.alcance.nivel === 'FLOWFOODS' && busca.recibo !== undefined && { reciboId: busca.recibo }) });
   const parametros = new URLSearchParams();
   if (consulta.ok && consulta.loja) {
     parametros.set('loja', consulta.loja.id);
@@ -92,6 +102,10 @@ export async function TelaConferenciaFinancial({ ctx, central, busca, permitirEn
   }
   const retorno = parametros.size ? `${base}?${parametros}` : base;
   const cenario = busca.exemplo;
+  const falha = ctx.alcance.nivel === 'FLOWFOODS' && typeof busca.erroEnvio === 'string' && Object.hasOwn(falhasDoEnvio, busca.erroEnvio)
+    ? falhasDoEnvio[busca.erroEnvio] : undefined;
+  const reciboVisivel = ctx.alcance.nivel === 'FLOWFOODS' && consulta.ok && typeof busca.recibo === 'string'
+    ? consulta.recibos.itens.find(r => r.id === busca.recibo) : undefined;
   const envio = permitirEnvio && ctx.alcance.nivel === 'FLOWFOODS' && consulta.ok && cenario === undefined
     ? conexoesParaEnvio(consulta, ctx.parceiro.id) : [];
   const valido = cenario === 'conforme' || cenario === 'divergente' || cenario === 'incompleto';
@@ -110,8 +124,10 @@ export async function TelaConferenciaFinancial({ ctx, central, busca, permitirEn
         <Aviso tom="alerta" titulo="Cenário inválido">Escolha um dos exemplos disponíveis na consulta.</Aviso>
         <Link href={retorno} className={classeDeBotao('secundario')}>Voltar à consulta da loja</Link>
       </> : <>
+        {falha && <div id="aviso-envio"><Aviso tom="alerta" titulo="Confira o envio">{falha}</Aviso></div>}
+        {reciboVisivel && <Aviso titulo="Recibo disponível na consulta">Pacote recebido para conferência. Recibo {reciboVisivel.id}.</Aviso>}
         <ConsultaDaLoja consulta={consulta} base={base} />
-        {consulta.loja && <RecibosFontesFinancial consulta={consulta} retorno={retorno} />}
+        {consulta.loja && <RecibosFontesFinancial consulta={consulta} retorno={retorno} destaque={reciboVisivel?.id} />}
         {consulta.loja && envio.length > 0 && <EnvioFontesFinancial key={retorno} conexoes={envio} base={base}
           loja={consulta.loja.id} competencia={consulta.competencia} retorno={retorno} />}
         {consulta.loja && <Link prefetch={false} href={`${retorno}&exemplo=conforme`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver exemplo com dados simulados</Link>}

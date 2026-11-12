@@ -167,6 +167,20 @@ describe.skipIf(!url)('recibos das fontes Financial no PostgreSQL descartável',
     expect(await a.ctx.cliente.integracaoReciboFinancial.count()).toBe(1);
   }, 30_000);
 
+  it('localiza a página do recibo reenviado dentro do histórico da mesma loja e competência', async () => {
+    const m = await preparar();
+    for (let i = 0; i < 13; i++) {
+      expect(await registrarFontesFinancial(m.ctx, entrada(m.escopo, 1200 + i))).toMatchObject({ ok: true, reenvio: false });
+    }
+    const original = await registrarFontesFinancial(m.ctx, entrada(m.escopo, 1200));
+    if (!original.ok || !original.reenvio) throw new Error('Recibo original ausente.');
+    const porRecibo = (reciboId: string) => m.ctx.cliente.transacao(tx =>
+      listarRecibosFontesFinancial(tx, rede, { ...m.escopo, reciboId }), { repetivel: true, relatorio: {} });
+    const pagina = await porRecibo(original.reciboId);
+    expect(pagina).toMatchObject({ total: 13, pagina: 2, itens: [{ id: original.reciboId }] });
+    expect((await porRecibo('recibo-de-fora')).pagina).toBe(1);
+  }, 30_000);
+
   it('revalida status e ambiente do parceiro e preserva a versão anterior ao religar um merchant', async () => {
     const m = await preparar(), { ctx, escopo } = m;
     expect(await registrarFontesFinancial(ctx, entrada(escopo))).toMatchObject({ ok: true });

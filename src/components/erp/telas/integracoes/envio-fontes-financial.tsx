@@ -47,7 +47,9 @@ export function EnvioFontesFinancial({ conexoes, base, loja, competencia, retorn
       }
       avisar({ ok: true, texto: recibo.reenvio ? `Este pacote já estava registrado. Recibo ${recibo.reciboId}.` : `Pacote recebido para conferência. Recibo ${recibo.reciboId}.` });
       form.reset();
-      if (new URLSearchParams(window.location.search).has('pagina')) router.replace(retorno, { scroll: false });
+      const busca = new URLSearchParams(window.location.search);
+      if (recibo.reenvio || busca.has('pagina') || busca.has('recibo') || busca.has('erroEnvio'))
+        router.replace(`${retorno}&recibo=${encodeURIComponent(recibo.reciboId)}`, { scroll: false });
       router.refresh();
     } catch {
       avisar({ ok: false, texto: 'A confirmação não chegou. Reenviar os mesmos arquivos recupera o recibo já registrado.' });

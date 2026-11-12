@@ -112,7 +112,7 @@ const metadadosDoRecibo = z.object({
 /** Recebe o cliente da transação de leitura repetível da conferência. */
 export async function listarRecibosFontesFinancial(
   tx: ClienteDoParceiro, alcance: Alcance,
-  filtro: Pick<EscopoFontesFinancial, 'lojaId' | 'ambiente' | 'competencia'>, paginaPedida = 1,
+  filtro: Pick<EscopoFontesFinancial, 'lojaId' | 'ambiente' | 'competencia'> & { reciboId?: string }, paginaPedida = 1,
 ): Promise<{ itens: ResumoReciboFontesFinancial[]; total: number; pagina: number; paginas: number }> {
   const { lojaId, ambiente, competencia } = filtro;
   if (!idValido(lojaId) || !diaDoPainelValido(competencia + '-01') || !['PRODUCAO', 'TEST'].includes(ambiente)
@@ -122,8 +122,17 @@ export async function listarRecibosFontesFinancial(
   const total = await tx.integracaoReciboFinancial.count({ where });
   const porPagina = 12;
   const paginas = Math.ceil(total / porPagina);
-  const pagina = Math.max(1, Math.min(Number.isSafeInteger(paginaPedida) ? paginaPedida : 1, paginas));
+  let pagina = Math.max(1, Math.min(Number.isSafeInteger(paginaPedida) ? paginaPedida : 1, paginas));
   if (!total) return { itens: [], total, pagina, paginas };
+  if (paginas > 1 && idValido(filtro.reciboId)) {
+    const alvo = await tx.integracaoReciboFinancial.findFirst({ where: { ...where, id: filtro.reciboId }, select: { id: true, recebidoEm: true } });
+    if (alvo) {
+      const maisRecentes = await tx.integracaoReciboFinancial.count({ where: { ...where, OR: [
+        { recebidoEm: { gt: alvo.recebidoEm } }, { recebidoEm: alvo.recebidoEm, id: { gt: alvo.id } },
+      ] } });
+      pagina = Math.floor(maisRecentes / porPagina) + 1;
+    }
+  }
   const linhas = await tx.integracaoReciboFinancial.findMany({
     where, select: resumo, orderBy: [{ recebidoEm: 'desc' }, { id: 'desc' }], take: porPagina, skip: (pagina - 1) * porPagina,
   });

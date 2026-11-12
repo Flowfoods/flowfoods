@@ -37,7 +37,7 @@ export async function lerConferenciaFinancial(
   cliente: ClienteDoParceiro,
   alcance: Alcance,
   contexto: { parceiroId: string; homologacaoDeIntegracao: boolean },
-  entrada: { lojaId?: unknown; competencia?: unknown; paginaRecibos?: unknown } = {},
+  entrada: { lojaId?: unknown; competencia?: unknown; paginaRecibos?: unknown; reciboId?: unknown } = {},
 ): Promise<ResultadoConferenciaFinancial> {
   if (!contexto || contexto.parceiroId !== cliente.parceiroId || typeof contexto.homologacaoDeIntegracao !== 'boolean') {
     return recusar('contexto-invalido', 'Não foi possível conferir o contexto deste parceiro.');
@@ -57,6 +57,9 @@ export async function lerConferenciaFinancial(
   const pagina = entrada.paginaRecibos === undefined ? '1' : entrada.paginaRecibos;
   if (typeof pagina !== 'string' || !/^[1-9]\d{0,5}$/.test(pagina))
     return recusar('filtro-invalido', 'Escolha uma página válida no histórico de recibos.');
+  const reciboId = entrada.reciboId;
+  if (reciboId !== undefined && (typeof reciboId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(reciboId)))
+    return recusar('filtro-invalido', 'A identificação do recibo é inválida.');
   const ambiente = contexto.homologacaoDeIntegracao ? 'TEST' : 'PRODUCAO';
 
   try {
@@ -95,7 +98,8 @@ export async function lerConferenciaFinancial(
         ...(alcance.nivel === 'FLOWFOODS' && v.estado === 'ATIVA' && (v.modulos[0]?.estado === 'AUTORIZADO' || v.modulos[0]?.estado === 'ATIVO')
           && { merchantDoModelo: v.idExterno }),
       }));
-      const recibos = await listarRecibosFontesFinancial(tx, alcance, { lojaId: loja.id, ambiente, competencia }, Number(pagina));
+      const recibos = await listarRecibosFontesFinancial(tx, alcance,
+        { lojaId: loja.id, ambiente, competencia, ...(reciboId && { reciboId }) }, Number(pagina));
       return { ok: true, lojas, loja, competencia, ambiente, conexoes, recibos,
         fonteMensal: recibos.total ? 'RECEBIDA_PARA_CONFERENCIA' : 'SEM_DADOS' };
     }, { repetivel: true, relatorio: {} });
