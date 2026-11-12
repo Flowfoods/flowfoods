@@ -43,7 +43,10 @@ export default async function ErpIntegracoesPage(props: { searchParams?: Promise
         titulo="Integrações"
         subtitulo={`${ctx.alcance.lojas === 'todas' ? 'Rede Completa' : 'Suas lojas'} · ${integracoes.length} ${integracoes.length === 1 ? 'loja do iFood ligada' : 'lojas do iFood ligadas'}`}
       />
-      {vePainel && <Link href={painelHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver painel iFood por período</Link>}
+      {vePainel && <nav aria-label="Conferências iFood" className="flex flex-wrap gap-x-6">
+        <Link href={painelHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver painel iFood por período</Link>
+        <Link href={`/erp/integracoes/financial${lojaDaConsulta ? `?loja=${encodeURIComponent(lojaDaConsulta)}` : ''}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Conferir financeiro do iFood</Link>
+      </nav>}
       <TelaIntegracoes integracoes={integracoes} painel={<PainelSituacaoAnalytics resultado={resultado} teste={ctx.parceiro.homologacaoDeIntegracao} base="/erp/integracoes" baseFaturamento="/erp/faturamento" />} />
     </div>
   );
