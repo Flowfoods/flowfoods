@@ -5,9 +5,10 @@ import { ErroDeRelatorio, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { diaDoPainelValido } from '../ifood/painel-campos';
 import type { AmbienteDeIntegracao } from './campos';
 import type { EstadoDoModulo } from './estados';
+import { listarRecibosFontesFinancial } from './fontes-financial';
 
 type Loja = { id: string; nome: string };
-type Conexao = { id: string; nome: string; estado: 'ATIVA' | 'DESLIGADA'; estadoFinancial: EstadoDoModulo | null };
+type Conexao = { id: string; nome: string; estado: 'ATIVA' | 'DESLIGADA'; estadoFinancial: EstadoDoModulo | null; merchantDoModelo?: string };
 type Motivo = 'sem-permissao' | 'nao-liberado' | 'filtro-invalido' | 'contexto-invalido' | 'leitura-indisponivel';
 
 export type ResultadoConferenciaFinancial =
@@ -19,7 +20,8 @@ export type ResultadoConferenciaFinancial =
     competencia: string;
     ambiente: AmbienteDeIntegracao;
     conexoes: Conexao[];
-    fonteMensal: 'SEM_DADOS';
+    fonteMensal: 'SEM_DADOS' | 'RECEBIDA_PARA_CONFERENCIA';
+    recibos: Awaited<ReturnType<typeof listarRecibosFontesFinancial>>;
   };
 
 export function podeVerConferenciaFinancial(alcance: Alcance, lojaId?: string): boolean {
@@ -35,7 +37,7 @@ export async function lerConferenciaFinancial(
   cliente: ClienteDoParceiro,
   alcance: Alcance,
   contexto: { parceiroId: string; homologacaoDeIntegracao: boolean },
-  entrada: { lojaId?: unknown; competencia?: unknown } = {},
+  entrada: { lojaId?: unknown; competencia?: unknown; paginaRecibos?: unknown } = {},
 ): Promise<ResultadoConferenciaFinancial> {
   if (!contexto || contexto.parceiroId !== cliente.parceiroId || typeof contexto.homologacaoDeIntegracao !== 'boolean') {
     return recusar('contexto-invalido', 'Não foi possível conferir o contexto deste parceiro.');
@@ -52,6 +54,9 @@ export async function lerConferenciaFinancial(
     return recusar('filtro-invalido', 'Escolha uma loja válida.');
   }
   if (lojaId !== undefined && !podeVerConferenciaFinancial(alcance, lojaId)) return lojaIndisponivel();
+  const pagina = entrada.paginaRecibos === undefined ? '1' : entrada.paginaRecibos;
+  if (typeof pagina !== 'string' || !/^[1-9]\d{0,5}$/.test(pagina))
+    return recusar('filtro-invalido', 'Escolha uma página válida no histórico de recibos.');
   const ambiente = contexto.homologacaoDeIntegracao ? 'TEST' : 'PRODUCAO';
 
   try {
@@ -71,12 +76,13 @@ export async function lerConferenciaFinancial(
       });
       const loja = lojaId === undefined ? lojas[0] ?? null : lojas.find(l => l.id === lojaId) ?? null;
       if (lojaId !== undefined && !loja) return lojaIndisponivel();
-      if (!loja) return { ok: true, lojas, loja: null, competencia, ambiente, conexoes: [], fonteMensal: 'SEM_DADOS' };
+      if (!loja) return { ok: true, lojas, loja: null, competencia, ambiente, conexoes: [], fonteMensal: 'SEM_DADOS',
+        recibos: { total: 0, pagina: 1, paginas: 0, itens: [] } };
       if (!podeVerConferenciaFinancial(alcance, loja.id)) return lojaIndisponivel();
 
       const vinculos = await tx.integracaoConexao.findMany({
         where: { parceiroId: tx.parceiroId, lojaId: loja.id, provedor: 'IFOOD' },
-        select: { id: true, nomeExterno: true, estado: true, ambiente: true,
+        select: { id: true, nomeExterno: true, estado: true, ambiente: true, ...(alcance.nivel === 'FLOWFOODS' && { idExterno: true }),
           modulos: { where: { modulo: 'FINANCIAL' }, select: { estado: true } } },
         orderBy: [{ estado: 'asc' }, { nomeExterno: 'asc' }, { id: 'asc' }],
       });
@@ -85,8 +91,12 @@ export async function lerConferenciaFinancial(
       }
       const conexoes = vinculos.map(v => ({
         id: v.id, nome: v.nomeExterno, estado: v.estado, estadoFinancial: v.modulos[0]?.estado ?? null,
+        ...(alcance.nivel === 'FLOWFOODS' && v.estado === 'ATIVA' && (v.modulos[0]?.estado === 'AUTORIZADO' || v.modulos[0]?.estado === 'ATIVO')
+          && { merchantDoModelo: v.idExterno }),
       }));
-      return { ok: true, lojas, loja, competencia, ambiente, conexoes, fonteMensal: 'SEM_DADOS' };
+      const recibos = await listarRecibosFontesFinancial(tx, alcance, { lojaId: loja.id, ambiente, competencia }, Number(pagina));
+      return { ok: true, lojas, loja, competencia, ambiente, conexoes, recibos,
+        fonteMensal: recibos.total ? 'RECEBIDA_PARA_CONFERENCIA' : 'SEM_DADOS' };
     }, { repetivel: true, relatorio: {} });
   } catch (erro) {
     if (erro instanceof ErroDeRelatorio) return leituraIndisponivel();

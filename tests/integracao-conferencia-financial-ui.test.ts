@@ -6,10 +6,12 @@ import { doParceiro } from '@/lib/erp/tenant';
 import { lerConferenciaFinancial, type ResultadoConferenciaFinancial } from '@/lib/integracoes/core/conferencia-financial';
 
 vi.mock('@/lib/integracoes/core/conferencia-financial', () => ({ lerConferenciaFinancial: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({}) }));
 
 const loja = { id: 'loja-consulta', nome: 'Unidade selecionada' };
 const consulta: Extract<ResultadoConferenciaFinancial, { ok: true }> = {
   ok: true, loja, lojas: [loja], competencia: '2026-06', ambiente: 'TEST', fonteMensal: 'SEM_DADOS',
+  recibos: { total: 0, pagina: 1, paginas: 0, itens: [] },
   conexoes: [{ id: 'conexao', nome: 'Vínculo cadastrado', estado: 'ATIVA', estadoFinancial: 'ATIVO' }],
 };
 const ctx = { parceiro: { id: 'parceiro-tela', homologacaoDeIntegracao: true }, alcance: ALCANCE_FLOWFOODS, cliente: doParceiro('parceiro-tela') };
@@ -45,6 +47,32 @@ describe('tela de conferência Financial · fontes e navegação', () => {
     for (const texto of ['Fonte de vendas ausente', 'Fonte de eventos ausente', 'Fonte de liquidações ausente']) expect(tela).toContain(texto);
     expect(tela).toContain('Baixar CSV.gz simulado');
     expect(tela).not.toContain('R$');
+  });
+
+  it('exibe o histórico do mês, paginação e taxas declaradas sem lançar valores no resultado', async () => {
+    const recibo = { id: 'recibo-qa', conexaoId: 'conexao', ambiente: 'TEST' as const, competencia: '2026-06',
+      origem: 'MANUAL_DECLARADA' as const, situacao: 'RECEBIDO_PARA_CONFERENCIA' as const, recebidoEm: new Date('2026-07-03T15:00:00Z'),
+      requestIdSha256: '1'.repeat(64), arquivoSha256: '2'.repeat(64), manifestoSha256: '3'.repeat(64),
+      eventosSha256: '4'.repeat(64), vigenciasSha256: '5'.repeat(64), pacoteSha256: '6'.repeat(64),
+      linhasArquivo: 8, pedidosDistintos: 3, paginasEventos: 1, quantidadeEventos: 5,
+      vigencias: [{ inicio: '2026-06-01', fim: '2026-06-30', comissaoBp: 850, pagamentoBp: 315 }] };
+    ler.mockResolvedValue({ ...consulta, fonteMensal: 'RECEBIDA_PARA_CONFERENCIA', recibos: { total: 13, paginas: 2, pagina: 1, itens: [recibo] } });
+    const tela = await html({ loja: loja.id, competencia: '2026-06', pagina: '1' });
+    for (const texto of ['Recibos de fontes', 'Recebido para conferência', '13 recibos', '8,5%', '3,15%', recibo.arquivoSha256, 'pagina=2#recibos']) expect(tela).toContain(texto);
+    expect(tela).not.toMatch(/Registrar recebimento|Baixar modelo do manifesto|R\$/);
+    expect(await html({ exemplo: 'conforme' })).not.toContain(recibo.pacoteSha256);
+  });
+
+  it('gera o modelo com o mês e a conexão autorizados somente no formulário de escrita', async () => {
+    ler.mockResolvedValue({ ...consulta, competencia: '2024-02', conexoes: [{ ...consulta.conexoes[0], merchantDoModelo: 'merchant-sintetico' }] });
+    const base = '/rodolfo/integracoes/qa';
+    const tela = renderToStaticMarkup(await TelaConferenciaFinancial({ ctx, central: base, busca: {}, permitirEnvio: true }));
+    expect(tela).toContain('Registrar recebimento');
+    const dados = /data:application\/json;charset=utf-8;base64,([\w+=/]+)/.exec(tela);
+    const modelo = JSON.parse(Buffer.from(dados![1], 'base64').toString());
+    expect(modelo).toMatchObject({ escopo: { lojaId: loja.id, merchantId: 'merchant-sintetico', competencia: '2024-02', ambiente: 'TEST' },
+      arquivo: { sha256: null }, configuracao: { vigencias: [{ fim: '2024-02-29', comissaoBp: null, pagamentoBp: null }] } });
+    expect(await html({}, base)).not.toContain('Registrar recebimento');
   });
 
   it.each([{ exemplo: 'desconhecido' }, { exemplo: ['conforme', 'divergente'] }])('recusa um cenário inválido ou repetido', async ({ exemplo }) => {

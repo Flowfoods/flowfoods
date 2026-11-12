@@ -142,7 +142,10 @@ function inteiroPositivo(valor: unknown): number {
 }
 
 /** Lê uma resposta 200. A conclusão da apuração depende de evidência fora desta página. */
-export function lerPaginaEventosV3(textoJson: string, pedido: { page: number; size: number; merchantId?: string }): PaginaEventosV3 {
+export function lerPaginaEventosV3(
+  textoJson: string, pedido: { page: number; size: number; merchantId?: string },
+  conferirFonte?: (pagina: Readonly<Record<string, unknown>>) => void,
+): PaginaEventosV3 {
   if (!pedido || !Number.isSafeInteger(pedido.page) || pedido.page < 1 || !Number.isSafeInteger(pedido.size) || pedido.size < 1) {
     throw new ErroEventosV3('PEDIDO_INVALIDO');
   }
@@ -165,5 +168,7 @@ export function lerPaginaEventosV3(textoJson: string, pedido: { page: number; si
   if (page !== pedido.page || size !== pedido.size) throw new ErroEventosV3('PAGINACAO_DIVERGENTE');
   if (pagina.financialEvents.length > MAX_EVENTOS_POR_PAGINA_LOCAL) throw new ErroEventosV3('LIMITE_LOCAL');
   if (pagina.financialEvents.length > size) throw new ErroEventosV3('PAGINA_INVALIDA');
-  return { formato, page, size, hasNextPage: pagina.hasNextPage, eventos: pagina.financialEvents.map(e => lerEvento(e, loja ?? undefined)) };
+  const eventos = pagina.financialEvents.map(e => lerEvento(e, loja ?? undefined));
+  conferirFonte?.(pagina);
+  return { formato, page, size, hasNextPage: pagina.hasNextPage, eventos };
 }

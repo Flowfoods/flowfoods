@@ -4,12 +4,15 @@ import { COR } from '@/lib/erp/modulos';
 import { lerConferenciaFinancial, type ResultadoConferenciaFinancial } from '@/lib/integracoes/core/conferencia-financial';
 import { ROTULO_DO_ESTADO } from '@/lib/integracoes/core/estados';
 import { montarExemploConferenciaFinancial } from '@/lib/integracoes/ifood/financial-v3-exemplo-conferencia';
+import { modeloManifestoFinancial } from '@/lib/integracoes/ifood/financial-v3-modelo-manifesto';
 import { Voltar } from '@/components/erp/telas/cadastro/partes';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { Campo, CAMPO } from '@/components/erp/ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Aviso, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { ExemploDeConferencia } from './exemplo-conferencia-financial';
+import { EnvioFontesFinancial, type ConexaoParaEnvio } from './envio-fontes-financial';
+import { RecibosFontesFinancial } from './recibos-fontes-financial';
 import { formatarCompetenciaFinancial } from './medidas-conferencia-financial';
 
 type Consulta = Extract<ResultadoConferenciaFinancial, { ok: true }>;
@@ -17,6 +20,18 @@ type Busca = Record<string, string | string[] | undefined>;
 type ContextoDaConferencia = Pick<ContextoDoParceiro, 'cliente' | 'alcance'> & {
   parceiro: Pick<ContextoDoParceiro['parceiro'], 'id' | 'homologacaoDeIntegracao'>;
 };
+
+function conexoesParaEnvio(consulta: Consulta, parceiroId: string): ConexaoParaEnvio[] {
+  const { loja, competencia, ambiente } = consulta;
+  if (!loja) return [];
+  return consulta.conexoes.flatMap(c => {
+    if (!c.merchantDoModelo) return [];
+    const modelo = modeloManifestoFinancial({ parceiroId, lojaId: loja.id, conexaoId: c.id,
+      merchantId: c.merchantDoModelo, competencia, ambiente });
+    const json = Buffer.from(JSON.stringify(modelo, null, 2), 'utf8').toString('base64');
+    return [{ id: c.id, nome: c.nome, modeloHref: `data:application/json;charset=utf-8;base64,${json}` }];
+  });
+}
 
 function ConsultaDaLoja({ consulta, base }: { consulta: Consulta; base: string }) {
   const { lojas, loja, competencia, ambiente, conexoes } = consulta;
@@ -36,8 +51,11 @@ function ConsultaDaLoja({ consulta, base }: { consulta: Consulta; base: string }
         <button type="submit" className={classeDeBotao('primario')}>Consultar</button>
       </form>
     </Painel>
-    <Painel titulo="Fontes da competência" subtitulo={`${loja.nome} · ${formatarCompetenciaFinancial(competencia)}`} acessorio={<Selo>Sem dados</Selo>}>
-      <p className="text-sm text-texto">Ainda não há uma fonte Financial conciliada para esta loja neste mês.</p>
+    <Painel titulo="Fontes da competência" subtitulo={`${loja.nome} · ${formatarCompetenciaFinancial(competencia)}`}
+      acessorio={<Selo>{consulta.fonteMensal === 'SEM_DADOS' ? 'Sem dados' : 'Recebido para conferência'}</Selo>}>
+      <p className="text-sm text-texto">{consulta.fonteMensal === 'SEM_DADOS'
+        ? 'Ainda não há uma fonte Financial conciliada para esta loja neste mês.'
+        : 'O ERP recebeu fontes declaradas para esta loja e mês. A conciliação dos valores está pendente.'}</p>
       <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-suave">
         <li>Arquivo mensal e eventos financeiros para conferir o saldo com impacto no repasse.</li>
         <li>Liquidações para confrontar o saldo de repasse com os eventos.</li>
@@ -57,15 +75,16 @@ function ConsultaDaLoja({ consulta, base }: { consulta: Consulta; base: string }
   </>;
 }
 
-export async function TelaConferenciaFinancial({ ctx, central, busca }: {
+export async function TelaConferenciaFinancial({ ctx, central, busca, permitirEnvio = false }: {
   ctx: ContextoDaConferencia;
   central: string;
   busca: Busca;
+  permitirEnvio?: boolean;
 }) {
   const base = `${central}/financial`;
   const consulta = await lerConferenciaFinancial(ctx.cliente, ctx.alcance,
     { parceiroId: ctx.parceiro.id, homologacaoDeIntegracao: ctx.parceiro.homologacaoDeIntegracao },
-    { lojaId: busca.loja, competencia: busca.competencia });
+    { lojaId: busca.loja, competencia: busca.competencia, ...(busca.pagina !== undefined && { paginaRecibos: busca.pagina }) });
   const parametros = new URLSearchParams();
   if (consulta.ok && consulta.loja) {
     parametros.set('loja', consulta.loja.id);
@@ -73,6 +92,8 @@ export async function TelaConferenciaFinancial({ ctx, central, busca }: {
   }
   const retorno = parametros.size ? `${base}?${parametros}` : base;
   const cenario = busca.exemplo;
+  const envio = permitirEnvio && ctx.alcance.nivel === 'FLOWFOODS' && consulta.ok && cenario === undefined
+    ? conexoesParaEnvio(consulta, ctx.parceiro.id) : [];
   const valido = cenario === 'conforme' || cenario === 'divergente' || cenario === 'incompleto';
   const exemplo = consulta.ok && consulta.loja && valido ? await montarExemploConferenciaFinancial(cenario) : null;
   const hrefDaCentral = consulta.ok && consulta.loja ? `${central}?loja=${encodeURIComponent(consulta.loja.id)}` : central;
@@ -90,6 +111,9 @@ export async function TelaConferenciaFinancial({ ctx, central, busca }: {
         <Link href={retorno} className={classeDeBotao('secundario')}>Voltar à consulta da loja</Link>
       </> : <>
         <ConsultaDaLoja consulta={consulta} base={base} />
+        {consulta.loja && <RecibosFontesFinancial consulta={consulta} retorno={retorno} />}
+        {consulta.loja && envio.length > 0 && <EnvioFontesFinancial key={retorno} conexoes={envio} base={base}
+          loja={consulta.loja.id} competencia={consulta.competencia} retorno={retorno} />}
         {consulta.loja && <Link prefetch={false} href={`${retorno}&exemplo=conforme`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver exemplo com dados simulados</Link>}
       </>}
   </div>;

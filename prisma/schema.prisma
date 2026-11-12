@@ -622,6 +622,7 @@ model ParceiroFlow {
   erpKpisIfoodDia             KpiIfoodDia[]
   erpIntegracaoFaturamentoDias IntegracaoFaturamentoDia[]
   erpIntegracaoFaturamentoFontes IntegracaoFaturamentoFonte[]
+  erpIntegracaoRecibosFinancial IntegracaoReciboFinancial[]
   erpLiberacoesDeModulo       LiberacaoDeModulo[]
 
   // Acesso das pessoas (0.3): FORA do tenant, só por `src/lib/erp/credenciais.ts`
@@ -721,6 +722,7 @@ model Loja {
   aberturasDeLote      AberturaDeLote[]
   faturamentos         FaturamentoLancamento[]
   integracaoFaturamentoDias IntegracaoFaturamentoDia[]
+  recibosFinancial     IntegracaoReciboFinancial[]
   despesas             Despesa[]
   fotografiasDoDre     DreFotografiaLinha[]
   categoriasNaLoja     CategoriaNaLoja[]
@@ -3019,6 +3021,7 @@ model IntegracaoConexao {
 
   modulos IntegracaoConexaoModulo[]
   fontesFaturamento IntegracaoFaturamentoFonte[]
+  recibosFinancial IntegracaoReciboFinancial[]
 
   @@unique([parceiroId, id])
   @@index([parceiroId, lojaId])
@@ -3050,6 +3053,7 @@ model IntegracaoConexaoModulo {
 
   execucoes IntegracaoExecucao[]
   fontesFaturamento IntegracaoFaturamentoFonte[]
+  recibosFinancial IntegracaoReciboFinancial[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, conexaoId, modulo])
@@ -3281,6 +3285,42 @@ model IntegracaoFaturamentoFonte {
   @@unique([parceiroId, reciboId, merchantId], map: "IFFFonte_recibo_merchant_key")
   @@unique([parceiroId, merchantId, dia], map: "IFFFonte_merchant_dia_key")
   @@unique([parceiroId, lancamentoId], map: "IFFFonte_lancamento_key")
+}
+
+// Recibo imutável dos três documentos apresentados ao nível 1 para conferência mensal.
+model IntegracaoReciboFinancial {
+  id                String                 @id @default(cuid())
+  parceiroId        String
+  parceiro          ParceiroFlow           @relation(fields: [parceiroId], references: [id], onDelete: Restrict, map: "IFRecibo_parceiro_fkey")
+  lojaId            String
+  loja              Loja                   @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict, map: "IFRecibo_loja_fkey")
+  conexaoId         String
+  conexao           IntegracaoConexao       @relation(fields: [parceiroId, conexaoId], references: [parceiroId, id], onDelete: Restrict, map: "IFRecibo_conexao_fkey")
+  moduloId          String
+  modulo            IntegracaoConexaoModulo @relation(fields: [parceiroId, moduloId], references: [parceiroId, id], onDelete: Restrict, map: "IFRecibo_modulo_fkey")
+  merchantId        String
+  ambiente          AmbienteDeIntegracao
+  competencia       String
+  versao            Int                    @default(1)
+  origem            String                 @default("MANUAL_DECLARADA")
+  situacao          String                 @default("RECEBIDO_PARA_CONFERENCIA")
+  recebidoEm        DateTime               @default(now()) @db.Timestamptz(3)
+  recebidoPorId     String
+  requestIdSha256   String
+  arquivoSha256     String
+  manifestoSha256   String
+  eventosSha256     String
+  vigenciasSha256   String
+  pacoteSha256      String
+  linhasArquivo     Int
+  pedidosDistintos  Int
+  paginasEventos    Int
+  quantidadeEventos Int
+  vigencias         Json
+
+  @@unique([parceiroId, id], map: "IFRecibo_tenant_key")
+  @@unique([parceiroId, conexaoId, competencia, pacoteSha256], map: "IFRecibo_pacote_key")
+  @@index([parceiroId, lojaId, ambiente, competencia, recebidoEm(sort: Desc), id(sort: Desc)], map: "IFRecibo_loja_mes_idx")
 }
 
 // Liberação de um módulo do ERP para um parceiro (decisão de Rodolfo de 25/10/2026: "cada módulo liberado individualmente").

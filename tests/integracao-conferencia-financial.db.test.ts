@@ -61,6 +61,7 @@ describe.skipIf(!url)('conferência Financial · isolamento entre parceiros e lo
     expect(resultado).toEqual({
       ok: true, lojas: [a.loja], loja: a.loja, competencia: '2026-02', ambiente: 'PRODUCAO',
       conexoes: [{ id: a.vinculo.id, nome: 'Vínculo sintético', estado: 'ATIVA', estadoFinancial: null }], fonteMensal: 'SEM_DADOS',
+      recibos: { total: 0, pagina: 1, paginas: 0, itens: [] },
     });
     const negativa = await consultar(outraLoja.id);
     expect(negativa).toMatchObject({ ok: false, motivo: 'sem-permissao' });

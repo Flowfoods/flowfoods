@@ -21,6 +21,7 @@ import type { ContextoDoParceiro } from './contexto-base';
 import { pode } from './permissoes';
 import { LIMITE_DA_FOTO, prepararFoto } from './foto';
 import { faxinarPendentes, salvarFoto } from './arquivos';
+import { lerComTeto } from './corpo-limitado';
 
 const resposta = (status: number, corpo: Record<string, string>) =>
   new Response(JSON.stringify(corpo), {
@@ -38,31 +39,6 @@ function mesmaOrigem(req: Request): boolean {
   } catch {
     return false;
   }
-}
-
-/** Lê o corpo até `teto` bytes; passou disso, corta e devolve null. */
-async function lerComTeto(req: Request, teto: number): Promise<Uint8Array | null> {
-  const leitor = req.body?.getReader();
-  if (!leitor) return new Uint8Array();
-  const partes: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await leitor.read();
-    if (done) break;
-    total += value.length;
-    if (total > teto) {
-      await leitor.cancel();
-      return null;
-    }
-    partes.push(value);
-  }
-  const tudo = new Uint8Array(total);
-  let i = 0;
-  for (const p of partes) {
-    tudo.set(p, i);
-    i += p.length;
-  }
-  return tudo;
 }
 
 export const MENSAGEM_SEM_SESSAO_NO_ENVIO = 'Sua sessão terminou. Entre de novo para enviar a foto.';
