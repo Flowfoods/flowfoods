@@ -311,6 +311,10 @@
     "versao": 3,
     "hash": "49cf8306e8a172df"
   },
+  "integracoes-financial": {
+    "versao": 1,
+    "hash": "abc90116a77d8b03"
+  },
   "equipe": {
     "versao": 1,
     "hash": "15d3af5a44b272be"
