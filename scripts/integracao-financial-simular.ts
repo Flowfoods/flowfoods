@@ -2,6 +2,7 @@
 import { gzipSync } from 'node:zlib';
 import { simularTaxasMensais } from './integracao-financial-taxas-simuladas';
 import { simularCustoAntecipacao } from './integracao-financial-custo-antecipacao-simulado';
+import { exportarConciliacaoSimulada } from './integracao-financial-exportar';
 import { lerArquivoConciliacaoV3 } from '../src/lib/integracoes/ifood/financial-v3-arquivo';
 import { compararConciliacaoEventosV3 } from '../src/lib/integracoes/ifood/financial-v3-comparacao';
 import { conciliarLiquidacaoMensalV3 } from '../src/lib/integracoes/ifood/financial-v3-liquidacao-mensal';
@@ -65,7 +66,7 @@ const respostasFicticias: Transporte = async pedido => {
   return { status: 200, cabecalhos: {}, corpo: JSON.stringify(corpo) };
 };
 
-async function simularProtocoloMensal(eventosDaSemana: Awaited<ReturnType<typeof consultarEventosFinancialV3>>) {
+async function gerarArquivoMensalSimulado() {
   const consulta = { merchantId: intervalo.merchantId, competencia: '2026-02' };
   const requestId = '00000000-0000-4000-8000-000000000002';
   const rota = '/financial/v3.0/merchants/' + consulta.merchantId + '/reconciliation/on-demand';
@@ -95,6 +96,11 @@ async function simularProtocoloMensal(eventosDaSemana: Awaited<ReturnType<typeof
   const arquivoInjetado = {
     protocolo: solicitacao.protocolo, bytes: gzipSync(csv), totaisInformados: { linhas: 3, pedidos: 1 },
   };
+  return { solicitacao, acompanhamento, arquivoInjetado, esperasSimuladasMs };
+}
+
+async function simularProtocoloMensal(eventosDaSemana: Awaited<ReturnType<typeof consultarEventosFinancialV3>>) {
+  const { solicitacao, acompanhamento, arquivoInjetado, esperasSimuladasMs } = await gerarArquivoMensalSimulado();
   const arquivo = await lerArquivoConciliacaoV3(acompanhamento, arquivoInjetado);
   const evidenciaArquivo = {
     protocolo: solicitacao.protocolo, produto: 'IFOOD', moeda: 'BRL', coberturaCompleta: true, apuracaoEncerrada: true,
@@ -155,7 +161,18 @@ async function simularLiquidacaoMensal() {
 }
 
 async function executar() {
-  if (process.argv.length > 2) throw new Error('Use npm run integracao:financial-simular sem argumentos.');
+  const args = process.argv.slice(2);
+  if (args.length === 2 && args[0] === '--exportar-conciliacao' && args[1].trim()) {
+    const { solicitacao, acompanhamento, arquivoInjetado } = await gerarArquivoMensalSimulado();
+    const identidade = { parceiro: 'parceiro-simulado', loja: 'loja-simulada', merchant: mes.merchantId,
+      competencia: '2026-02', produto: 'IFOOD', moeda: 'BRL' as const };
+    const exportacao = await exportarConciliacaoSimulada(args[1], { origem: 'SIMULACAO',
+      pedido: { identidade, protocolo: solicitacao.protocolo }, acompanhamento, arquivo: { ...arquivoInjetado, identidade },
+    });
+    console.log(JSON.stringify(exportacao, serializarCentavos, 2));
+    return;
+  }
+  if (args.length) throw new Error('Use npm run integracao:financial-simular ou acrescente -- --exportar-conciliacao <diretório existente>.');
   const eventos = await consultarEventosFinancialV3(intervalo, transporteEventos('30.00'));
   const liquidacoes = await consultarLiquidacoesFinancialV3({ ...intervalo, filtro: 'APURACAO' }, respostasFicticias);
   const antecipacoes = await consultarAntecipacoesFinancialV3({ ...intervalo, filtro: 'PAGAMENTO_ANTECIPADO' }, respostasFicticias);
@@ -166,7 +183,11 @@ async function executar() {
   const custoDeAntecipacao = await simularCustoAntecipacao();
   console.log(JSON.stringify({ origem: 'SIMULACAO', moedaDoCenario: 'BRL', eventos, liquidacoes, antecipacoes, vendas, conciliacao,
     conciliacaoDeLiquidacao, comparacaoDeTaxas, custoDeAntecipacao },
-    (_chave, valor) => typeof valor === 'bigint' ? valor.toString() : valor, 2));
+    serializarCentavos, 2));
+}
+
+function serializarCentavos(_chave: string, valor: unknown) {
+  return typeof valor === 'bigint' ? valor.toString() : valor;
 }
 
 executar().catch((erro: Error) => { console.error(erro.message); process.exitCode = 1; });

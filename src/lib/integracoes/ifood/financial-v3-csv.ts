@@ -62,12 +62,20 @@ function percorrerCsv(texto: string, receber?: (campos: readonly string[]) => vo
   }
 }
 
-export async function lerRegistrosCsvGzip(bytes: Uint8Array, receber: (campos: readonly string[]) => void): Promise<void> {
-  if (!(bytes instanceof Uint8Array) || bytes.length < 2 || bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
+/** Preserva somente a janela recebida e verifica o limite antes de reservar a cópia. */
+export function copiarGzipConciliacaoV3(bytes: Uint8Array): Uint8Array {
+  if (!(bytes instanceof Uint8Array) || bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
     throw new Error('Gzip de conciliação inválido.');
   }
-  if (bytes.length > maximoCompactado) limiteExcedido();
-  const entrada = Buffer.from(bytes);
+  const tamanho = bytes.byteLength;
+  if (tamanho > maximoCompactado) limiteExcedido();
+  const copia = new Uint8Array(tamanho);
+  copia.set(bytes);
+  return copia;
+}
+
+export async function lerRegistrosCsvGzip(bytes: Uint8Array, receber: (campos: readonly string[]) => void): Promise<void> {
+  const entrada = copiarGzipConciliacaoV3(bytes);
   let conteudo: Buffer;
   try {
     // Os tipos de Node descrevem apenas o retorno padrão, sem info.

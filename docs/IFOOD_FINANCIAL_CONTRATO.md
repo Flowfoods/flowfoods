@@ -163,6 +163,18 @@ O resultado mantém os diagnósticos por título. Uma antecipação `FAILED` apa
 
 Em `npm run integracao:financial-simular`, dois títulos de fevereiro antecipam R$ 800,00 e R$ 200,00. Os valores líquidos são R$ 796,00 e R$ 196,00. Com as bases dos dois títulos atestadas no cenário, as taxas de 0,5% e 2% somam R$ 8,00, ou 0,8% de R$ 1.000,00. O comando também demonstra a ausência de base em um título, um desvio de um centavo no líquido e um percentual declarado divergente. Os campos originais e antecipados vêm do mesmo título de Anticipations. O cruzamento com títulos de Settlements, a base comercial real, a paginação e os regimes D+1/D+7 dependem de verificação no ambiente oficial.
 
+### Download do CSV.gz de conciliação simulado
+
+Para salvar uma cópia do relatório fictício de fevereiro de 2026, indique um diretório existente ao simulador. A publicação atômica do arquivo usa um link físico no mesmo diretório, disponível em sistemas de arquivos como NTFS e ext4.
+
+```sh
+npm run integracao:financial-simular -- --exportar-conciliacao ./relatorios
+```
+
+O comando usa o mesmo cenário de solicitação e acompanhamento do relatório mensal. Antes de gravar, confere a identidade do parceiro e da loja, o merchant, a competência, o produto, a moeda e o protocolo. O arquivo precisa estar disponível e passar pela leitura integral, com as contagens de lançamentos e de pedidos conferidas. A exportação preserva os bytes compactados originais, inclusive cabeçalho e colunas adicionais. A cobertura do mês e o fechamento dos valores continuam sujeitos às verificações de conciliação.
+
+Ao concluir, o comando informa o caminho do arquivo `conciliacao-simulada-<merchant>-<competencia>.csv.gz`, o tipo `application/gzip`, o tamanho e o resumo do conteúdo. No exemplo são três lançamentos, um pedido distinto e R$ 27,00 com impacto no repasse. O nome final só aparece quando a escrita está completa. Se o arquivo já existir, seu conteúdo é preservado. Esta entrega usa transporte e bytes fictícios em memória. O fluxo operacional de disponibilização ao usuário está previsto na integração do ERP com o ambiente autorizado. [Guia iFood de Reconciliation On-Demand](https://developer.ifood.com.br/en-US/docs/food/guides/modules/financial/api-reconciliation-ondemand)
+
 ## Verificação
 
 Execute `npm test -- ifood-financial-v3` para conferir os leitores e as consultas por transporte simulado. A suíte inclui precisão do JSON, paginação de vendas e eventos, antecipações e liquidações, conflitos de protocolo, divergência de loja e competência e retomada após o prazo de consulta. A demonstração pelo comando `integracao:financial-simular` usa as mesmas funções de consulta.
