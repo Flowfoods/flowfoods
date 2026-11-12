@@ -113,7 +113,7 @@ describe.skipIf(!url)('recibos das fontes Financial no PostgreSQL descartável',
     const gravado = await cliente.integracaoReciboFinancial.findUniqueOrThrow({ where: { id: primeira.reciboId } });
     expect(gravado).toMatchObject({
       ...m.escopo, moduloId: m.moduloId, recebidoPorId: autor.userId, recebidoEm: expect.any(Date),
-      origem: 'MANUAL_DECLARADA', situacao: 'RECEBIDO_PARA_CONFERENCIA', linhasArquivo: 2, pedidosDistintos: 1,
+      origem: 'MANUAL_DECLARADA', situacao: 'RECEBIDO_PARA_CONFERENCIA', produto: 'IFOOD', linhasArquivo: 2, pedidosDistintos: 1,
       quantidadeEventos: 1, paginasEventos: 1, vigencias: [{ inicio: '2024-02-01', fim: '2024-02-29', comissaoBp: 1200, pagamentoBp: 0 }],
       arquivoSha256: createHash('sha256').update(dados.arquivoGzip).digest('hex'),
       manifestoSha256: createHash('sha256').update(dados.manifestoJson).digest('hex'),

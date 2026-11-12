@@ -51,6 +51,7 @@ export interface VigenciaFontesFinancial {
 export interface ReciboPacoteFontesFinancial {
   versao: 1;
   escopo: EscopoFontesFinancial;
+  produto: string;
   requestIdSha256: string;
   arquivoSha256: string;
   manifestoSha256: string;
@@ -79,7 +80,7 @@ const manifestoSchema = z.strictObject({
 const arquivoSchema = z.strictObject({
   merchantId: merchant, competencia, requestId: z.string().refine(requestIdConciliacaoValido),
   sha256: z.string().length(64).toLowerCase().regex(/^[0-9a-f]{64}$/),
-  produto: z.literal('IFOOD'), moeda: z.literal('BRL'), linhas: natural, pedidos: natural,
+  produto: idInterno.max(120), moeda: z.literal('BRL'), linhas: natural, pedidos: natural,
 });
 const paginaSchema = z.strictObject({
   consulta: z.strictObject({ merchantId: merchant, inicio: dia, fim: dia, page: natural, size: natural.pipe(z.literal(tamanhoPagina)) }),
@@ -153,7 +154,7 @@ function conferirEcosDaPagina(pagina: Readonly<Record<string, unknown>>, consult
   }
 }
 
-function conferirEventos(valor: unknown, escopo: EscopoFontesFinancial) {
+function conferirEventos(valor: unknown, escopo: EscopoFontesFinancial, produto: string) {
   if (!Array.isArray(valor) || !valor.length || valor.length > maximoPaginas) throw new ErroPacoteFontesFinancial('EVENTOS');
   const paginas = [];
   let quantidadeEventos = 0;
@@ -169,7 +170,7 @@ function conferirEventos(valor: unknown, escopo: EscopoFontesFinancial) {
         throw new ErroPacoteFontesFinancial('EVENTOS');
       }
       const motivos = new Set<MotivoEventosMensaisV3>();
-      somarEventosMensaisV3({ consulta, paginasLidas: 1, eventos: [...pagina.eventos] }, escopo, 'IFOOD', motivos);
+      somarEventosMensaisV3({ consulta, paginasLidas: 1, eventos: [...pagina.eventos] }, escopo, produto, motivos);
       if (motivos.size) throw new ErroPacoteFontesFinancial('EVENTOS');
       quantidadeEventos += pagina.eventos.length;
       paginas.push({ consulta, sha256: sha256(corpo) });
@@ -195,7 +196,7 @@ export async function prepararPacoteFontesFinancial(
   try { bytes = copiarGzipConciliacaoV3(arquivoGzip); } catch { throw new ErroPacoteFontesFinancial('ARQUIVO'); }
   const arquivoSha256 = sha256(bytes);
   if (arquivoSha256 !== arquivo.sha256) throw new ErroPacoteFontesFinancial('ARQUIVO');
-  const { janela, paginasEventos, quantidadeEventos, eventosSha256 } = conferirEventos(manifesto.eventos, escopo);
+  const { janela, paginasEventos, quantidadeEventos, eventosSha256 } = conferirEventos(manifesto.eventos, escopo, arquivo.produto);
   const { vigencias, vigenciasSha256 } = conferirVigencias(manifesto.configuracao, escopo, janela.inicio, janela.fim);
   let resumo;
   try { resumo = await conferirConteudoArquivoV3(escopo, bytes, { linhas: arquivo.linhas, pedidos: arquivo.pedidos }, arquivo); }
@@ -207,7 +208,7 @@ export async function prepararPacoteFontesFinancial(
     arquivo.produto, arquivo.moeda, resumo.linhas, resumo.pedidosDistintos,
   ]));
   return {
-    versao: 1, escopo, requestIdSha256, arquivoSha256, manifestoSha256: sha256(bytesManifesto), eventosSha256, vigenciasSha256, pacoteSha256,
+    versao: 1, escopo, produto: arquivo.produto, requestIdSha256, arquivoSha256, manifestoSha256: sha256(bytesManifesto), eventosSha256, vigenciasSha256, pacoteSha256,
     linhasArquivo: resumo.linhas, pedidosDistintos: resumo.pedidosDistintos, paginasEventos, quantidadeEventos, vigencias,
   };
 }

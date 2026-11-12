@@ -3301,6 +3301,7 @@ model IntegracaoReciboFinancial {
   merchantId        String
   ambiente          AmbienteDeIntegracao
   competencia       String
+  produto           String
   versao            Int                    @default(1)
   origem            String                 @default("MANUAL_DECLARADA")
   situacao          String                 @default("RECEBIDO_PARA_CONFERENCIA")

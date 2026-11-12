@@ -8,6 +8,7 @@ CREATE TABLE "IntegracaoReciboFinancial" (
   "merchantId" text NOT NULL,
   "ambiente" "AmbienteDeIntegracao" NOT NULL,
   "competencia" text NOT NULL,
+  "produto" text NOT NULL,
   "versao" integer NOT NULL DEFAULT 1,
   "origem" text NOT NULL DEFAULT 'MANUAL_DECLARADA',
   "situacao" text NOT NULL DEFAULT 'RECEBIDO_PARA_CONFERENCIA',
@@ -30,6 +31,7 @@ CREATE TABLE "IntegracaoReciboFinancial" (
   CONSTRAINT "IFRecibo_modulo_fkey" FOREIGN KEY ("parceiroId", "moduloId") REFERENCES "IntegracaoConexaoModulo" ("parceiroId", "id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "IFRecibo_identidade" CHECK (
     "competencia" ~ '^[0-9]{4}-(0[1-9]|1[0-2])$' AND left("competencia", 4) <> '0000'
+    AND "produto" ~ '^[A-Za-z0-9_-]{1,120}$'
     AND "merchantId" ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     AND length(btrim("recebidoPorId")) BETWEEN 1 AND 128
   ),

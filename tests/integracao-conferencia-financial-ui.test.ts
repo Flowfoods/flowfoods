@@ -50,7 +50,7 @@ describe('tela de conferência Financial · fontes e navegação', () => {
   });
 
   it('exibe o histórico do mês, paginação e taxas declaradas sem lançar valores no resultado', async () => {
-    const recibo = { id: 'recibo-qa', conexaoId: 'conexao', ambiente: 'TEST' as const, competencia: '2026-06',
+    const recibo = { id: 'recibo-qa', conexaoId: 'conexao', ambiente: 'TEST' as const, competencia: '2026-06', produto: 'DELIVERY',
       origem: 'MANUAL_DECLARADA' as const, situacao: 'RECEBIDO_PARA_CONFERENCIA' as const, recebidoEm: new Date('2026-07-03T15:00:00Z'),
       requestIdSha256: '1'.repeat(64), arquivoSha256: '2'.repeat(64), manifestoSha256: '3'.repeat(64),
       eventosSha256: '4'.repeat(64), vigenciasSha256: '5'.repeat(64), pacoteSha256: '6'.repeat(64),
@@ -58,7 +58,7 @@ describe('tela de conferência Financial · fontes e navegação', () => {
       vigencias: [{ inicio: '2026-06-01', fim: '2026-06-30', comissaoBp: 850, pagamentoBp: 315 }] };
     ler.mockResolvedValue({ ...consulta, fonteMensal: 'RECEBIDA_PARA_CONFERENCIA', recibos: { total: 13, paginas: 2, pagina: 1, itens: [recibo] } });
     const tela = await html({ loja: loja.id, competencia: '2026-06', pagina: '1' });
-    for (const texto of ['Recibos de fontes', 'Recebido para conferência', '13 recibos', '8,5%', '3,15%', recibo.arquivoSha256, 'pagina=2#recibos']) expect(tela).toContain(texto);
+    for (const texto of ['Recibos de fontes', 'Recebido para conferência', '13 recibos', 'Produto DELIVERY', '8,5%', '3,15%', recibo.arquivoSha256, 'pagina=2#recibos']) expect(tela).toContain(texto);
     expect(tela).not.toMatch(/Registrar recebimento|Baixar modelo do manifesto|R\$/);
     expect(await html({ exemplo: 'conforme' })).not.toContain(recibo.pacoteSha256);
   });
@@ -71,7 +71,7 @@ describe('tela de conferência Financial · fontes e navegação', () => {
     const dados = /data:application\/json;charset=utf-8;base64,([\w+=/]+)/.exec(tela);
     const modelo = JSON.parse(Buffer.from(dados![1], 'base64').toString());
     expect(modelo).toMatchObject({ escopo: { lojaId: loja.id, merchantId: 'merchant-sintetico', competencia: '2024-02', ambiente: 'TEST' },
-      arquivo: { sha256: null }, configuracao: { vigencias: [{ fim: '2024-02-29', comissaoBp: null, pagamentoBp: null }] } });
+      arquivo: { sha256: null, produto: null }, configuracao: { canal: 'IFOOD', vigencias: [{ fim: '2024-02-29', comissaoBp: null, pagamentoBp: null }] } });
     expect(await html({}, base)).not.toContain('Registrar recebimento');
   });
 

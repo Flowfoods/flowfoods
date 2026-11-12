@@ -9,7 +9,7 @@ export function modeloManifestoFinancial(escopo: EscopoFontesFinancial) {
   const fim = ultimo.toISOString().slice(0, 10);
   return {
     versao: 1, escopo,
-    arquivo: { merchantId, competencia, requestId: null, sha256: null, linhas: null, pedidos: null, produto: 'IFOOD', moeda: 'BRL' },
+    arquivo: { merchantId, competencia, requestId: null, sha256: null, linhas: null, pedidos: null, produto: null, moeda: 'BRL' },
     eventos: [{ consulta: { merchantId, inicio, fim, page: 1, size: 100 }, corpo: '' }],
     configuracao: { parceiroId, lojaId, canal: 'IFOOD', competencia, vigencias: [{ inicio, fim, comissaoBp: null, pagamentoBp: null }] },
   };

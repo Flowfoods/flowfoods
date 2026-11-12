@@ -16,7 +16,7 @@ export function RecibosFontesFinancial({ consulta, retorno }: { consulta: Consul
       {recibos.itens.map(r => <li key={r.id} id={`recibo-${r.id}`}>
         <details className="min-w-0">
           <summary className="min-h-11 cursor-pointer break-words px-4 py-3 text-sm font-semibold sm:px-5">
-            {instanteAnalytics(r.recebidoEm.toISOString())} · {conexoes.find(c => c.id === r.conexaoId)?.nome ?? 'Conexão da loja'}
+            {instanteAnalytics(r.recebidoEm.toISOString())} · {conexoes.find(c => c.id === r.conexaoId)?.nome ?? 'Conexão da loja'} · Produto {r.produto}
             <span className="ml-2 inline-block font-mono text-xs font-normal text-suave">Pacote {r.pacoteSha256.slice(0, 10)}</span>
           </summary>
           <div className="space-y-4 px-4 pb-4 text-[13px] sm:px-5">

@@ -67,7 +67,7 @@ export async function conferirConteudoArquivoV3(
   escopo: Pick<ProtocoloConciliacaoV3, 'merchantId' | 'competencia'>,
   bytes: Uint8Array,
   totais?: ArquivoInjetado['totaisInformados'],
-  identidade?: { moeda: 'BRL'; produto: 'IFOOD' },
+  identidade?: { moeda: 'BRL'; produto: string },
 ): Promise<ResumoArquivo> {
   const esperado = conferirEscopoConciliacaoV3(escopo);
   if (totais !== undefined && (!totais || typeof totais !== 'object' || Array.isArray(totais)

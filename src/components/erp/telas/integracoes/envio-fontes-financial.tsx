@@ -68,7 +68,7 @@ export function EnvioFontesFinancial({ conexoes, base, loja, competencia, retorn
       <details className="rounded-[7px] border border-linha">
         <summary className="min-h-11 cursor-pointer p-3 text-sm font-medium">Como preparar o manifesto</summary>
         <div className="space-y-2 px-3 pb-3 text-[13px] text-suave">
-          <p>O modelo traz a loja, a conexão e o mês selecionados. Preencha o protocolo, o SHA-256 e as contagens do CSV.gz recebido.</p>
+          <p>O modelo traz a loja, a conexão e o mês selecionados. Preencha o protocolo, o SHA-256 e as contagens do CSV.gz recebido. Em <code>produto</code>, informe o código do produto financeiro dos eventos desta conferência.</p>
           <p>Em cada página de eventos, informe a consulta e copie a resposta original no campo de texto <code>corpo</code>. Declare todas as vigências de comissão e pagamento do mês em pontos-base. Por exemplo, 800 representa 8%.</p>
           <p>O recibo guarda as impressões dos arquivos, as contagens e as vigências declaradas. A conciliação financeira é uma etapa posterior.</p>
         </div>

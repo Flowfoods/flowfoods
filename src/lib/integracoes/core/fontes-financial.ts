@@ -59,7 +59,7 @@ export async function registrarFontesFinancial(ctx: ContextoDoParceiro, entrada:
     return await ctx.cliente.transacao(async tx => {
       const salvo = await tx.integracaoReciboFinancial.createMany({
         data: {
-          ...escopo, versao: recibo.versao, moduloId: modulo.id, recebidoPorId: ctx.sessao.userId,
+          ...escopo, versao: recibo.versao, produto: recibo.produto, moduloId: modulo.id, recebidoPorId: ctx.sessao.userId,
           requestIdSha256: recibo.requestIdSha256, arquivoSha256: recibo.arquivoSha256,
           manifestoSha256: recibo.manifestoSha256, eventosSha256: recibo.eventosSha256,
           vigenciasSha256: recibo.vigenciasSha256, pacoteSha256: recibo.pacoteSha256,
@@ -84,7 +84,7 @@ export async function registrarFontesFinancial(ctx: ContextoDoParceiro, entrada:
 }
 
 export type ResumoReciboFontesFinancial = Pick<ReciboPacoteFontesFinancial,
-  'requestIdSha256' | 'arquivoSha256' | 'manifestoSha256' | 'eventosSha256' | 'vigenciasSha256' | 'pacoteSha256'
+  'produto' | 'requestIdSha256' | 'arquivoSha256' | 'manifestoSha256' | 'eventosSha256' | 'vigenciasSha256' | 'pacoteSha256'
   | 'linhasArquivo' | 'pedidosDistintos' | 'paginasEventos' | 'quantidadeEventos' | 'vigencias'> & {
   id: string;
   conexaoId: string;
@@ -96,7 +96,7 @@ export type ResumoReciboFontesFinancial = Pick<ReciboPacoteFontesFinancial,
 };
 
 const resumo = {
-  id: true, conexaoId: true, ambiente: true, competencia: true, origem: true, situacao: true, recebidoEm: true,
+  id: true, conexaoId: true, ambiente: true, competencia: true, produto: true, origem: true, situacao: true, recebidoEm: true,
   requestIdSha256: true, arquivoSha256: true, manifestoSha256: true, eventosSha256: true, vigenciasSha256: true, pacoteSha256: true,
   linhasArquivo: true, pedidosDistintos: true, paginasEventos: true, quantidadeEventos: true, vigencias: true,
 } satisfies Prisma.IntegracaoReciboFinancialSelect;

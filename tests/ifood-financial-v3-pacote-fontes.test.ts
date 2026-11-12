@@ -46,7 +46,7 @@ describe('recebimento manual das fontes Financial por loja e competência', () =
     const envelope = bytes(f.manifesto);
     const recibo = await prepararPacoteFontesFinancial(f.escopo, f.arquivoGzip, envelope);
     expect(recibo).toEqual({
-      versao: 1, escopo: f.escopo,
+      versao: 1, escopo: f.escopo, produto: 'IFOOD',
       requestIdSha256: hash(f.manifesto.arquivo.requestId), manifestoSha256: hash(envelope), arquivoSha256: hash(f.arquivoGzip),
       eventosSha256: expect.stringMatching(/^[0-9a-f]{64}$/), pacoteSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
       vigenciasSha256: expect.stringMatching(/^[0-9a-f]{64}$/), vigencias: f.manifesto.configuracao.vigencias,
@@ -125,7 +125,7 @@ describe('recebimento manual das fontes Financial por loja e competência', () =
 
   it.each([
     ['sha256', '0'.repeat(64), 'ARQUIVO'], ['linhas', 1, 'ARQUIVO'], ['pedidos', 2, 'ARQUIVO'],
-    ['linhas', null, 'ARQUIVO'], ['pedidos', '1', 'ARQUIVO'], ['linhas', 100_001, 'ARQUIVO'], ['produto', 'OUTRO', 'ARQUIVO'],
+    ['linhas', null, 'ARQUIVO'], ['pedidos', '1', 'ARQUIVO'], ['linhas', 100_001, 'ARQUIVO'], ['produto', '', 'ARQUIVO'],
     ['moeda', 'USD', 'ARQUIVO'], ['requestId', 'https://exemplo.invalid/privado', 'ARQUIVO'],
     ['merchantId', outroMerchant, 'ESCOPO'], ['competencia', '2023-02', 'ESCOPO'],
   ] as const)('recusa inconsistência no metadado %s do arquivo', async (campo, valor, erro) => {
@@ -149,6 +149,17 @@ describe('recebimento manual das fontes Financial por loja e competência', () =
     substituirArquivo(f, csv => csv.replace('100.00;', '200.00;'));
     f.manifesto.arquivo.sha256 = original;
     await expect(preparar(f)).rejects.toThrow(codigo('ARQUIVO'));
+  });
+
+  it('confere o produto financeiro declarado no CSV e nos eventos, mantendo o canal iFood', async () => {
+    const f = criarFontesFinancial();
+    f.manifesto.arquivo.produto = 'DELIVERY';
+    await expect(preparar(f)).rejects.toThrow(codigo('EVENTOS'));
+    alterarCorpo(f, c => { c.financialEvents[0].product = 'DELIVERY'; });
+    await expect(preparar(f)).rejects.toThrow(codigo('ARQUIVO'));
+    substituirArquivo(f, csv => csv.replaceAll(';IFOOD', ';DELIVERY'));
+    expect(f.manifesto.configuracao.canal).toBe('IFOOD');
+    expect(await preparar(f)).toMatchObject({ quantidadeEventos: 1, produto: 'DELIVERY' });
   });
 
   it.each<[(f: Fontes) => void]>([
