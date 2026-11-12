@@ -40,7 +40,7 @@ function lerColunas(campos: readonly string[]) {
     valor: campos.indexOf('valor'),
   };
   if (Object.values(colunas).includes(-1)) throw new ErroArquivoConciliacaoV3('CABECALHO');
-  return { ...colunas, largura: campos.length };
+  return { ...colunas, largura: campos.length, moeda: campos.indexOf('moeda'), produto: campos.indexOf('produto') };
 }
 
 function lerContagem(valor: unknown): number | null {
@@ -59,7 +59,17 @@ export async function lerArquivoConciliacaoV3(acompanhamento: Acompanhamento, ar
   if (esperado.merchantId !== recebido.merchantId || esperado.competencia !== recebido.competencia) {
     throw new ErroArquivoConciliacaoV3('ESCOPO');
   }
-  const totais = arquivo.totaisInformados;
+  return conferirConteudoArquivoV3(esperado, arquivo.bytes, arquivo.totaisInformados);
+}
+
+/** Confere os bytes e as contagens de um arquivo recebido, independentemente do estado de uma consulta à API. */
+export async function conferirConteudoArquivoV3(
+  escopo: Pick<ProtocoloConciliacaoV3, 'merchantId' | 'competencia'>,
+  bytes: Uint8Array,
+  totais?: ArquivoInjetado['totaisInformados'],
+  identidade?: { moeda: 'BRL'; produto: string },
+): Promise<ResumoArquivo> {
+  const esperado = conferirEscopoConciliacaoV3(escopo);
   if (totais !== undefined && (!totais || typeof totais !== 'object' || Array.isArray(totais)
       || Object.keys(totais).some(chave => chave !== 'linhas' && chave !== 'pedidos'))) throw new ErroArquivoConciliacaoV3('TOTAIS');
   const linhasInformadas = lerContagem(totais?.linhas);
@@ -69,7 +79,7 @@ export async function lerArquivoConciliacaoV3(acompanhamento: Acompanhamento, ar
   let linhas = 0;
   const pedidos = new Set<string>();
   let soma: bigint | null = 0n;
-  await lerRegistrosCsvGzip(arquivo.bytes, campos => {
+  await lerRegistrosCsvGzip(bytes, campos => {
     if (colunas === undefined) {
       colunas = lerColunas(campos);
       return;
@@ -78,6 +88,8 @@ export async function lerArquivoConciliacaoV3(acompanhamento: Acompanhamento, ar
     if (campos[colunas.loja].toLowerCase() !== esperado.merchantId || campos[colunas.competencia] !== esperado.competencia) {
       throw new ErroArquivoConciliacaoV3('ESCOPO');
     }
+    if (identidade && ((colunas.moeda >= 0 && campos[colunas.moeda] !== identidade.moeda)
+        || (colunas.produto >= 0 && campos[colunas.produto] !== identidade.produto))) throw new ErroArquivoConciliacaoV3('ESCOPO');
     const pedido = campos[colunas.pedido];
     if (pedido) {
       if (pedido.trim() !== pedido || /[\u0000-\u001f\u007f]/.test(pedido)) throw new ErroArquivoConciliacaoV3('REGISTRO');

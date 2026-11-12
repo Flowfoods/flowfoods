@@ -218,6 +218,21 @@ describe('ERP 0.3 · sessões separadas (middleware) e portal travado', () => {
     expect(['/api/auth/signin', '/rodolfo/login']).toContain(destino(r));
   });
 
+  it('sessão expirada no envio Financial volta por GET ao login ou devolve 401 ao cliente JSON', async () => {
+    const path = 'http://localhost:3100/rodolfo/integracoes/rede-sintetica/financial/fontes';
+    const enviar = async (accept: string) => (await middleware(new NextRequest(path, {
+      method: 'POST', headers: { accept }, body: 'arquivo sintético',
+    }), evento)) as Response;
+    const html = await enviar('text/html,application/xhtml+xml,*/*;q=0.8');
+    expect(html.status).toBe(303);
+    expect(destino(html)).toBe('/rodolfo/login');
+    const json = await enviar('application/json, text/html;q=0');
+    expect(json.status).toBe(401);
+    expect(json.headers.get('location')).toBeNull();
+    expect(json.headers.get('x-middleware-next')).toBeNull();
+    expect(await json.json()).toMatchObject({ mensagem: expect.any(String) });
+  });
+
   it('/erp sem o cookie próprio volta para /entrar — o cookie do next-auth (/rodolfo) não serve', async () => {
     expect(destino(await pedir('/erp'))).toBe('/entrar');
     expect(destino(await pedir('/erp/acesso', 'next-auth.session-token=qualquer-jwt'))).toBe('/entrar');
