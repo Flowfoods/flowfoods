@@ -134,4 +134,16 @@ describe('conferência mensal Financial · leitura por loja', () => {
     });
     expect(m.consultarConexoes).not.toHaveBeenCalled();
   });
+
+  it('mantém a produção consultável quando há uma conexão histórica desligada em TEST', async () => {
+    const m = clienteDeTeste();
+    m.consultarConexoes.mockResolvedValueOnce([
+      { id: 'anterior', idExterno: 'merchant-test', nomeExterno: 'Histórico TEST', estado: 'DESLIGADA', ambiente: 'TEST', modulos: [] },
+      { id: 'atual', idExterno: 'merchant-prod', nomeExterno: 'Produção', estado: 'ATIVA', ambiente: 'PRODUCAO', modulos: [{ estado: 'AUTORIZADO' }] },
+    ]);
+    const nivel1: Alcance = { ...acesso(permissoes, 'todas'), nivel: 'FLOWFOODS' };
+    const r = await lerConferenciaFinancial(m.cliente, nivel1, contexto, { lojaId: m.loja.id, competencia: '2024-02' });
+    expect(r).toMatchObject({ ok: true, ambiente: 'PRODUCAO', conexoes: [{ id: 'atual', merchantDoModelo: 'merchant-prod' }] });
+    expect(listarRecibosFontesFinancial).toHaveBeenLastCalledWith(expect.anything(), nivel1, { ambiente: 'PRODUCAO', competencia: '2024-02', lojaId: m.loja.id }, 1);
+  });
 });

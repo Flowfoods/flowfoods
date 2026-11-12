@@ -143,13 +143,9 @@ function conferirEcosDaPagina(pagina: Readonly<Record<string, unknown>>, consult
       || (Object.hasOwn(pagina, 'endDate') && pagina.endDate !== consulta.fim)
       || (Object.hasOwn(pagina, 'competence') && pagina.competence !== mes)
       || (Object.hasOwn(pagina, 'currency') && pagina.currency !== 'BRL')) throw new ErroPacoteFontesFinancial('EVENTOS');
-  // O parser compartilhado já conferiu o formato da página e o máximo de eventos.
+  // O leitor de eventos verifica o recebedor quando informado. A loja da página vem da consulta declarada.
   for (const item of pagina.financialEvents as unknown[]) {
     const evento = objetoPeriodoFinancialV3(item, Error);
-    const recebedor = objetoPeriodoFinancialV3(evento.receiver, Error);
-    if (typeof recebedor.merchantId !== 'string' || recebedor.merchantId.toLowerCase() !== consulta.merchantId) {
-      throw new ErroPacoteFontesFinancial('EVENTOS');
-    }
     if (evento.amount != null) {
       const valor = objetoPeriodoFinancialV3(evento.amount, Error);
       if (Object.hasOwn(valor, 'currency') && valor.currency !== 'BRL') throw new ErroPacoteFontesFinancial('EVENTOS');

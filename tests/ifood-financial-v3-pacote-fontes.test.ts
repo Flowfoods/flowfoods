@@ -174,7 +174,7 @@ describe('recebimento manual das fontes Financial por loja e competência', () =
 
   it.each([
     { product: 'OUTRO' }, { competence: '2024-03' }, { competence: null }, { receiver: { merchantId: outroMerchant } },
-    { receiver: {} }, { receiver: null }, { hasTransferImpact: null }, { amount: { value: '1.001', currency: 'BRL' } },
+    { receiver: { merchantId: '' } }, { receiver: 'inválido' }, { hasTransferImpact: null }, { amount: { value: '1.001', currency: 'BRL' } },
     { amount: { value: '1', currency: 'USD' } }, { amount: { value: null } }, { amount: { value: '9'.repeat(81) } },
     { amount: { value: 0 } },
   ])('confere escopo, centavos e impacto nos eventos originais (%#)', async mudanca => {
@@ -197,6 +197,17 @@ describe('recebimento manual das fontes Financial por loja e competência', () =
       await expect(preparar(f)).rejects.toThrow(codigo('EVENTOS'));
     },
   );
+
+  it.each([true, false])('atribui o evento sem recebedor à consulta declarada (eco de merchant no corpo: %s)', async eco => {
+    const f = criarFontesFinancial();
+    alterarCorpo(f, c => {
+      delete c.financialEvents[0].receiver;
+      if (eco) Object.assign(c, { merchantId: f.escopo.merchantId });
+    });
+    expect((await preparar(f)).quantidadeEventos).toBe(1);
+    f.manifesto.eventos[0].consulta.merchantId = outroMerchant;
+    await expect(preparar(f)).rejects.toThrow(codigo('EVENTOS'));
+  });
 
   it('conserva os dois percentuais de cada intervalo inclusivo e as bordas reais de um contrato anterior/posterior ao mês', async () => {
     const f = criarFontesFinancial();

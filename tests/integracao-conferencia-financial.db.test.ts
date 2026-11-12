@@ -29,6 +29,21 @@ describe.skipIf(!url)('conferência Financial · isolamento entre parceiros e lo
     }
   }, 60_000);
 
+  it('consulta a conexão da produção após a troca legítima de ambiente da mesma loja', async () => {
+    const a = await criarParceiro(true);
+    const parceiroId = a.cliente.parceiroId;
+    await mudarLiberacao(a.cliente, 'integracao', true, autor);
+    await a.cliente.integracaoConexao.update({ where: { id: a.vinculo.id }, data: {
+      estado: 'DESLIGADA', desligadaEm: new Date(), desligadaPorNome: autor,
+    } });
+    await db.parceiroFlow.update({ where: { id: parceiroId }, data: { homologacaoDeIntegracao: false } });
+    const atual = await a.cliente.integracaoConexao.create({ data: { parceiroId, lojaId: a.loja.id, provedor: 'IFOOD',
+      ambiente: 'PRODUCAO', idExterno: randomUUID(), nomeExterno: 'Vínculo atual', criadoPorNome: autor }, select: { id: true } });
+    const r = await lerConferenciaFinancial(a.cliente, rede, { parceiroId, homologacaoDeIntegracao: false },
+      { lojaId: a.loja.id, competencia: '2024-02' });
+    expect(r).toMatchObject({ ok: true, ambiente: 'PRODUCAO', conexoes: [{ id: atual.id }], recibos: { total: 0 } });
+  }, 60_000);
+
   async function criarParceiro(homologacaoDeIntegracao: boolean) {
     const p = await db.parceiroFlow.create({
       data: { nome: 'Parceiro sintético', slug: 'conf-' + randomUUID(), status: 'ATIVO', homologacaoDeIntegracao },

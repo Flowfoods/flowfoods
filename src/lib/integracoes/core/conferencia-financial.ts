@@ -86,10 +86,11 @@ export async function lerConferenciaFinancial(
           modulos: { where: { modulo: 'FINANCIAL' }, select: { estado: true } } },
         orderBy: [{ estado: 'asc' }, { nomeExterno: 'asc' }, { id: 'asc' }],
       });
-      if (vinculos.some(v => v.ambiente !== ambiente)) {
+      if (vinculos.some(v => v.estado === 'ATIVA' && v.ambiente !== ambiente)) {
         return recusar('contexto-invalido', 'O ambiente dos vínculos desta loja precisa ser conferido pela FlowFoods.');
       }
-      const conexoes = vinculos.map(v => ({
+      // A troca de ambiente mantém no banco as conexões já desligadas do ambiente anterior.
+      const conexoes = vinculos.filter(v => v.ambiente === ambiente).map(v => ({
         id: v.id, nome: v.nomeExterno, estado: v.estado, estadoFinancial: v.modulos[0]?.estado ?? null,
         ...(alcance.nivel === 'FLOWFOODS' && v.estado === 'ATIVA' && (v.modulos[0]?.estado === 'AUTORIZADO' || v.modulos[0]?.estado === 'ATIVO')
           && { merchantDoModelo: v.idExterno }),
