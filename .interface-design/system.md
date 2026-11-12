@@ -98,10 +98,12 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   < 900 px: gaveta com a mesma grade.
 - **Seletor de áreas** lista as áreas em uso (links, a atual marcada) e, num
   grupo separado e nomeado, o catálogo **"Em breve"**: nome, finalidade e selo,
-  como texto. Nunca link, botão, foco, busca ou consulta. Vale no `/erp` e no
-  nível 1 dentro de um parceiro (a mesma fonte do hub dele); fora de um
-  parceiro o seletor do nível 1 não lista futuros. Na gaveta do celular o
-  painel fica na largura dela.
+  como texto. Nunca link, botão, foco, busca ou consulta. Só o público
+  autorizado enxerga o catálogo (`veCatalogoEmBreve`): hoje, o nível 1 dentro
+  de um parceiro, pela mesma fonte do hub dele; as pessoas do parceiro não
+  veem módulo futuro até o público delas ser definido. Fora de um parceiro o
+  seletor do nível 1 não lista futuros. Na gaveta do celular o painel fica na
+  largura dela.
 - **Barra superior** 64 px, na cor da superfície, borda inferior, sem blur.
 - **Botão** 40 px (44 no celular), padding 16, raio 10, 14 px/600. Um
   primário por tela. Variantes: primario (texto `sobre-acao`), secundario (na
@@ -132,8 +134,9 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   subtítulo com contexto e contagem + ação à direita + busca/filtros abaixo.
 - **Hub** grade 4 (≥ 1280) e 2 no tablet e no celular; card com ícone, nome
   15/600, subtítulo 13; no celular, compacto (nome 14, descrição em até 3
-  linhas, sem os links das abas). O catálogo **"Em breve"** é a última seção,
-  depois das áreas e dos indicadores: card neutro e tracejado, com nome e
+  linhas, sem os links das abas). O catálogo **"Em breve"** (só para quem o
+  enxerga) é a última seção, depois das áreas e dos indicadores: card neutro
+  e tracejado, com nome e
   finalidade inteiros (sem reticências nem corte de linhas) e o selo (mais o
   cadeado em CRM Time e CRM Clube, lido como "Com cadeado"), sem link. Com
   uma loja escolhida a Home analítica toma o lugar do hub e o catálogo fica só
@@ -195,7 +198,7 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | `suave` claro #686A61 e `farol-vermelho` escuro #F4656C | os aprovados davam 4,12:1 e 4,24:1 nas superfícies reais; ajuste mínimo, mesma matiz | 2026-11-11 |
 | Lateral em grade de 2 colunas mantendo 232 px (a confirmar com Rodolfo) | "Movimentações" a 12 px/600 pede 92 px; a 142 px os nomes reais só cabem em uma coluna | 2026-11-11 |
 | Assinatura `Marca` mantida | não há arquivo de logo oficial no repositório; a marca textual da prévia não a substitui | 2026-11-11 |
-| "Em breve" como catálogo de apresentação, igual para todo perfil | não existe permissão para módulo sem tela; mostrar não concede | 2026-11-11 |
+| "Em breve" como catálogo de apresentação, só para público autorizado (hoje, o nível 1) | regra do plano de 11/11: futuro não aparece a todo perfil; o público do parceiro é decisão do proprietário, ainda em aberto | 2026-11-12 |
 | Selo sobre superfície opaca; tinta só no `cheio`, pelos pares aprovados | `ok` a 15 % dava 4,28:1 com a cor nova; o fundo opaco tira o selo da conta de onde ele pousa | 2026-11-11 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em

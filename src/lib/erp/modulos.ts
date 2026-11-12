@@ -14,8 +14,8 @@
  * Módulos do catálogo que ainda não têm tela aparecem como "Em breve": nome,
  * finalidade e selo, nunca com link, rota, ação, busca ou consulta — não existe
  * destino que leve a uma tela que não existe. É um catálogo de APRESENTAÇÃO:
- * não concede acesso, não depende de permissão (nenhuma foi criada para eles)
- * e não promete data nem fase.
+ * não concede acesso, nenhuma permissão foi criada para ele e não promete data
+ * nem fase. Quem o enxerga é decidido por `veCatalogoEmBreve`.
  */
 
 import { pode, type Alcance, type Permissao } from './permissoes';
@@ -774,7 +774,7 @@ function liberada(alcance: Alcance, t: Tela) {
  * Áreas do ERP do parceiro para este alcance: as construídas com só as abas e
  * as ações que a pessoa pode (área sem nenhuma aba permitida some, e com ela
  * as ações: ação só existe dentro de uma área visível) e, depois delas, o
- * catálogo "Em breve" (apresentação igual para todos: sem link, aba ou ação).
+ * catálogo "Em breve" para quem o enxerga (sem link, aba ou ação).
  * A entrada da área é a primeira aba permitida.
  */
 export function modulosDoParceiro(alcance: Alcance, base: string, liberados: ReadonlySet<ModuloComLiberacao>): ModuloNav[] {
@@ -804,7 +804,17 @@ export function modulosDoParceiro(alcance: Alcance, base: string, liberados: Rea
       acoes: m.acoes.filter((t) => liberada(alcance, t) && (!t.modulo || liberados.has(t.modulo))).map(({ permissao: _p, tambem: _t, entradaPara: _e, modulo: _m, ...item }) => ({ ...item, area: m.nome })),
     });
   }
-  return [...construidos, ...modulosEmBreve()];
+  return veCatalogoEmBreve(alcance) ? [...construidos, ...modulosEmBreve()] : construidos;
+}
+
+/**
+ * Quem enxerga o catálogo "Em breve". Regra do plano (11/11/2026): módulo futuro só aparece, bloqueado, para público
+ * autorizado; a navegação não mostra tudo a todo perfil. O público do lado do parceiro ainda não foi definido (decisão
+ * reservada ao proprietário): até lá, só o nível 1 (FlowFoods) vê o catálogo. Não é permissão nova e não concede nada: é
+ * só quem enxerga a apresentação. Para abrir a outro público, a mudança é aqui, num lugar só.
+ */
+export function veCatalogoEmBreve(alcance: Alcance): boolean {
+  return alcance.nivel === 'FLOWFOODS';
 }
 
 /** O catálogo "Em breve" como módulos de navegação: sempre sem destino, sem abas e sem ações. */

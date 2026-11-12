@@ -2,8 +2,9 @@
  * ERP 1.1 — shell único (/erp e /rodolfo), sem banco:
  *
  * - menu e hub mostram só os módulos que o alcance libera (Dono, Gerente,
- *   Operador, N3, perfil sem insumos) + o catálogo "Em breve" (10/11/2026):
- *   apresentação igual para todos, sem link, aba, ação, busca nem rota;
+ *   Operador, N3, perfil sem insumos); o catálogo "Em breve" (10/11/2026) é
+ *   apresentação sem link, aba, ação, busca nem rota, e só o público
+ *   autorizado o enxerga (hoje, o nível 1);
  * - o nível 1 ganha o Barney antigo como módulos e o ERP do parceiro dentro
  *   do parceiro;
  * - visão (Rede Completa ↔ loja): cookie forjado/velho cai na primeira opção
@@ -26,6 +27,7 @@ import {
   MODULOS_FUTUROS,
   navegacaoDoParceiro,
   telasDaNavegacao,
+  veCatalogoEmBreve,
 } from '@/lib/erp/modulos';
 import { NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO, type ModuloComLiberacao } from '@/lib/erp/liberacao';
 import { comParceiroAtual, modulosDoNivel1, navegacaoDoNivel1, slugNoCaminho } from '@/lib/rodolfo/modulos';
@@ -58,7 +60,7 @@ const futuros = (a: Alcance) =>
   modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO)
     .filter((m) => !m.href)
     .map((m) => m.chave);
-// O catálogo "Em breve" é apresentação: o mesmo para qualquer alcance, sempre depois das áreas em uso.
+// O catálogo "Em breve" é apresentação: sempre depois das áreas em uso, e só para quem `veCatalogoEmBreve` autoriza.
 const CATALOGO_EM_BREVE = MODULOS_FUTUROS.map((f) => f.chave);
 // Os 18 nomes do catálogo conferidos em 10/11/2026, na ordem dele. Integração não está aqui: já tem tela, sob liberação.
 const NOMES_EM_BREVE = [
@@ -83,7 +85,7 @@ const NOMES_EM_BREVE = [
 ];
 
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
-  it('Dono: as abas de cada área (UX.9), as ações fora do menu; os futuros são só o catálogo "Em breve" (Etiquetas é área desde a 3.4)', () => {
+  it('Dono: as abas de cada área (UX.9), as ações fora do menu; nenhum módulo futuro para o parceiro (Etiquetas é área desde a 3.4)', () => {
     const a = alcance({ perfilBase: 'DONO' });
     expect(modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => m.href).map((m) => m.nome)).toEqual([
       'Cadastros e Cardápio',
@@ -146,9 +148,11 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/dre/despesas/nova',
     ]);
     // 2.1: Faturamento e DRE saiu dos futuros e virou área com tela. 3.1: a Produção também. 3.4: e as Etiquetas.
-    // 10/11: os futuros são o catálogo "Em breve" inteiro, que não acrescenta aba nem ação (as listas acima não mudaram).
-    expect(futuros(a)).toEqual(CATALOGO_EM_BREVE);
-    for (const chave of ['cadastros', 'compras', 'estoque', 'producao', 'etiquetas', 'dre', 'rede']) expect(futuros(a)).not.toContain(chave);
+    // 11/11: o catálogo "Em breve" só aparece para público autorizado; o do parceiro ainda não foi definido.
+    expect(futuros(a)).toEqual([]);
+    // Para o nível 1 ele vem inteiro e não acrescenta aba nem ação a nenhuma área.
+    expect(futuros(ALCANCE_FLOWFOODS)).toEqual(CATALOGO_EM_BREVE);
+    for (const chave of ['cadastros', 'compras', 'estoque', 'producao', 'etiquetas', 'dre', 'rede']) expect(futuros(ALCANCE_FLOWFOODS)).not.toContain(chave);
   });
 
   it('Gerente: sem Equipe (não cuida da equipe); com Histórico (rede inteira)', () => {
@@ -174,8 +178,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     ]);
     // 3.1: o cozinheiro produz, então planejar a produção é a única ação dele.
     expect(hrefsDasAcoes(a)).toEqual(['/erp/producao/nova']);
-    // O catálogo "Em breve" é o mesmo do Dono: apresentação não depende de permissão nem a concede.
-    expect(futuros(a)).toEqual(CATALOGO_EM_BREVE);
+    expect(futuros(a)).toEqual([]);
   });
 
   it('Gerente de uma loja só (N3): Histórico some (exige a rede inteira)', () => {
@@ -203,7 +206,31 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     const mods = modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO);
     expect(mods.map((m) => m.chave)).not.toContain('cadastros');
     expect(hrefs(a)).toEqual(['/erp/lojas', '/erp/acesso']);
-    expect(futuros(a)).toEqual(CATALOGO_EM_BREVE);
+    expect(futuros(a)).toEqual([]);
+  });
+
+  it('quem enxerga o catálogo "Em breve": só o nível 1; nenhum perfil nem permissão do parceiro o faz aparecer', () => {
+    expect(veCatalogoEmBreve(ALCANCE_FLOWFOODS)).toBe(true);
+    const doParceiro = [
+      alcance({ perfilBase: 'DONO' }),
+      alcance({ perfilBase: 'GERENTE' }),
+      alcance({ perfilBase: 'GERENTE', redeInteira: false, lojaIds: ['l1'] }),
+      alcance({ perfilBase: 'OPERADOR' }),
+      alcance({ perfilBase: null, perfilProprio: [] }),
+      // Nem o dono com todas as permissões extras que existem hoje.
+      alcance({ perfilBase: 'DONO', permissoesExtras: ['integracao.ver', 'acessos.gerir', 'historico.ver', 'metas.editar'] as never }),
+    ];
+    for (const a of doParceiro) {
+      expect(veCatalogoEmBreve(a)).toBe(false);
+      for (const liberados of [NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO]) {
+        const mods = modulosDoParceiro(a, '/erp', liberados);
+        // Sem catálogo, sobram só áreas com tela: nenhum módulo sem destino chega ao hub, ao menu ou ao seletor.
+        expect(mods.every((m) => m.href)).toBe(true);
+        for (const nome of NOMES_EM_BREVE) expect(mods.map((m) => m.nome), nome).not.toContain(nome);
+      }
+    }
+    // A regra mora num lugar só e não olha permissão: liberar um módulo com liberação não muda quem vê o catálogo.
+    expect(modulosDoParceiro(ALCANCE_FLOWFOODS, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href)).toHaveLength(18);
   });
 
   it('catálogo "Em breve" (10/11): os 18 módulos, na ordem do catálogo, só com nome, finalidade, ícone e cadeado', () => {
@@ -222,9 +249,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     expect(MODULOS_FUTUROS.filter((f) => f.cadeado).map((f) => f.nome)).toEqual(['CRM Time', 'CRM Clube']);
   });
 
-  it('módulo "Em breve" nunca tem link, abas, ações nem fase, para qualquer alcance e nos dois níveis', () => {
-    const alcances = [ALCANCE_FLOWFOODS, alcance({ perfilBase: 'DONO' }), alcance({ perfilBase: 'OPERADOR' }), alcance({ perfilBase: null, perfilProprio: [] })];
-    for (const a of alcances) {
+  it('módulo "Em breve" nunca tem link, abas, ações nem fase, em qualquer base e com qualquer liberação', () => {
+    for (const a of [ALCANCE_FLOWFOODS]) {
       for (const base of ['/erp', '/rodolfo/erp/valentins']) {
         for (const liberados of [NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO]) {
           const mods = modulosDoParceiro(a, base, liberados);
@@ -260,7 +286,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
   });
 
   it('"Em breve" fica fora da busca, da trilha, do item ativo e do disco: nenhuma rota, tela ou ação foi criada para eles', () => {
-    const nav = navegacaoDoParceiro(alcance({ perfilBase: 'DONO' }), TODOS_OS_MODULOS_COM_LIBERACAO);
+    // Com o alcance de quem enxerga o catálogo (nível 1), para o teste valer com os 18 presentes na navegação.
+    const nav = navegacaoDoParceiro(ALCANCE_FLOWFOODS, TODOS_OS_MODULOS_COM_LIBERACAO);
+    expect(nav.modulos.filter((m) => !m.href)).toHaveLength(18);
     const naBusca = [...telasDaNavegacao(nav), ...acoesDaNavegacao(nav)];
     for (const nome of NOMES_EM_BREVE) {
       expect(naBusca.some((t) => t.rotulo === nome || t.modulo === nome), nome).toBe(false);

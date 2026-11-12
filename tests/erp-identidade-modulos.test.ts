@@ -7,8 +7,8 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { COR, itemAtivo, navegacaoDoParceiro, type ModuloNav } from '@/lib/erp/modulos';
-import { resolverAlcance } from '@/lib/erp/permissoes';
+import { COR, itemAtivo, modulosDoParceiro, navegacaoDoParceiro, type ModuloNav, type Navegacao } from '@/lib/erp/modulos';
+import { ALCANCE_FLOWFOODS, resolverAlcance } from '@/lib/erp/permissoes';
 import { NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
 import { AreasDoSeletor, NavLateral } from '@/components/erp/shell/NavLateral';
 import { CartaoModulo } from '@/components/erp/ui/hub';
@@ -17,9 +17,11 @@ const navDoPerfil = (perfilBase: 'DONO' | 'OPERADOR') => navegacaoDoParceiro(res
   perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [],
 }), NENHUM_MODULO_LIBERADO);
 const nav = navDoPerfil('DONO');
-// Áreas em uso (com tela) e o catálogo "Em breve" (10/11/2026) saem da mesma navegação, mas não se misturam.
+// Áreas em uso (com tela) e o catálogo "Em breve" (10/11/2026) saem da mesma navegação, mas não se misturam. Só o público
+// autorizado enxerga o catálogo (11/11: o nível 1); a navegação da dona não traz nenhum módulo sem tela.
 const emUso = nav.modulos.filter((m) => m.href);
-const emBreve = nav.modulos.filter((m) => !m.href);
+const navDoNivel1: Navegacao = { ...nav, modulos: modulosDoParceiro(ALCANCE_FLOWFOODS, '/erp', NENHUM_MODULO_LIBERADO) };
+const emBreve = navDoNivel1.modulos.filter((m) => !m.href);
 const cartao = (m: ModuloNav) => renderToStaticMarkup(createElement(CartaoModulo, {
   c: { ...m, abas: m.grupos.flatMap((g) => g.itens.map(({ rotulo, href }) => ({ rotulo, href }))) },
 }));
@@ -70,7 +72,12 @@ describe('Identidade central das áreas no hub e no menu', () => {
 
   it('catálogo "Em breve": card neutro, com selo e sem controle; o menu lateral não ganha entrada para ele', () => {
     expect(emBreve).toHaveLength(18);
-    const noMenu = menu(null);
+    expect(nav.modulos.filter((m) => !m.href)).toEqual([]);
+    // O menu de quem enxerga o catálogo (nível 1), aberto e recolhido.
+    const menuDoNivel1 = (recolhido = false) => renderToStaticMarkup(createElement(NavLateral, {
+      nav: navDoNivel1, estado: { modulo: null, hrefAtivo: nav.inicio.href }, contexto: 'Casa de teste', versao: 'Teste', recolhido,
+    }));
+    const noMenu = menuDoNivel1();
     for (const m of emBreve) {
       const h = cartao(m);
       // Neutro de propósito: a cor de área fica para o que já tem tela.
@@ -81,14 +88,20 @@ describe('Identidade central das áreas no hub e no menu', () => {
       expect(h).not.toMatch(/href=|<a[ >]|<button|tabindex/);
       // A grade do menu é de destinos: módulo sem tela não entra nela (aberta nem recolhida).
       expect(noMenu).not.toContain(m.nome);
-      expect(menu(null, true)).not.toContain(m.nome);
+      expect(menuDoNivel1(true)).not.toContain(m.nome);
     }
     // Os únicos links do menu: a marca e o Início (os dois para o hub) e uma célula por área em uso.
     expect(links(noMenu).map((a) => atributo(a[1], 'href'))).toEqual([nav.inicio.href, nav.inicio.href, ...emUso.map((m) => m.href)]);
   });
 
   it('seletor de áreas: em uso com link e a atual marcada; "Em breve" num grupo separado, com nome, finalidade e selo, sem link', () => {
-    const h = renderToStaticMarkup(createElement(AreasDoSeletor, { nav, atual: emUso[2], aoEscolher: () => {} }));
+    // Para a dona (sem catálogo): só as áreas em uso, nenhum grupo "Em breve".
+    const daDona = renderToStaticMarkup(createElement(AreasDoSeletor, { nav, atual: emUso[2], aoEscolher: () => {} }));
+    expect(daDona).not.toContain('Em breve');
+    expect(daDona.match(/<ul /g)).toHaveLength(1);
+    expect(links(daDona).map((a) => atributo(a[1], 'href'))).toEqual([nav.inicio.href, ...emUso.map((m) => m.href)]);
+    // Para quem enxerga o catálogo (nível 1).
+    const h = renderToStaticMarkup(createElement(AreasDoSeletor, { nav: navDoNivel1, atual: emUso[2], aoEscolher: () => {} }));
     const [areas, futuros] = h.split(/<p id="[^"]*"[^>]*>Em breve<\/p>/);
     expect(futuros, 'o grupo "Em breve" existe e vem depois das áreas').toBeTruthy();
     // Em uso: um link por área (mais o Início), a atual com aria-current, cada uma com a cor dela.

@@ -52,7 +52,8 @@ const proprio = (permissoes: string[]) => alcance({ perfilBase: null, perfilProp
 
 // 3.1: Produção virou área. 3.4: Etiquetas também.
 const AREAS = ['Cadastros e Cardápio', 'Compras e Fornecedores', 'Estoque e Movimentações', 'Produção', 'Etiquetas', 'Faturamento e DRE', 'Rede e Equipe'];
-// 10/11/2026: o catálogo "Em breve" (18 módulos sem tela), o mesmo para todo alcance e sempre depois das áreas em uso.
+// 10/11/2026: o catálogo "Em breve" (18 módulos sem tela), sempre depois das áreas em uso. 11/11: só o público autorizado
+// o enxerga (hoje, o nível 1); para as pessoas do parceiro não há módulo futuro na navegação.
 const FUTUROS: string[] = [
   'CRM Time', 'CRM Clube', 'Divulgação em TVs', 'Atendimento com IA', 'Consultoria de Delivery', 'Pedidos Próprios', 'Equipe e RH', 'Freelancers',
   'Pedidos na Cozinha (KDS)', 'Entregas', 'Monitoramento por Câmeras', 'Patrimônio e Dispositivos', 'Anúncios', 'Contratos e Royalties', 'Implantação',
@@ -68,7 +69,7 @@ const acoesPorArea = (a: Alcance) => Object.fromEntries(emUso(a).map((m) => [m.n
 
 // ---------------------------------------------------------------- papéis × áreas
 describe('UX.9 · papéis × áreas, abas e ações', () => {
-  it('Dono: 7 áreas, as abas de cada uma e as 10 ações; os futuros são só o catálogo "Em breve"', () => {
+  it('Dono: 7 áreas, as abas de cada uma e as 10 ações; nenhum futuro (o catálogo "Em breve" é só do nível 1)', () => {
     expect(emUso(DONO).map((m) => m.nome)).toEqual(AREAS);
     expect(abasPorArea(DONO)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Fichas técnicas', 'Precificação'],
@@ -88,7 +89,9 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Faturamento e DRE': ['Lançar o dia', 'Importar faturamento', 'Lançar despesa'],
       'Rede e Equipe': [],
     });
-    expect(modulosDoParceiro(DONO, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href).map((m) => m.nome)).toEqual(FUTUROS);
+    expect(modulosDoParceiro(DONO, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href).map((m) => m.nome)).toEqual([]);
+    // O nível 1 vê as mesmas 7 áreas e, depois delas, o catálogo inteiro.
+    expect(modulosDoParceiro(ALCANCE_FLOWFOODS, '/erp', NENHUM_MODULO_LIBERADO).map((m) => m.nome)).toEqual([...AREAS, ...FUTUROS]);
   });
 
   it('Gerente (rede): Precificação visível (ver preços), sem Equipe; ações de cadastro e de compra', () => {
@@ -103,7 +106,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Rede e Equipe': ['Lojas e marcas', 'Histórico', 'Seu acesso'],
     });
     expect(emUso(GERENTE).flatMap((m) => m.acoes.map((a) => a.rotulo))).toEqual(ACOES);
-    expect(modulosDoParceiro(GERENTE, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href).map((m) => m.nome)).toEqual(FUTUROS);
+    expect(modulosDoParceiro(GERENTE, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href)).toHaveLength(0);
   });
 
   it('Gerente de loja (N3): igual ao gerente, sem Histórico (exige a rede inteira)', () => {
@@ -129,10 +132,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(modulosDoParceiro(GERENTE, '/erp', NENHUM_MODULO_LIBERADO).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/lista');
     // Um chefe (operador + "definir a lista do dia") entra pela lista, como a gerência.
     expect(modulosDoParceiro(proprio(['producao.ver', 'producao.registrar', 'producao.planejar']), '/erp', NENHUM_MODULO_LIBERADO).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/lista');
-    // O catálogo "Em breve" é o mesmo de qualquer papel e não traz aba nem ação para o operador.
-    const semTela = modulosDoParceiro(OPERADOR, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href);
-    expect(semTela.map((m) => m.nome)).toEqual(FUTUROS);
-    expect(semTela.flatMap((m) => [...m.grupos, ...m.acoes])).toEqual([]);
+    expect(modulosDoParceiro(OPERADOR, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href).map((m) => m.nome)).toEqual([]);
   });
 
   it('Rede e Equipe sempre aparece (Seu acesso é livre), mesmo num perfil sem nada', () => {
@@ -146,15 +146,14 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     const a = proprio(['compras.lancar', 'fornecedores.editar', 'lojas.ver']);
     const nav = navegacaoDoParceiro(a, NENHUM_MODULO_LIBERADO);
     expect(nav.modulos.map((m) => m.nome)).not.toContain('Compras e Fornecedores');
-    // Área em uso fora do acesso NÃO vira "Em breve": some. O catálogo de futuros é outro assunto.
-    expect(nav.modulos.filter((m) => !m.href).map((m) => m.nome)).toEqual(FUTUROS);
+    // Área em uso fora do acesso NÃO vira "Em breve": some.
+    expect(nav.modulos.filter((m) => !m.href)).toEqual([]);
     expect(telasDaNavegacao(nav).map((t) => t.href)).not.toContain('/erp/compras');
     expect(acoesDaNavegacao(nav).map((x) => x.rotulo)).toEqual([]);
     expect(nav.modulos.flatMap((m) => m.grupos.map((g) => g.rotulo))).not.toContain('Compras');
     // Idem para "Novo insumo" sem "ver insumos" nem "ver fichas".
     const b = navegacaoDoParceiro(proprio(['insumos.editar', 'lojas.ver']), NENHUM_MODULO_LIBERADO);
-    expect(b.modulos.filter((m) => m.href).map((m) => m.nome)).toEqual(['Rede e Equipe']);
-    expect(b.modulos.map((m) => m.nome)).toEqual(['Rede e Equipe', ...FUTUROS]);
+    expect(b.modulos.map((m) => m.nome)).toEqual(['Rede e Equipe']);
     expect(acoesDaNavegacao(b)).toEqual([]);
   });
 
@@ -201,7 +200,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Rede ↔ loja nunca muda quais áreas e abas aparecem (só o que as telas leem)', () => {
     // A navegação nasce SÓ do alcance e da base: `modulosDoParceiro(alcance, base)` não recebe a visão.
     expect(modulosDoParceiro.length).toBe(3); // (alcance, base, liberados): a visão não entra
-    expect(modulosDoParceiro(GERENTE_N3, '/erp', NENHUM_MODULO_LIBERADO).map((m) => m.nome)).toEqual([...AREAS, ...FUTUROS]);
+    expect(modulosDoParceiro(GERENTE_N3, '/erp', NENHUM_MODULO_LIBERADO).map((m) => m.nome)).toEqual(AREAS);
   });
 });
 
@@ -222,7 +221,7 @@ const abasDoCartao = (c: string) =>
 const texto = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 describe('UX.9 · hub: um card por área, nunca uma ação', () => {
-  it('Dono: "Em uso" tem exatamente 7 cards de área; "Em breve" vem depois, com os 18 do catálogo, sem link, botão nem promessa', () => {
+  it('Dono: "Em uso" tem exatamente 7 cards de área e nenhuma seção de futuros (o catálogo "Em breve" não é mostrado ao parceiro)', () => {
     const h = html(DONO);
     const uso = cartoes(secao(h, 'Em uso'));
     expect(uso).toHaveLength(7);
@@ -230,6 +229,16 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
       expect(texto(c)).toContain(AREAS[n]);
       expect(c).toMatch(/<a [^>]*href="\/erp\//);
     });
+    expect(h).not.toContain('Chegam nas próximas fases');
+    expect(h).not.toContain('aria-label="Em breve"');
+    expect(h).not.toContain('Em breve');
+    for (const nome of FUTUROS) expect(texto(h), nome).not.toContain(nome);
+  });
+
+  it('nível 1 no parceiro: "Em breve" vem depois de "Em uso", com os 18 do catálogo, sem link, botão nem promessa', () => {
+    const h = html(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins');
+    const uso = cartoes(secao(h, 'Em uso'));
+    expect(uso).toHaveLength(7);
     // O rótulo antigo prometia fase; a seção agora só diz "Em breve".
     expect(h).not.toContain('Chegam nas próximas fases');
     expect(h.indexOf('<section aria-label="Em uso">')).toBeLessThan(h.indexOf('<section aria-label="Em breve">'));
@@ -321,12 +330,10 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
   it('Operador não vê a área Compras no hub; perfil sem aba de uma área não a vê', () => {
     expect(texto(secao(html(OPERADOR), 'Em uso'))).not.toContain('Compras e Fornecedores');
     expect(texto(secao(html(proprio(['lojas.ver'])), 'Em uso'))).not.toContain('Cadastros e Cardápio');
-    // O catálogo "Em breve" é apresentação: aparece igual num perfil mínimo, sem dar link para nada.
-    const minimo = secao(html(proprio(['lojas.ver'])), 'Em breve');
-    expect(cartoes(minimo)).toHaveLength(18);
-    expect(minimo).not.toContain('href=');
-    // Área em uso que a pessoa não pode ver não aparece disfarçada de "Em breve".
-    expect(texto(minimo)).not.toMatch(/Compras e Fornecedores|Cadastros e Cardápio|Faturamento e DRE/);
+    // Perfil mínimo: nenhuma seção de futuros, e área que a pessoa não pode ver não aparece disfarçada de "Em breve".
+    expect(secao(html(proprio(['lojas.ver'])), 'Em breve')).toBe('');
+    expect(secao(html(OPERADOR), 'Em breve')).toBe('');
+    expect(texto(html(proprio(['lojas.ver'])))).not.toMatch(/Em breve|Compras e Fornecedores|Cadastros e Cardápio|Faturamento e DRE/);
   });
 
   it('nível 1 dentro do parceiro: mesmos 7 cards, sob a base dele, com Cadastro do parceiro em Rede e Equipe', () => {
