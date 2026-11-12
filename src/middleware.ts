@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import type { NextFetchEvent } from 'next/server';
 import comSessao from 'next-auth/middleware';
 import { COOKIE_DO_ERP, COOKIE_DO_ERP_SEGURO } from '@/lib/erp/sessao-cookie';
+import { formularioFinancialPedeHtml } from '@/lib/integracoes/core/fontes-financial-navegacao';
 
 /**
  * Duas travas, nesta ordem:
@@ -50,7 +51,7 @@ const PAGINA_EM_CONFIGURACAO = `<!doctype html>
 
 const SEM_SESSAO = new Set(['/rodolfo/login', '/rodolfo/setup']);
 
-export default function middleware(req: NextRequest, event: NextFetchEvent) {
+export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   // Lido a cada request (não no escopo do módulo): em self-host o middleware
   // enxerga o env do processo em runtime, e é isso que faz o gate desligar
   // sozinho no instante em que o painel ganhar a DATABASE_URL.
@@ -81,7 +82,14 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
 
   // O default do next-auth/middleware também funciona chamado à mão — é o
   // mesmo objeto, só que decidimos NÓS quando ele entra.
-  return (comSessao as unknown as (r: NextRequest, e: NextFetchEvent) => Response)(req, event);
+  const acesso = await (comSessao as unknown as (r: NextRequest, e: NextFetchEvent) => Promise<Response | undefined>)(req, event);
+  // O redirecionamento padrão 307 reenviaria os arquivos ao login se a sessão vencesse com o formulário aberto.
+  if (req.method === 'POST' && /^\/rodolfo\/integracoes\/[^/]+\/financial\/fontes\/?$/.test(pathname) && acesso?.status === 307) {
+    const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
+    if (formularioFinancialPedeHtml(req.headers)) return NextResponse.redirect(new URL('/rodolfo/login', req.url), { status: 303, headers });
+    return NextResponse.json({ mensagem: 'Entre na central FlowFoods para registrar fontes.' }, { status: 401, headers });
+  }
+  return acesso;
 }
 
 export const config = {

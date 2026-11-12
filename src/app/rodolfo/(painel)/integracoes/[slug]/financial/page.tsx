@@ -12,5 +12,6 @@ export default async function ConferenciaFinancialNoNivel1(props: {
   exigirPermissao(ctx, 'integracao.ver');
   exigirPermissao(ctx, 'faturamento.ver');
   const central = `/rodolfo/integracoes/${encodeURIComponent(ctx.parceiro.slug)}`;
-  return <TelaConferenciaFinancial ctx={ctx} central={central} busca={await props.searchParams} />;
+  return <TelaConferenciaFinancial ctx={ctx} central={central} busca={await props.searchParams}
+    permitirEnvio={ctx.podeEscrever && !ctx.bloqueio && ctx.parceiro.status === 'ATIVO'} />;
 }

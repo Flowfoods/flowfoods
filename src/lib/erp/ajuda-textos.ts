@@ -1982,13 +1982,20 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['integracoes/financial'],
     titulo: 'Conferência financeira do iFood',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Escolha a loja e o mês para conferir as fontes dos repasses, taxas e antecipações.' },
-      { texto: 'Sem dados indica que falta uma fonte conciliada para aquela loja no mês consultado.' },
+      { texto: 'Sem dados indica que ainda não há fontes recebidas. Recebido para conferência indica que a central registrou um envio para aquela loja e mês.' },
       { texto: 'Abra o exemplo simulado para comparar os valores ou baixar o arquivo de um pedido fictício.' },
     ],
     secoes: [{
+      id: 'consultar-os-recibos',
+      titulo: 'Consultar os recibos',
+      blocos: [
+        { texto: 'Abra o recibo para ver a conexão, o ambiente, a quantidade de pedidos e eventos e as datas de vigência das taxas declaradas.' },
+        { texto: 'Um reenvio idêntico recupera o mesmo recibo. Se as fontes mudarem, o histórico guarda a outra versão. Os valores dependem de conciliação antes de entrarem no DRE.' },
+      ],
+    }, {
       id: 'conferir-uma-diferenca',
       titulo: 'Conferir uma diferença',
       blocos: [
