@@ -153,6 +153,16 @@ A diferença é o movimento cobrado menos o movimento previsto, ambos com o sina
 
 Em `npm run integracao:financial-simular`, fevereiro de 2026 tem uma comissão de 12% sobre R$ 100,00 e uma taxa de pagamento de 3,2% sobre R$ 50,00. Os débitos de R$ 12,00 e R$ 1,60 conferem. No segundo cenário, a comissão cobrada sobe a 13% e os R$ 13,00 debitados excedem o previsto em R$ 1,00. Os outros dois cenários demonstram uma comissão sem base e um mês sem histórico de vigência. Todos os valores e vínculos comerciais são fictícios.
 
+### Conferência mensal do custo da antecipação
+
+A simulação consulta `/anticipations` pelo mês civil de apuração. Cada título conserva o grupo de origem, o estado do pagamento, as datas original e antecipada e os respectivos valores. A data original pode cair no mês seguinte. Um grupo que atravessa duas competências precisa de evidência adicional para que seu custo seja atribuído a uma delas. O cenário confirma separadamente a cobertura, o fechamento da competência e o vínculo dos títulos com parceiro, loja, merchant, produto e moeda. O saldo do envelope continua disponível no leitor.
+
+Em cada título `SUCCEED`, a conferência em reais compara `feeAmount` com `originalPaymentAmount − anticipatedPaymentAmount` quando a taxa é o único desconto atestado. Para conferir `feePercentage`, o cenário fornece a base usada naquela ocorrência. O percentual efetivo é `100 × taxa em centavos / base em centavos`. Uma base ausente ou igual a zero deixa a conferência percentual pendente. A taxa declarada e a verificação em reais continuam visíveis. Quando a aplicação do percentual declarado produz uma fração de centavo, a confirmação monetária desse percentual depende da regra de arredondamento do provedor. [Critérios do iFood para Anticipations](https://developer.ifood.com.br/en-US/docs/food/guides/modules/financial/homologation)
+
+O resultado mantém os diagnósticos por título. Uma antecipação `FAILED` aparece entre as ocorrências e fica fora do custo realizado. Para títulos comparáveis, o percentual efetivo do mês usa a soma das taxas e a soma das bases comprovadas. A conferência conserva a razão exata. O resumo em português usa uma casa decimal apenas para exibir o percentual mensal.
+
+Em `npm run integracao:financial-simular`, dois títulos de fevereiro antecipam R$ 800,00 e R$ 200,00. Os valores líquidos são R$ 796,00 e R$ 196,00. Com as bases dos dois títulos atestadas no cenário, as taxas de 0,5% e 2% somam R$ 8,00, ou 0,8% de R$ 1.000,00. O comando também demonstra a ausência de base em um título, um desvio de um centavo no líquido e um percentual declarado divergente. Os campos originais e antecipados vêm do mesmo título de Anticipations. O cruzamento com títulos de Settlements, a base comercial real, a paginação e os regimes D+1/D+7 dependem de verificação no ambiente oficial.
+
 ## Verificação
 
 Execute `npm test -- ifood-financial-v3` para conferir os leitores e as consultas por transporte simulado. A suíte inclui precisão do JSON, paginação de vendas e eventos, antecipações e liquidações, conflitos de protocolo, divergência de loja e competência e retomada após o prazo de consulta. A demonstração pelo comando `integracao:financial-simular` usa as mesmas funções de consulta.
