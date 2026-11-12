@@ -20,7 +20,8 @@ it('concilia as quatro fontes fictícias e entrega o CSV.gz validado do mesmo m�
       titulos: [{ pagamentoOriginalEm: '2026-03-04', pagamentoAntecipadoEm: '2026-02-18', valorAntecipadoCentavos: 2673n }] },
   });
   const merchant = '00000000-0000-4000-8000-000000000001';
-  expect(exemplo.download).toMatchObject({ nomeArquivo: `conciliacao-simulada-${merchant}-2026-02.csv.gz`, linhas: 3, pedidosDistintos: 1 });
+  expect(exemplo.download).toMatchObject({ nomeArquivo: `conciliacao-simulada-${merchant}-2026-02.csv.gz`, linhas: 3, pedidosDistintos: 1,
+    estado: 'DISPONIVEL', integridade: 'VERIFICADA', consultas: 3 });
   const partes = /^data:application\/gzip;base64,([A-Za-z0-9+/]+={0,2})$/.exec(exemplo.download.href);
   expect(partes).not.toBeNull();
   const bytes = Buffer.from(partes![1], 'base64');
@@ -30,6 +31,33 @@ it('concilia as quatro fontes fictícias e entrega o CSV.gz validado do mesmo m�
     `30.00;2026-02;pedido-simulado;${merchant};SIM`, `-3.00;2026-02;pedido-simulado;${merchant};SIM`,
     `4.00;2026-02;;${merchant};NAO`,
   ]);
+});
+
+it.each([
+  { cenario: 'conforme' as const, comissao: -240n, saldo: 2700n },
+  { cenario: 'divergente' as const, comissao: -270n, saldo: 2670n },
+])('mostra pedido, recebedor, eventos e título da mesma fixture no cenário $cenario', async ({ cenario, comissao, saldo }) => {
+  const exemplo = await montarExemploConferenciaFinancial(cenario);
+  expect(exemplo.vendas).toMatchObject([{
+    id: 'pedido-simulado', numeroCurto: '0012', criadaEm: '2026-02-03T14:00:00-03:00', estado: 'CONCLUDED',
+    valorBruto: { itensCentavos: 3000n, entregaCentavos: 0n, servicoCentavos: 0n },
+    faturamento: { saldoVendaCentavos: saldo, lancamentos: [
+      { nome: 'ORDER_COMMISSION', valorCentavos: comissao }, { nome: 'PAYMENT_TRANSACTION_FEE', valorCentavos: -60n },
+    ] },
+    metodosPagamento: [{ metodo: 'CREDIT', tipo: 'ONLINE', responsabilidade: 'IFOOD', moeda: 'BRL', valorCentavos: 3000n }],
+  }]);
+  expect(exemplo.eventos?.map(e => [e.nome, e.valorCentavos, e.impactoNoRepasse])).toEqual([
+    ['ORDER_PAYMENT', 3000n, true], ['ORDER_COMMISSION', comissao, true], ['PAYMENT_TRANSACTION_FEE', -60n, true],
+    ['AJUSTE_SIMULADO', 400n, false],
+  ]);
+  const pedidoCriadoEm = exemplo.vendas?.[0].criadaEm;
+  expect(exemplo.eventos?.map(e => [e.referenciaEm, e.repassePrevistoEm])).toEqual([
+    [pedidoCriadoEm, '2026-03-04'], [pedidoCriadoEm, '2026-03-04'], [pedidoCriadoEm, '2026-03-04'], [undefined, undefined],
+  ]);
+  expect(exemplo.arquivoEventos.eventosComImpactoCentavos).toBe(saldo);
+  expect(exemplo.titulosLiquidacao).toEqual([{
+    natureza: 'TITULO', tipo: 'REPASSE', produto: 'IFOOD', estado: 'SUCCEED', pagamentoEm: '2026-03-04', valorCentavos: 2700n,
+  }]);
 });
 
 it('atribui a divergência de trinta centavos à cobrança da comissão e a propaga aos confrontos do repasse', async () => {
@@ -52,5 +80,6 @@ it('mantém só o arquivo disponível no exemplo incompleto e os quatro confront
   } });
   expect(exemplo.antecipacao).toMatchObject({ estado: 'PENDENTE', titulos: [], monetario: { taxaInformadaCentavos: null },
     percentual: { efetivoPonderado: null } });
-  expect(exemplo.download.linhas).toBe(3);
+  expect(exemplo).toMatchObject({ vendas: null, eventos: null, titulosLiquidacao: null,
+    download: { linhas: 3, estado: 'DISPONIVEL', integridade: 'VERIFICADA' } });
 });

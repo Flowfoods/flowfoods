@@ -31,6 +31,10 @@ describe('tela de conferência Financial · fontes e navegação', () => {
     const tela = await html({ loja: loja.id, competencia: '2026-06', exemplo: 'divergente' }, central);
     expect(tela).toContain(`href="${central}/financial?loja=loja-consulta&amp;competencia=2026-06"`);
     for (const texto of ['Loja fictícia', 'fevereiro de 2026', 'Dados simulados', 'Divergente', 'R$ 26,70', '−R$ 0,30', '9%', '8%', 'Baixar CSV.gz simulado']) expect(tela).toContain(texto);
+    for (const texto of ['0012', 'Cartão de crédito', 'Recebedor', '03/02/2026', '04/03/2026', 'Pago', '+R$ 30,00', 'Sem impacto no repasse', 'Arquivo disponível e verificado']) expect(tela).toContain(texto);
+    expect(tela).toContain('Data da referência · 03/02/2026');
+    expect(tela).toContain('Previsão de repasse · 04/03/2026');
+    expect(tela).toContain('Previsão de repasse · Não informada');
     expect(tela).not.toMatch(/Unidade selecionada|junho de 2026|Vínculo cadastrado/);
   });
 
@@ -38,6 +42,7 @@ describe('tela de conferência Financial · fontes e navegação', () => {
     const tela = await html({ exemplo: 'incompleto' });
     expect(tela).toContain('Apenas o arquivo mensal está disponível');
     expect(tela).toContain('Pendente');
+    for (const texto of ['Fonte de vendas ausente', 'Fonte de eventos ausente', 'Fonte de liquidações ausente']) expect(tela).toContain(texto);
     expect(tela).toContain('Baixar CSV.gz simulado');
     expect(tela).not.toContain('R$');
   });

@@ -1,6 +1,6 @@
 import { gerarArquivoMensalSimulado, identidadeSimulada as identidade } from './financial-v3-arquivo-simulado';
 import { compararConciliacaoEventosV3 } from './financial-v3-comparacao';
-import { consultarAntecipacoesFinancialV3, consultarEventosFinancialV3, consultarLiquidacoesFinancialV3 } from './financial-v3-consultas';
+import { consultarAntecipacoesFinancialV3, consultarEventosFinancialV3, consultarLiquidacoesFinancialV3, consultarVendasFinancialV3 } from './financial-v3-consultas';
 import { conferirCustoAntecipacaoMensalV3 } from './financial-v3-custo-antecipacao';
 import { prepararDownloadConciliacaoV3 } from './financial-v3-download';
 import { conciliarLiquidacaoMensalV3 } from './financial-v3-liquidacao-mensal';
@@ -28,20 +28,36 @@ function respostaFicticia(corpo: unknown): Transporte {
 }
 
 async function lerFontesDoExemplo(cenario: CenarioExemploFinancial) {
-  if (cenario === 'incompleto') return { eventos: null, liquidacoes: null, antecipacoes: null };
+  if (cenario === 'incompleto') return { vendas: null, eventos: null, liquidacoes: null, antecipacoes: null };
 
   const evento = {
     trigger: 'SALE_CONCLUDED', product: identidade.produto, competence: identidade.competencia,
     period: semana, hasTransferImpact: true, receiver: { merchantId: identidade.merchant },
   };
+  const pedidoCriadoEm = '2026-02-03T14:00:00-03:00';
+  const eventoDoPedido = { ...evento, reference: { date: pedidoCriadoEm }, settlement: { expectedDate: '2026-03-04' } };
   const cobrancaDivergente = cenario === 'divergente';
-  const [eventos, liquidacoes, antecipacoes] = await Promise.all([
+  const comissao = cobrancaDivergente ? '-2.70' : '-2.40';
+  const taxaPagamento = '-0.60';
+  const [vendas, eventos, liquidacoes, antecipacoes] = await Promise.all([
+    consultarVendasFinancialV3(mes, respostaFicticia({
+      beginSalesDate: mes.inicio, endSalesDate: mes.fim, page: 1, size: 1, total: 1, pageCount: 1,
+      sales: [{
+        id: 'pedido-simulado', shortId: '0012', createdAt: pedidoCriadoEm, currentStatus: 'CONCLUDED',
+        merchant: { id: identidade.merchant }, salesChannel: 'IFOOD', type: 'DELIVERY',
+        saleGrossValue: { bag: '30.00', deliveryFee: '0.00', serviceFee: '0.00' },
+        billingSummary: { saleBalance: cobrancaDivergente ? '26.70' : '27.00', billingEntries: [
+          { name: 'ORDER_COMMISSION', value: comissao }, { name: 'PAYMENT_TRANSACTION_FEE', value: taxaPagamento },
+        ] },
+        payments: { methods: [{ method: 'CREDIT', type: 'ONLINE', liability: 'IFOOD', currency: 'BRL', value: '30.00' }] },
+      }],
+    })),
     consultarEventosFinancialV3(mes, respostaFicticia({
       page: 1, size: 100, hasNextPage: false, financialEvents: [
-        { ...evento, name: 'ORDER_PAYMENT', amount: { value: '30.00' } },
-        { ...evento, name: 'ORDER_COMMISSION', amount: { value: cobrancaDivergente ? '-2.70' : '-2.40' },
+        { ...eventoDoPedido, name: 'ORDER_PAYMENT', amount: { value: '30.00' } },
+        { ...eventoDoPedido, name: 'ORDER_COMMISSION', amount: { value: comissao },
           billing: { baseValue: '30.00', feePercentage: cobrancaDivergente ? '9' : '8' } },
-        { ...evento, name: 'PAYMENT_TRANSACTION_FEE', amount: { value: '-0.60' },
+        { ...eventoDoPedido, name: 'PAYMENT_TRANSACTION_FEE', amount: { value: taxaPagamento },
           billing: { baseValue: '30.00', feePercentage: '2' } },
         { ...evento, name: 'AJUSTE_SIMULADO', hasTransferImpact: false, amount: { value: '4.00' } },
       ],
@@ -60,13 +76,13 @@ async function lerFontesDoExemplo(cenario: CenarioExemploFinancial) {
       }] }],
     })),
   ]);
-  return { eventos, liquidacoes, antecipacoes };
+  return { vendas: vendas.estado === 'PAGINAS_LIDAS' ? vendas.vendas : null, eventos, liquidacoes, antecipacoes };
 }
 
 /** Cenários fechados de uma única loja fictícia. Nenhum identificador ou dado operacional é aceito. */
 export async function montarExemploConferenciaFinancial(cenario: CenarioExemploFinancial = 'conforme') {
   if (!CENARIOS_EXEMPLO_FINANCIAL.includes(cenario)) throw new Error('Cenário de exemplo Financial desconhecido.');
-  const [{ solicitacao, acompanhamento, arquivoInjetado }, { eventos, liquidacoes, antecipacoes }] = await Promise.all([
+  const [{ solicitacao, acompanhamento, arquivoInjetado }, { vendas, eventos, liquidacoes, antecipacoes }] = await Promise.all([
     gerarArquivoMensalSimulado(), lerFontesDoExemplo(cenario),
   ]);
   const protocolo = solicitacao.protocolo;
@@ -90,9 +106,13 @@ export async function montarExemploConferenciaFinancial(cenario: CenarioExemploF
     // A base atestada para este título é independente dos valores informados no envelope.
     basesPorTitulo: titulo && new Map([[titulo, 2_700n]]),
   });
+  const titulosLiquidacao = liquidacoes?.liquidacoes.lancamentos.flatMap(lancamento =>
+    lancamento.natureza === 'GRUPO_APURACAO' ? lancamento.itens : [lancamento]) ?? null;
   return {
     origem, cenario, nomeLoja: 'Loja fictícia', competencia: identidade.competencia, arquivoEventos, liquidacao, taxas, antecipacao,
+    vendas, eventos: eventos?.eventos ?? null, titulosLiquidacao,
     download: { nomeArquivo: anexo.nomeArquivo, href: 'data:' + anexo.tipoConteudo + ';base64,' + Buffer.from(anexo.bytes).toString('base64'),
+      estado: acompanhamento.estado, integridade: anexo.resumo.integridade, consultas: acompanhamento.consultas,
       linhas: anexo.resumo.linhas, pedidosDistintos: anexo.resumo.pedidosDistintos },
   } as const;
 }

@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { CENARIOS_EXEMPLO_FINANCIAL, type ExemploConferenciaFinancial } from '@/lib/integracoes/ifood/financial-v3-exemplo-conferencia';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { Aviso, Painel, Selo, type Tom } from '@/components/erp/ui/superficies';
-import { diaAnalytics, dinheiroAnalytics, percentualAnalytics } from './formato-analytics';
+import { diaAnalytics, percentualAnalytics } from './formato-analytics';
+import { dinheiroFinancial as dinheiro, MedidaFinancial as Medida } from './medidas-conferencia-financial';
+import { DetalhesDasFontes, rotuloDoPagamento } from './detalhes-conferencia-financial';
 
 const CENARIOS = { conforme: 'Valores compatíveis', divergente: 'Com divergência', incompleto: 'Fontes incompletas' } as const;
 const ESTADOS = {
@@ -10,25 +12,12 @@ const ESTADOS = {
   DIVERGENTE: ['Divergente', 'erro'], PENDENTE: ['Pendente', 'alerta'],
 } as const satisfies Record<string, readonly [string, Tom]>;
 
-export function formatarCompetenciaFinancial(mes: string) {
-  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
-    .format(new Date(`${mes}-01T00:00:00Z`));
-}
-
 function Situacao({ estado }: { estado: keyof typeof ESTADOS }) {
   const [rotulo, tom] = ESTADOS[estado];
   return <Selo tom={tom}>{rotulo}</Selo>;
 }
 
-const dinheiro = (valor: bigint | null) => valor === null ? '—' : dinheiroAnalytics(valor.toString());
 const percentual = (valor: string | null) => valor === null ? '—' : `${valor.replace('.', ',')}%`;
-
-function Medida({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return <div className="min-w-0">
-    <dt className="text-[12px] text-suave">{rotulo}</dt>
-    <dd className="mt-1 font-semibold tabular-nums text-texto">{valor}</dd>
-  </div>;
-}
 
 function Taxa({ titulo, taxa }: { titulo: string; taxa: ExemploConferenciaFinancial['taxas']['porTipo']['ORDER_COMMISSION'] }) {
   // A simulação usa uma cobrança por tipo. Cada percentual pertence à sua própria ocorrência.
@@ -71,6 +60,10 @@ export function ExemploDeConferencia({ exemplo, retorno }: { exemplo: ExemploCon
           <a href={download.href} download={download.nomeArquivo} className={classeDeBotao('secundario')}>Baixar CSV.gz simulado</a>
           <span className="text-[12px] text-suave">{download.linhas} linhas · {download.pedidosDistintos} pedido</span>
         </div>
+        <p className="mt-2 text-[12px] text-suave">
+          {download.estado === 'DISPONIVEL' && download.integridade === 'VERIFICADA' && 'Arquivo disponível e verificado. '}
+          Data de conclusão não informada pela fonte.
+        </p>
       </Painel>
       <Painel titulo="Liquidação e eventos" acessorio={<Situacao estado={liquidacao.estado} />}>
         <dl className="grid grid-cols-2 gap-3">
@@ -96,7 +89,9 @@ export function ExemploDeConferencia({ exemplo, retorno }: { exemplo: ExemploCon
         <Medida rotulo="Pagamento antecipado" valor={titulo?.pagamentoAntecipadoEm ? diaAnalytics(titulo.pagamentoAntecipadoEm) : '—'} />
         <Medida rotulo="Percentual informado" valor={percentual(titulo?.taxaPercentual ?? null)} />
         <Medida rotulo="Percentual efetivo" valor={razao ? percentualAnalytics({ numerador: razao.taxaCentavos.toString(), denominador: razao.baseCentavos.toString() }) : '—'} />
+        <Medida rotulo="Situação do pagamento" valor={rotuloDoPagamento(titulo?.estadoDeclarado ?? null)} />
       </dl>
     </Painel>
+    <DetalhesDasFontes exemplo={exemplo} />
   </>;
 }

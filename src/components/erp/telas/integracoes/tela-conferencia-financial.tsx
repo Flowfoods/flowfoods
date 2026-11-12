@@ -9,7 +9,8 @@ import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { Campo, CAMPO } from '@/components/erp/ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Aviso, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
-import { ExemploDeConferencia, formatarCompetenciaFinancial } from './exemplo-conferencia-financial';
+import { ExemploDeConferencia } from './exemplo-conferencia-financial';
+import { formatarCompetenciaFinancial } from './medidas-conferencia-financial';
 
 type Consulta = Extract<ResultadoConferenciaFinancial, { ok: true }>;
 type Busca = Record<string, string | string[] | undefined>;

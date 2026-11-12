@@ -2,6 +2,7 @@ import { decimalFinancialEmCentavos, ErroFinancialSimulado, MAX_CARACTERES_DECIM
 import { centavosNumeroFinancialV3, objetoPeriodoFinancialV3, type CodigoEnvelopePeriodoV3, type PedidoPeriodoFinancialV3 } from './financial-v3-envelope-periodo';
 import { lerJsonFinancialV3, NumeroJsonFinancial } from './financial-v3-json';
 import { diaDoPainelValido, UUID_DO_MERCHANT } from './painel-campos';
+import { instanteIsoComFusoValido } from './datas';
 
 type PedidoPaginaVendas = PedidoPeriodoFinancialV3 & { readonly page: number };
 
@@ -79,8 +80,7 @@ function numeroCurto(valor: unknown): string | null {
 function criacao(valor: unknown): string | null {
   const instante = texto(valor);
   if (instante === null) return null;
-  const iso = /^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/i.exec(instante);
-  if (!iso || !diaDoPainelValido(iso[1])) throw new ErroVendasV3('ESTRUTURA');
+  if (!instanteIsoComFusoValido(instante)) throw new ErroVendasV3('ESTRUTURA');
   return instante;
 }
 
