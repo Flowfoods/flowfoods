@@ -3,9 +3,12 @@
  * pessoa do parceiro (/erp) e para o nível 1 dentro do parceiro
  * (/rodolfo/erp/<slug>). Recebe as áreas já filtradas pelo alcance de quem vê
  * (`modulosDoParceiro`): em uso, UM CARD POR ÁREA (nome, descrição e as abas
- * que a pessoa pode abrir, cada uma um link; área sem aba permitida nem chega aqui); as do plano
- * ainda sem tela, desabilitadas com a fase. O card nunca é uma ação ("Novo
+ * que a pessoa pode abrir, cada uma um link; área sem aba permitida nem chega aqui); as do catálogo
+ * ainda sem tela, numa seção "Em breve" separada, depois das áreas e dos indicadores. O card nunca é uma ação ("Novo
  * insumo", "Lançar nota"): as ações moram no cabeçalho da aba e no ⌘K.
+ *
+ * Com uma loja escolhida, a Home analítica toma o lugar do hub: o catálogo "Em breve" continua no seletor de áreas do
+ * menu e não empurra os indicadores.
  */
 
 import type { ModuloNav } from '@/lib/erp/modulos';
@@ -81,7 +84,9 @@ export function HubDoParceiro({
             })),
           },
           {
-            rotulo: 'Chegam nas próximas fases',
+            rotulo: 'Em breve',
+            // Três situações diferentes, três textos: fora do acesso e módulo não liberado têm o aviso deles lá em cima.
+            descricao: 'Módulos do catálogo que ainda não estão disponíveis. Não é falta de acesso nem de liberação.',
             cartoes: futuros.map((m) => ({
               chave: m.chave,
               nome: m.nome,
@@ -89,7 +94,7 @@ export function HubDoParceiro({
               icone: m.icone,
               cor: m.cor,
               href: null,
-              fase: m.fase,
+              cadeado: m.cadeado,
             })),
           },
         ]}

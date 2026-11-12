@@ -54,7 +54,7 @@ describe('cards de módulos: atalhos recolhidos por padrão', () => {
   it('card sem atalhos, só com entrada principal, ou "Em breve": nenhum botão vazio', () => {
     expect(html({ ...compras, abas: [] })).not.toContain('<button');
     expect(html({ ...compras, abas: undefined })).not.toContain('Ver atalhos');
-    const futuro = html({ ...compras, href: null, fase: 'Fase 3', abas: undefined });
+    const futuro = html({ ...compras, href: null, abas: undefined });
     expect(futuro).toContain('Em breve');
     expect(futuro).not.toContain('<button');
   });

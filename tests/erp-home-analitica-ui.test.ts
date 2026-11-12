@@ -6,6 +6,7 @@ import type { AnaliticoDaHome, FaturamentoDiarioHome, WidgetAnaliticoHome, Widge
 import type { WidgetCmvHome } from '@/lib/erp/home-cmv';
 import type { PainelDoDia } from '@/lib/erp/painel-do-dia';
 import { formatarDinheiro } from '@/lib/erp/unidades';
+import { modulosEmBreve } from '@/lib/erp/modulos';
 import { HubDoParceiro } from '../src/components/erp/telas/hub-do-parceiro';
 import { EvolucaoFaturamentoHome } from '../src/components/erp/telas/evolucao-faturamento-home';
 
@@ -167,6 +168,20 @@ describe('H2 · composição de uma loja', () => {
     const h = html(p, 'Parceiro QA');
     expect(h).toContain('Parceiro QA · Parceiro QA · Loja B sintética');
     expect(h).toContain('href="/rodolfo/erp/parceiro-qa/compras/relatorios/periodo');
+  });
+
+  it('catálogo "Em breve" não entra na Home de uma loja (não empurra os seis indicadores); na Rede, vem depois do resumo', () => {
+    const comFuturos = (painel?: PainelDaFatia) =>
+      renderToStaticMarkup(createElement(HubDoParceiro, { titulo: 'Áreas da Rede', subtitulo: 'Parceiro QA', modulos: modulosEmBreve(), semAcesso: false, painel }));
+    const daLoja = comFuturos(completo());
+    expect(daLoja.match(/role="group" aria-label="Indicador de /g)).toHaveLength(6);
+    expect(daLoja).not.toContain('aria-label="Em breve"');
+    for (const m of modulosEmBreve()) expect(daLoja, m.nome).not.toContain(m.nome);
+    // Na visão da Rede o hub aparece: o catálogo é a última seção, abaixo do resumo e do "O que precisa de você".
+    const daRede = comFuturos({ indicadores: [], pendencias: [], analitico: { tipo: 'rede' } });
+    expect(daRede).toContain('aria-label="Em breve"');
+    expect(daRede.indexOf('Selecione uma loja no topo')).toBeLessThan(daRede.indexOf('aria-label="Em breve"'));
+    expect(daRede.slice(daRede.indexOf('aria-label="Em breve"'))).not.toMatch(/href=|<button/);
   });
 
   it('loja sem widgets tem estado vazio explícito, sem grade ou retry sem fontes', () => {

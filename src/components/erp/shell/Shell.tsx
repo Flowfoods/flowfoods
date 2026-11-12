@@ -254,7 +254,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
         </aside>
 
         <div className="min-w-0">
-          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-linha bg-fundo px-2 sm:px-4 lg:px-6">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-linha bg-painel px-2 sm:px-4 lg:px-6">
             <div className="flex min-w-0 items-center gap-1 sm:gap-2">
               <button
                 ref={botaoMenu}

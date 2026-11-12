@@ -160,7 +160,11 @@ export function comParceiroAtual(
   if (!parceiro) return nav;
   const base = `/rodolfo/erp/${parceiro.slug}`;
   // O nível 1 vê as abas de módulo com liberação em qualquer parceiro (é quem libera; Integrações leva à Central dele).
-  const areas = modulosDoParceiro(ALCANCE_FLOWFOODS, base, TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => m.href);
+  const doParceiroTodo = modulosDoParceiro(ALCANCE_FLOWFOODS, base, TODOS_OS_MODULOS_COM_LIBERACAO);
+  const areas = doParceiroTodo.filter((m) => m.href);
+  // O catálogo "Em breve" do ERP do parceiro, da mesma fonte do hub dele: entra só no seletor de áreas (sem link, aba ou
+  // ação), para continuar encontrável quando a Home de uma loja toma o lugar do hub. Fora de um parceiro ele não aparece.
+  const emBreve = doParceiroTodo.filter((m) => !m.href);
   const doParceiro: GrupoNav = {
     rotulo: parceiro.nome,
     icone: 'rede',
@@ -170,8 +174,9 @@ export function comParceiroAtual(
   const acoes = areas.flatMap((a) => a.acoes);
   return {
     ...nav,
-    modulos: nav.modulos.map((m) =>
-      m.chave === 'parceiros' ? { ...m, grupos: [...m.grupos, doParceiro, ...grupos], acoes } : m,
-    ),
+    modulos: [
+      ...nav.modulos.map((m) => (m.chave === 'parceiros' ? { ...m, grupos: [...m.grupos, doParceiro, ...grupos], acoes } : m)),
+      ...emBreve,
+    ],
   };
 }

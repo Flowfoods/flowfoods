@@ -9,9 +9,10 @@
  * cor da área + nome + descrição do fluxo e, embaixo, as abas que a pessoa
  * pode abrir, cada uma um link próprio (UX.9: o hub mostra ÁREAS, nunca ações;
  * o card inteiro leva à primeira aba); borda
- * fina, raio 14 px; hover troca borda e fundo (sem pulo). Módulo do plano
- * ainda não construído: mesmo card, sem link, com o selo "Em breve" — nunca
- * leva a uma tela que não existe.
+ * fina, raio 16 px; hover troca borda e fundo (sem pulo). Módulo do catálogo
+ * ainda sem tela: mesmo card, neutro e tracejado, sem link, com o selo
+ * "Em breve" (e o cadeado, quando previsto) — nunca leva a uma tela que não
+ * existe, não é botão e não dispara nada.
  *
  * 30/10/2026 (pedido de Rodolfo): as abas abaixo do divisor começam RECOLHIDAS e abrem por "Ver atalhos"
  * (`AtalhosDoCartao`). Cards com altura natural e alinhados ao topo: abrir um não estica os vizinhos da linha.
@@ -22,6 +23,7 @@ import type { CSSProperties } from 'react';
 import type { ChaveIcone } from '@/lib/erp/modulos';
 import { IconeDoModulo } from './cabecalho';
 import { AtalhosDoCartao } from './atalhos-do-cartao';
+import { SeloEmBreve } from './em-breve';
 
 export interface CartaoDoHub {
   chave: string;
@@ -29,13 +31,15 @@ export interface CartaoDoHub {
   subtitulo: string;
   icone: ChaveIcone;
   cor: string;
+  /** null = "Em breve": card de apresentação, sem link. */
   href: string | null;
-  fase?: string;
+  /** Só nos "Em breve": o cadeado previsto acompanha o selo. */
+  cadeado?: boolean;
   /** Abas da área que a pessoa pode abrir (sem número, sem R$, sem %): cada uma é um link próprio. */
   abas?: { rotulo: string; href: string }[];
 }
 
-const CAIXA = 'ff-identidade-modulo ff-cartao-modulo flex h-full min-w-0 flex-col items-start rounded-[14px] border p-3.5 sm:p-5';
+const CAIXA = 'ff-identidade-modulo ff-cartao-modulo flex h-full min-w-0 flex-col items-start rounded-cartao border p-3.5 sm:p-5';
 const HOVER = 'ff-transicao';
 
 export function CartaoModulo({ c }: { c: CartaoDoHub }) {
@@ -50,14 +54,16 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
     </>
   );
   if (!c.href) {
+    // "Em breve": nome e finalidade inteiros em qualquer largura (quebram em linhas; nada de reticências nem de corte em 3
+    // linhas, que é só do card de área no celular, onde a área abre a tela que explica o resto).
     return (
       <div aria-disabled="true" className={CAIXA} style={identidade}>
-        {cabeca}
-        {c.fase && (
-          <span className="mt-3 inline-flex w-max items-center rounded-[7px] border border-linha-forte px-2 py-0.5 text-[12px] font-medium text-suave">
-            Em breve
-          </span>
-        )}
+        <IconeDoModulo icone={c.icone} cor={c.cor} tamanho={40} />
+        <span className="mt-3 block min-w-0">
+          <span className="block text-[14px] font-semibold leading-snug text-texto [overflow-wrap:anywhere] sm:text-[15px]">{c.nome}</span>
+          <span className="mt-0.5 block text-[13px] leading-snug text-suave [text-wrap:pretty]">{c.subtitulo}</span>
+        </span>
+        <SeloEmBreve cadeado={c.cadeado} className="mt-3" />
       </div>
     );
   }
@@ -87,7 +93,7 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
   );
 }
 
-export function HubDeModulos({ secoes }: { secoes: { rotulo: string; cartoes: CartaoDoHub[] }[] }) {
+export function HubDeModulos({ secoes }: { secoes: { rotulo: string; descricao?: string; cartoes: CartaoDoHub[] }[] }) {
   return (
     <div className="space-y-8">
       {secoes
@@ -95,10 +101,11 @@ export function HubDeModulos({ secoes }: { secoes: { rotulo: string; cartoes: Ca
         .map((s) => (
           <section key={s.rotulo} aria-label={s.rotulo}>
             {/* avoid-ai-design-ignore: SD4 — rótulo de seção em caixa alta só no hub e nos grupos do menu (contrato do shell). */}
-            <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-suave">{s.rotulo}</h2>
+            <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-suave">{s.rotulo}</h2>
+            {s.descricao && <p className="mt-1 text-[13px] text-suave">{s.descricao}</p>}
             {/* Seção com atalhos: altura natural a partir de 600 px, para abrir um card não esticar os vizinhos (pedido de 30/10).
                 Sem atalhos (ou no celular, onde a lista não aparece), os cards da linha seguem com a mesma altura. */}
-            <ul className={`grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4 ${s.cartoes.some((c) => c.href && c.abas?.length) ? 'min-[600px]:items-start' : ''}`}>
+            <ul className={`grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4 mt-3 ${s.cartoes.some((c) => c.href && c.abas?.length) ? 'min-[600px]:items-start' : ''}`}>
               {s.cartoes.map((c) => (
                 <li key={c.chave} className="min-w-0">
                   <CartaoModulo c={c} />

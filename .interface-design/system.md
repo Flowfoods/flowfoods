@@ -23,58 +23,101 @@ segue nas tabelas densas. O **Dark** virou v2.0.0 (vidro, violeta, gradiente,
 raio 24) e não é mais base: a geometria "pulso" já adotada fica, o resto não
 entra. Acento continua o vermelho FlowFoods (o kit manda preservar a marca).
 
+**Revisão de 09/11/2026 (padrão visual aprovado, aplicado em 11/11):** paleta,
+raios e movimento abaixo valem para o shell e os componentes compartilhados
+(`/erp` e `/rodolfo`, mais `/entrar` e o login do nível 1, que carregam os
+mesmos tokens). Site e Portal do cliente (`.ff-site`) não mudam: a paleta
+escura deles deixou de ser a do ERP (o teste `paleta-escura` trava as duas).
+
 ## Tokens (`src/components/erp/tokens.css`, escopo `.ff-app`)
 
-| Token | Escuro | Claro | Uso |
+| Token | Claro | Escuro | Uso |
 |---|---|---|---|
-| `fundo` | #0E0D0C | #F5F0EB | página |
-| `lateral` | #0A0A0A | #EDE6DF | menu lateral |
-| `painel` | #161513 | #FCFAF8 | card, tabela, diálogo |
-| `forte` | #1F1D1B | #EDE6DF | cabeçalho de tabela, opção marcada |
-| `campo` | #090908 | #FFFFFF | campo (inset) |
-| `texto` | #F5F0EB | #0A0A0A | texto |
-| `suave` | #A39C95 | #625D58 | texto secundário (≥ 5,2:1) |
-| `linha` / `linha-forte` | creme 9 % / 18 % | preto 10 % / 20 % | bordas |
-| `acao` / `acao-hover` | #C41522 / #D61A27 | #C41522 / #A8111C | botão principal (branco ≈ 6:1) |
-| `acento` | #EA1D2C | #EA1D2C | indicador ativo, filete do topo, foco |
-| `assinatura` | #F2323F | #C41522 | o "Foods" da marca |
-| `erro` / `ok` / `atencao` | #F5525A / #4ADE80 / #F59E0B | #C41522 / #166534 / #92400E | só em selo e texto, sempre com palavra |
+| `fundo` | #F5F2EB | #181917 | página |
+| `painel` / `lateral` / `campo` | #FFFEFB | #242521 | card, tabela, diálogo, menu lateral, barra do topo, campo |
+| `forte` | #EDE9E0 | #2D2D29 | cabeçalho de tabela, opção marcada (derivado, não consta do aprovado) |
+| `texto` | #292B27 | #EEEAE0 | texto |
+| `suave` | #686A61 | #B0B1A6 | texto secundário (aprovado #74766D dava 4,12:1 no claro; ajuste mínimo para 4,5:1) |
+| `linha` | #E8E7DE | #3B3D35 | divisórias e bordas de superfície (sólida) |
+| `linha-forte` | texto a 22 % | texto a 20 % | borda de campo e de botão secundário (derivado) |
+| `acao` / `acao-hover` | #BC382E / #A72D24 | #B83D33 / #A63229 | botão principal |
+| `sobre-acao` | #FFFDF8 | #FFFDF8 | texto do botão principal (5,5:1) |
+| `acento` / `assinatura` | #BC382E | #EE8C7E | filete do topo, foco, aba ativa, o "Foods" da marca |
+| `destaque` | #FBEBE5 | #3C2926 | opção escolhida, linha alvo, fundo do selo de erro cheio |
+| `erro` | #BC382E | #EE8C7E | só em selo e texto, sempre com palavra |
+| `ok` / `ok-fundo` | #42765B / #EDF4EC | #9BC8AA / #27372C | idem; o fundo só no selo cheio (par ≥ 4,5:1) |
+| `atencao` / `atencao-fundo` | #926626 / #FAF2E1 | #E5BB76 / #393222 | idem |
+| `bloqueio` | #262A23 a 32 % | preto a 56 % | fundo de modal e gaveta (a página segue reconhecível) |
+| `sombra` | 0 18px 60px, 13 % | 0 18px 60px, 40 % | só no que flutua |
+
+Farol e séries dos gráficos não mudaram, com uma exceção: `farol-vermelho` no
+escuro passou de #F5424D para #F4656C (4,24:1 → 5,09:1 sobre a nova superfície).
 
 Tema: cookie `ff_tema` (claro | escuro | sistema) lido no servidor → `data-tema`.
 Cor de módulo: uma paleta central em `src/lib/erp/modulos.ts` para ícone,
 card e menu, conforme a decisão do Notion de 29/10. O quadrado mantém fundo
 a 14 % (claro) / 22 % (escuro), ícone na cor (escuro: misturado ao creme).
 Cards e seletor usam fundo tonal de 7 % (12 % no realce), borda derivada da
-tinta e sombra de 2–3 px. O menu ativo usa a tinta da área com filete e peso,
-além de `aria-current`; o vermelho continua no foco e no botão de marca.
-Liberação, erro e "Em breve" conservam palavras e controles próprios.
+tinta e sombra de 2–3 px. O item ativo do menu é a célula preenchida com
+contorno e peso 600, na tinta da área, além de `aria-current`; o vermelho
+continua no foco e no botão de marca. Liberação, erro e "Em breve" conservam
+palavras e controles próprios; "Em breve" é neutro (`COR.futuro`), sem cor de
+área.
 
 ## Tipo
 
-Libre Franklin em tudo; Gelasio só no h1 da página, no número grande e no
-título de estado vazio (sempre `lining-nums tabular-nums`). Escala
-12 · 13 · 14 · 15 · 18 · 26–30. Mínimo 12 px. Caixa alta só no rótulo de seção
-do hub e nos grupos do menu.
+Libre Franklin em tudo; Gelasio nos títulos editoriais: h1 da página
+(29 px/1,2, peso regular; 25 px no celular), título de diálogo e de gaveta
+(20 px), número grande e título de estado vazio (sempre
+`lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 20 · 25–29; título de
+painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px). Caixa
+alta só no rótulo de seção do hub e nos grupos do menu.
 
 ## Espaço e raio
 
-Base 4 px: 4 · 8 · 12 · 16 · 24 · 32. Raios: 5 (item do menu), 7 (botão,
-campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
+Base 4 px: 4 · 8 · 12 · 16 · 24 · 32. Conteúdo com 16/24/32 px de respiro
+(celular/tablet/desktop), a escala que as telas e as barras fixas dos
+formulários já usam; painel com 16/20. Raios nomeados (tokens `--ff-raio-*`, classes
+`rounded-cartao|modal|popover|nav|botao|campo`): cartão 16, modal e gaveta 19,
+popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
+(quadrado do ícone 40, segmentado).
 
 ## Padrões
 
-- **Menu lateral** 232 px (68 recolhido), altura total, borda direita; item
-  40 px, ativo = realce tonal + `inset 2px 0 0 tinta da área`; seletor de módulo no
-  topo; grupos com botão `aria-expanded`; fase no rodapé. < 900 px: gaveta.
-- **Barra superior** 64 px, borda inferior, sem blur.
-- **Botão** 40 px (44 no celular), padding 16, raio 7, 14 px/600. Um
-  primário por tela. Variantes: primario, secundario, perigo, fantasma
+- **Menu lateral** 232 px (68 recolhido), altura total, borda direita, na cor
+  da superfície. Os itens formam uma **grade compacta** de ícone + nome
+  (12 px), em **duas colunas quando o nome cabe**: a coluna mínima é 8,1em
+  (o maior nome sem partir palavra) e no máximo metade da largura, então a
+  grade cai para uma coluna sozinha se o texto crescer. Nome nunca cortado
+  (quebra em linhas; a célula cresce, mínimo 64 px). Ativo = célula preenchida
+  com contorno na tinta da área (≥ 3:1) + peso 600. A largura de 232 px ficou:
+  a de referência (142 px) só comporta duas colunas com nomes curtos; os nomes
+  reais das áreas ("Movimentações", 92 px) pediriam uma coluna só. Barra de
+  rolagem fina: as duas colunas cabem também com a barra clássica.
+  Seletor de área no topo; grupos com botão `aria-expanded`; fase no rodapé.
+  < 900 px: gaveta com a mesma grade.
+- **Seletor de áreas** lista as áreas em uso (links, a atual marcada) e, num
+  grupo separado e nomeado, o catálogo **"Em breve"**: nome, finalidade e selo,
+  como texto. Nunca link, botão, foco, busca ou consulta. Só o público
+  autorizado enxerga o catálogo (`veCatalogoEmBreve`): hoje, o nível 1 dentro
+  de um parceiro, pela mesma fonte do hub dele; as pessoas do parceiro não
+  veem módulo futuro até o público delas ser definido. Fora de um parceiro o
+  seletor do nível 1 não lista futuros. Na gaveta do celular o painel fica na
+  largura dela.
+- **Barra superior** 64 px, na cor da superfície, borda inferior, sem blur.
+- **Botão** 40 px (44 no celular), padding 16, raio 10, 14 px/600. Um
+  primário por tela. Variantes: primario (texto `sobre-acao`), secundario (na
+  cor da superfície), perigo (sob o ponteiro, `destaque`), fantasma
   (`classeDeBotao`).
-- **Campo** 42 px (44 no celular, fonte 16 px), borda `linha-forte`, fundo
-  `campo`, rótulo persistente 13 px/500, erro embaixo ligado por
-  `aria-describedby`.
-- **Card** borda `linha`, raio 14, cabeçalho 48 px com título 13 px/600,
+- **Campo** 42 px (44 no celular, fonte 16 px), raio 9, borda `linha-forte`,
+  fundo `campo`, rótulo persistente 13 px/500, erro embaixo ligado por
+  `aria-describedby`. Texto de exemplo em `suave` inteiro (a 70 % caía a 3:1).
+- **Card** borda `linha`, raio 16, cabeçalho 48 px com título 14 px/600,
   corpo 16/20.
+- **Selo** sempre sobre a superfície (opaco: o contraste da palavra não
+  depende de onde pousa); `cheio` usa o fundo do par (`ok-fundo`,
+  `atencao-fundo`, `destaque`). Palavra de estado solta (`ok`, `atencao`) vai
+  sobre `fundo` ou `painel`, nunca sobre `forte` (4,4:1 e 4,2:1 no claro).
 - **Histórico** wrapper `HistoricoRecolhivel` sobre os registros já autorizados:
   fechado ao entrar, voltar, restaurar cache ou trocar pessoa/parceiro/visão/objeto;
   preserva expansão ao filtrar/atualizar a mesma consulta. `summary` nativo,
@@ -91,7 +134,13 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   subtítulo com contexto e contagem + ação à direita + busca/filtros abaixo.
 - **Hub** grade 4 (≥ 1280) e 2 no tablet e no celular; card com ícone, nome
   15/600, subtítulo 13; no celular, compacto (nome 14, descrição em até 3
-  linhas, sem os links das abas); futuro sem link, com "Em breve".
+  linhas, sem os links das abas). O catálogo **"Em breve"** (só para quem o
+  enxerga) é a última seção, depois das áreas e dos indicadores: card neutro
+  e tracejado, com nome e
+  finalidade inteiros (sem reticências nem corte de linhas) e o selo (mais o
+  cadeado em CRM Time e CRM Clube, lido como "Com cadeado"), sem link. Com
+  uma loja escolhida a Home analítica toma o lugar do hub e o catálogo fica só
+  no seletor de áreas.
 - **Caixa "Como funciona"** dentro do `PageHeader`, entre o título e a busca
   (`ContextoDaCaixa`): rótulo 13/600, sem repetir o nome da tela em serifa.
 - **Toque** (`pointer: coarse`, tablet e celular): todo alvo volta a 44 px; link
@@ -114,8 +163,22 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   detalhe: quem opera bate o olho e sabe o que é.
 - **Custo incompleto**: selo "Custo incompleto" (tom atenção) no lugar do
   número na lista; no detalhe, o parcial com "sem contar X (sem preço)".
-- **Foco** anel 3 px `acento`, folga 4 px (campo: 1 px). **Movimento** 160 ms
-  hover, 220 ms entrada (8 px); `prefers-reduced-motion` zera.
+- **Foco** anel 3 px `acento`, folga 4 px (campo: 1 px).
+- **Movimento** um token de 220 ms. Entrada de modal e popover: opacidade +
+  `translateY(-7px) scale(.98)`, `cubic-bezier(.2,.8,.2,1)`; gaveta de detalhes:
+  opacidade + `translateX(28px)` pela direita (o menu do celular espelha, pela
+  esquerda); fundo de bloqueio: só opacidade, `ease`; botões e navegação: cor,
+  fundo e borda. **Fechar é imediato**, sem animação de saída. Sem laço,
+  vai-e-vem ou atraso. `prefers-reduced-motion` zera tudo, inclusive o
+  `::backdrop`.
+- **Camadas** popover ancorado ao botão, que desliza para caber na tela (12 px
+  de folga) sem mover o acionador; abre por clique, toque e teclado; Escape e
+  toque fora fecham; o foco volta ao botão. Modal e gaveta = `<dialog>` nativo:
+  nome acessível, fundo inerte, Tab contido, Escape, clique no fundo, retorno
+  do foco. Abaixo de 600 px a gaveta de detalhes ocupa a largura disponível;
+  nunca duas gavetas empilhadas. Abrir, animar e fechar não gravam nem enviam.
+  Não há toast no kit: confirmação e erro continuam na própria tela
+  (`MensagemDeResposta`, `Resultado`, `Aviso`).
 
 ## Decisões
 
@@ -131,6 +194,12 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
 | Hub 2 colunas no celular | Ref.1 do plano vence o kit | 2026-10-21 |
 | Erro escuro #F5525A | #F2323F dava 4,42:1 na linha destacada | 2026-10-21 |
 | Máscara na borda do trilho de filtros no celular | indício de rolagem (funcional, não decorativa) | 2026-10-16 |
+| Paleta, raios e movimento do padrão aprovado em 09/11, só no `.ff-app` | decisão de Rodolfo após experimentar a prévia; site e Portal ficam fora (substitui, para o ERP, o cruzamento da decisão 476) | 2026-11-11 |
+| `suave` claro #686A61 e `farol-vermelho` escuro #F4656C | os aprovados davam 4,12:1 e 4,24:1 nas superfícies reais; ajuste mínimo, mesma matiz | 2026-11-11 |
+| Lateral em grade de 2 colunas mantendo 232 px (a confirmar com Rodolfo) | "Movimentações" a 12 px/600 pede 92 px; a 142 px os nomes reais só cabem em uma coluna | 2026-11-11 |
+| Assinatura `Marca` mantida | não há arquivo de logo oficial no repositório; a marca textual da prévia não a substitui | 2026-11-11 |
+| "Em breve" como catálogo de apresentação, só para público autorizado (hoje, o nível 1) | regra do plano de 11/11: futuro não aparece a todo perfil; o público do parceiro é decisão do proprietário, ainda em aberto | 2026-11-12 |
+| Selo sobre superfície opaca; tinta só no `cheio`, pelos pares aprovados | `ok` a 15 % dava 4,28:1 com a cor nova; o fundo opaco tira o selo da conta de onde ele pousa | 2026-11-11 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,

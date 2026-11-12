@@ -149,7 +149,7 @@ export function DecisaoDoPedido({
                 spellCheck={false}
                 aria-invalid={!!e.slug}
                 aria-describedby="ativar-slug-erro ativar-slug-dica"
-                className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-sm text-texto outline-none placeholder:text-suave/70 sm:min-h-[42px]"
+                className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-sm text-texto outline-none placeholder:text-suave sm:min-h-[42px]"
               />
             </div>
             <p id="ativar-slug-dica" className={AJUDA}>

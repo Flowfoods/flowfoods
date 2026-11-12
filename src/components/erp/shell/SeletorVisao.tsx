@@ -21,7 +21,7 @@ import { useContextoDaConsulta } from './contexto-da-consulta';
 import type { VisaoDoNivel1, VisaoDoParceiro } from './tipos';
 
 const GATILHO =
-  'ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[7px] border border-linha px-2.5 text-[13px] text-texto hover:border-linha-forte aria-expanded:border-linha-forte sm:px-3';
+  'ff-transicao flex min-h-11 w-full items-center gap-2 rounded-botao border border-linha px-2.5 text-[13px] text-texto hover:border-linha-forte aria-expanded:border-linha-forte sm:px-3';
 
 export function SeletorVisao({ visao }: { visao: VisaoDoParceiro | VisaoDoNivel1 }) {
   return visao.modo === 'parceiro' ? <DoParceiro visao={visao} /> : <DoNivel1 visao={visao} />;
@@ -47,7 +47,7 @@ function ListaDeOpcoes({
               type="button"
               aria-pressed={o.valor === valor}
               onClick={() => aoEscolher(o.valor)}
-              className="ff-transicao flex min-h-11 w-full items-center justify-between gap-3 rounded-[8px] px-3 text-left text-[14px] hover:bg-texto/5"
+              className="ff-transicao flex min-h-11 w-full items-center justify-between gap-3 rounded-[8px] px-3 text-left text-[14px] hover:bg-texto/5 aria-pressed:bg-destaque aria-pressed:font-medium"
             >
               <span className="min-w-0 truncate">
                 {o.rotulo}

@@ -1,85 +1,119 @@
 /*
- * Tokens do shell do ERP (Barney) — Kairu Dark "pulso" na geometria, FlowFoods
- * na cor e no tipo. Contrato completo em `.interface-design/system.md`.
+ * Tokens do shell do ERP — padrão visual FlowFoods aprovado em 09/11/2026.
+ * Contrato completo em `.interface-design/system.md`.
  *
- * Escopo: só `.ff-app` (o wrapper dos layouts do shell). O site institucional
- * e o Portal do cliente não carregam este arquivo e não mudam.
+ * Escopo: só `.ff-app` (o wrapper dos layouts do shell, do /entrar e do login do
+ * nível 1). O site institucional e o Portal do cliente não carregam este
+ * arquivo e não mudam.
  *
  * Tema: `data-tema` vem do cookie `ff_tema`, lido NO SERVIDOR pelo layout do
  * shell. "sistema" resolve aqui, por media query: zero JS, zero flash.
  *
- * Cores em canais RGB ("14 13 12") para o Tailwind aplicar opacidade
- * (`bg-texto/5`). `linha` e `linha-forte` já trazem a opacidade.
+ * Cores em canais RGB ("41 43 39") para o Tailwind aplicar opacidade
+ * (`bg-texto/5`). `linha` é a divisória sólida; `linha-forte` já traz a opacidade.
  *
- * avoid-ai-design-ignore-file: SD1 — creme #F5F0EB + preto #0A0A0A + vermelho
- * #EA1D2C é a identidade FlowFoods (CLAUDE.md), pedida pelo contrato do ERP.
+ * Dois valores saem do aprovado só o necessário para o contraste (AA):
+ *  - `suave` no claro: #686a61 no lugar de #74766d (4,12:1 sobre o fundo →
+ *    4,91:1; 4,5:1 também sobre `forte`, `destaque` e os fundos das áreas);
+ *  - `farol-vermelho` no escuro: #f4656c no lugar de #f5424d (4,24:1 sobre a
+ *    nova superfície → 5,09:1; 4,56:1 sobre `forte`). Mesma matiz, mais clara.
+ * `forte` e `linha-forte` não constam da paleta aprovada: derivam dela na mesma
+ * relação que tinham com o fundo e o texto anteriores.
+ *
+ * avoid-ai-design-ignore-file: SD1 — creme, quase preto e vermelho são a
+ * identidade FlowFoods (CLAUDE.md), pedida pelo contrato do ERP.
  */
+
+/* Geometria e movimento: iguais nos dois temas. */
+.ff-app {
+  --ff-raio-cartao: 16px;
+  --ff-raio-modal: 19px;
+  --ff-raio-popover: 13px;
+  --ff-raio-nav: 12px;
+  --ff-raio-botao: 10px;
+  --ff-raio-campo: 9px;
+  /* Entrada de popover, modal e gaveta; cor, fundo e borda de botões e navegação. Fechar é imediato. */
+  --ff-movimento: 220ms;
+  --ff-curva-entrada: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 
 /* Claro: o padrão, e o que vale em "sistema" quando o aparelho está claro. */
 .ff-app,
 .ff-app[data-tema='claro'] {
-  --ff-fundo: 245 240 235;
-  --ff-lateral: 237 230 223;
-  --ff-painel: 252 250 248;
-  --ff-forte: 237 230 223;
-  --ff-campo: 255 255 255;
-  --ff-texto: 10 10 10;
-  --ff-suave: 98 93 88;
-  --ff-linha: rgb(10 10 10 / 0.1);
-  --ff-linha-forte: rgb(10 10 10 / 0.2);
-  --ff-acao: 196 21 34;
-  --ff-acao-hover: 168 17 28;
-  --ff-acento: 234 29 44;
-  --ff-marca: 196 21 34;
-  --ff-erro: 196 21 34;
-  --ff-ok: 22 101 52;
-  --ff-atencao: 146 64 14;
+  --ff-fundo: 245 242 235;
+  --ff-lateral: 255 254 251;
+  --ff-painel: 255 254 251;
+  --ff-forte: 237 233 224;
+  --ff-campo: 255 254 251;
+  --ff-texto: 41 43 39;
+  --ff-suave: 104 106 97;
+  --ff-linha: #e8e7de;
+  --ff-linha-forte: rgb(41 43 39 / 0.22);
+  --ff-acao: 188 56 46;
+  --ff-acao-hover: 167 45 36;
+  --ff-sobre-acao: 255 253 248;
+  --ff-acento: 188 56 46;
+  --ff-marca: 188 56 46;
+  /* Superfície de destaque: seleção, linha alvo e fundo do que é do vermelho. */
+  --ff-destaque: 251 235 229;
+  --ff-erro: 188 56 46;
+  --ff-ok: 66 118 91;
+  --ff-ok-fundo: 237 244 236;
+  --ff-atencao: 146 102 38;
+  --ff-atencao-fundo: 250 242 225;
   --ff-farol-azul: 47 93 138;
   --ff-farol-verde: 22 101 52;
   --ff-farol-amarelo: 111 99 0;
   --ff-farol-laranja: 176 68 0;
   --ff-farol-vermelho: 196 21 34;
-  --ff-ativo: rgb(196 21 34 / 0.08);
+  --ff-ativo: rgb(var(--ff-destaque));
   /* Véu da ajuda (24/10): vermelho clarinho, translúcido; destaca o card sem apagar a tela. Não é sinal de erro. */
-  --ff-veu-ajuda: rgb(234 29 44 / 0.1);
+  --ff-veu-ajuda: rgb(188 56 46 / 0.1);
+  /* Fundo de bloqueio de modal e gaveta: a página continua reconhecível atrás. */
+  --ff-bloqueio: rgb(38 42 35 / 0.32);
   /* Séries dos gráficos (canais Loja, Delivery, iFood), ordem fixa; validadas (daltonismo e contraste) no claro e no escuro. */
   --ff-serie-1: #2563a8;
   --ff-serie-2: #0e9f6e;
   --ff-serie-3: #c2410c;
-  --ff-sombra: 0 10px 22px rgb(10 10 10 / 0.12);
+  --ff-sombra: 0 18px 60px rgb(40 48 38 / 0.13);
   --ff-mistura-icone: 14%;
   --ff-icone-tinta: 100%;
   color-scheme: light;
 }
 
 .ff-app[data-tema='escuro'] {
-  --ff-fundo: 14 13 12;
-  --ff-lateral: 10 10 10;
-  --ff-painel: 22 21 19;
-  --ff-forte: 31 29 27;
-  --ff-campo: 9 9 8;
-  --ff-texto: 245 240 235;
-  --ff-suave: 163 156 149;
-  --ff-linha: rgb(245 240 235 / 0.09);
-  --ff-linha-forte: rgb(245 240 235 / 0.18);
-  --ff-acao: 196 21 34;
-  --ff-acao-hover: 214 26 39;
-  --ff-acento: 234 29 44;
-  --ff-marca: 242 50 63;
-  --ff-erro: 245 82 90;
-  --ff-ok: 74 222 128;
-  --ff-atencao: 245 158 11;
+  --ff-fundo: 24 25 23;
+  --ff-lateral: 36 37 33;
+  --ff-painel: 36 37 33;
+  --ff-forte: 45 45 41;
+  --ff-campo: 36 37 33;
+  --ff-texto: 238 234 224;
+  --ff-suave: 176 177 166;
+  --ff-linha: #3b3d35;
+  --ff-linha-forte: rgb(238 234 224 / 0.2);
+  --ff-acao: 184 61 51;
+  --ff-acao-hover: 166 50 41;
+  --ff-sobre-acao: 255 253 248;
+  --ff-acento: 238 140 126;
+  --ff-marca: 238 140 126;
+  --ff-destaque: 60 41 38;
+  --ff-erro: 238 140 126;
+  --ff-ok: 155 200 170;
+  --ff-ok-fundo: 39 55 44;
+  --ff-atencao: 229 187 118;
+  --ff-atencao-fundo: 57 50 34;
   --ff-farol-azul: 141 180 220;
   --ff-farol-verde: 93 187 132;
   --ff-farol-amarelo: 226 197 90;
   --ff-farol-laranja: 240 145 58;
-  --ff-farol-vermelho: 245 66 77;
-  --ff-ativo: rgb(234 29 44 / 0.12);
-  --ff-veu-ajuda: rgb(234 29 44 / 0.14);
+  --ff-farol-vermelho: 244 101 108;
+  --ff-ativo: rgb(var(--ff-destaque));
+  --ff-veu-ajuda: rgb(238 140 126 / 0.14);
+  --ff-bloqueio: rgb(0 0 0 / 0.56);
   --ff-serie-1: #4a86d0;
   --ff-serie-2: #129c6e;
   --ff-serie-3: #d9602a;
-  --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
+  --ff-sombra: 0 18px 60px rgb(0 0 0 / 0.4);
   --ff-mistura-icone: 22%;
   --ff-icone-tinta: 55%;
   color-scheme: dark;
@@ -87,45 +121,50 @@
 
 @media (prefers-color-scheme: dark) {
   .ff-app[data-tema='sistema'] {
-    --ff-fundo: 14 13 12;
-    --ff-lateral: 10 10 10;
-    --ff-painel: 22 21 19;
-    --ff-forte: 31 29 27;
-    --ff-campo: 9 9 8;
-    --ff-texto: 245 240 235;
-    --ff-suave: 163 156 149;
-    --ff-linha: rgb(245 240 235 / 0.09);
-    --ff-linha-forte: rgb(245 240 235 / 0.18);
-    --ff-acao: 196 21 34;
-    --ff-acao-hover: 214 26 39;
-    --ff-acento: 234 29 44;
-    --ff-marca: 242 50 63;
-    --ff-erro: 245 82 90;
-    --ff-ok: 74 222 128;
-    --ff-atencao: 245 158 11;
+    --ff-fundo: 24 25 23;
+    --ff-lateral: 36 37 33;
+    --ff-painel: 36 37 33;
+    --ff-forte: 45 45 41;
+    --ff-campo: 36 37 33;
+    --ff-texto: 238 234 224;
+    --ff-suave: 176 177 166;
+    --ff-linha: #3b3d35;
+    --ff-linha-forte: rgb(238 234 224 / 0.2);
+    --ff-acao: 184 61 51;
+    --ff-acao-hover: 166 50 41;
+    --ff-sobre-acao: 255 253 248;
+    --ff-acento: 238 140 126;
+    --ff-marca: 238 140 126;
+    --ff-destaque: 60 41 38;
+    --ff-erro: 238 140 126;
+    --ff-ok: 155 200 170;
+    --ff-ok-fundo: 39 55 44;
+    --ff-atencao: 229 187 118;
+    --ff-atencao-fundo: 57 50 34;
     --ff-farol-azul: 141 180 220;
     --ff-farol-verde: 93 187 132;
     --ff-farol-amarelo: 226 197 90;
     --ff-farol-laranja: 240 145 58;
-    --ff-farol-vermelho: 245 66 77;
-    --ff-ativo: rgb(234 29 44 / 0.12);
-  --ff-veu-ajuda: rgb(234 29 44 / 0.14);
-  --ff-serie-1: #4a86d0;
-  --ff-serie-2: #129c6e;
-  --ff-serie-3: #d9602a;
-    --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
+    --ff-farol-vermelho: 244 101 108;
+    --ff-ativo: rgb(var(--ff-destaque));
+    --ff-veu-ajuda: rgb(238 140 126 / 0.14);
+    --ff-bloqueio: rgb(0 0 0 / 0.56);
+    --ff-serie-1: #4a86d0;
+    --ff-serie-2: #129c6e;
+    --ff-serie-3: #d9602a;
+    --ff-sombra: 0 18px 60px rgb(0 0 0 / 0.4);
     --ff-mistura-icone: 22%;
     --ff-icone-tinta: 55%;
     color-scheme: dark;
   }
   html:has(.ff-app[data-tema='sistema']) {
-    background-color: #0e0d0c;
+    background-color: #181917;
   }
 }
 
 /* A rolagem elástica do navegador mostra o fundo do html: que seja o do tema. */
 html:has(.ff-app[data-tema='escuro']) {
-  background-color: #0e0d0c;
+  background-color: #181917;
 }
 
 .ff-app {
@@ -160,11 +199,11 @@ html:has(.ff-app[data-tema='escuro']) {
   outline: none;
 }
 
-/* Hover 160 ms; entrada 220 ms com 8 px (kit). */
+/* Botões e navegação: cor, fundo e borda em 220 ms (padrão aprovado). Sem deslocar o alvo. */
 .ff-app .ff-transicao {
   transition-property: background-color, border-color, color, box-shadow, opacity;
-  transition-duration: 160ms;
-  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  transition-duration: var(--ff-movimento);
+  transition-timing-function: ease;
 }
 
 /* Identidade das áreas (29/10): a paleta de modulos.ts também orienta cards e menu.
@@ -199,6 +238,31 @@ html:has(.ff-app[data-tema='escuro']) {
 .ff-app :is(.ff-nav-item, a.ff-opcao-modulo):hover {
   background-color: var(--ff-modulo-fundo);
 }
+
+/*
+ * Grade lateral compacta (padrão aprovado): duas colunas quando o nome cabe. A coluna mínima é medida em `em`, então
+ * acompanha o tamanho do texto; sem espaço, a grade cai para uma coluna sozinha. O nome nunca é cortado: quebra em
+ * linhas e a célula cresce (nada de quadrado rígido). Recolhido: uma coluna só de ícones.
+ */
+.ff-app .ff-nav-grade {
+  display: grid;
+  /* 8,1em = o maior nome sem quebra no meio da palavra ("Movimentações", 12 px/600) mais a borda e a folga da célula;
+     50% − meia folga = no máximo duas colunas. Cabe também com a barra de rolagem clássica (17 px) na lateral de 232 px. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(8.1em, calc(50% - 3px))), 1fr));
+  gap: 6px;
+  font-size: 12px;
+}
+.ff-app .ff-nav-grade[data-recolhido='true'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ff-app .ff-nav-item {
+  border: 1px solid transparent;
+  border-radius: var(--ff-raio-nav);
+}
+.ff-app .ff-nav-rotulo {
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
 .ff-app .ff-opcao-modulo[aria-current='true'] {
   background-color: var(--ff-modulo-realce);
   box-shadow: inset 2px 0 0 var(--ff-modulo-tinta);
@@ -211,10 +275,10 @@ html:has(.ff-app[data-tema='escuro']) {
   color: color-mix(in srgb, var(--cor-modulo) var(--ff-icone-tinta), rgb(var(--ff-texto)));
 }
 
-/* Ativo reconhecível por forma/peso e aria-current, além da cor da própria área. */
+/* Ativo reconhecível por forma (célula preenchida com contorno na tinta da área, ≥ 3:1), peso e aria-current, além da cor. */
 .ff-app .ff-nav-item[aria-current='page'] {
   background-color: var(--ff-modulo-realce);
-  box-shadow: inset 2px 0 0 var(--ff-modulo-tinta);
+  border-color: var(--ff-modulo-tinta);
   color: rgb(var(--ff-texto));
   font-weight: 600;
 }
@@ -232,7 +296,7 @@ html:has(.ff-app[data-tema='escuro']) {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 14px;
+  border-radius: var(--ff-raio-cartao);
 }
 .ff-app a.ff-cartao-titulo:focus-visible {
   outline: none;
@@ -242,16 +306,24 @@ html:has(.ff-app[data-tema='escuro']) {
   outline-offset: 2px;
 }
 
-/* Diálogo nativo (busca, drawer, sheet): uma camada de superfície + a única sombra do sistema. */
+/* Diálogo nativo (busca, gaveta, folha): uma camada de superfície + a única sombra do sistema. */
 .ff-app dialog.ff-dialogo {
   background: rgb(var(--ff-painel));
   color: rgb(var(--ff-texto));
-  border: 1px solid var(--ff-linha-forte);
+  border: 1px solid var(--ff-linha);
+  border-radius: var(--ff-raio-modal);
   box-shadow: var(--ff-sombra);
   padding: 0;
 }
+/* Fundo de bloqueio: só opacidade, 220 ms. O valor repetido cobre o navegador em que o ::backdrop não herda a variável. */
 .ff-app dialog.ff-dialogo::backdrop {
-  background: rgb(10 10 10 / 0.55);
+  background: var(--ff-bloqueio, rgb(38 42 35 / 0.32));
+  animation: ff-fundo var(--ff-movimento, 220ms) ease;
+}
+/* Painel que abre de um botão (visão, conta, notificações, áreas): a mesma entrada do modal, nascendo do acionador. */
+.ff-app .ff-popover {
+  border-radius: var(--ff-raio-popover);
+  animation: ff-camada var(--ff-movimento) var(--ff-curva-entrada);
 }
 /* A gaveta da ajuda usa o mesmo véu do card: a tela continua reconhecível atrás. */
 .ff-app dialog.ff-dialogo.ff-veu-de-ajuda::backdrop {
@@ -276,7 +348,7 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 @media (prefers-reduced-motion: no-preference) {
   .ff-veu-ajuda {
-    animation: ff-veu 180ms ease-out;
+    animation: ff-veu var(--ff-movimento, 220ms) ease;
   }
 }
 @keyframes ff-veu {
@@ -284,31 +356,33 @@ html:has(.ff-app[data-tema='escuro']) {
     opacity: 0;
   }
 }
+/* Entrada das camadas: 220 ms, sem animação de saída (fechar é imediato, como na prévia aprovada). */
 .ff-app dialog.ff-dialogo[open] {
-  animation: ff-entrada 220ms cubic-bezier(0.23, 1, 0.32, 1);
+  animation: ff-camada var(--ff-movimento) var(--ff-curva-entrada);
 }
 .ff-app dialog.ff-gaveta {
   margin: 0;
   height: 100dvh;
   max-height: 100dvh;
   width: min(300px, 86vw);
-  border-radius: 0 14px 14px 0;
+  border-radius: 0 var(--ff-raio-modal) var(--ff-raio-modal) 0;
   border-left: 0;
 }
+/* Menu do celular: a gaveta da esquerda espelha o movimento aprovado da gaveta de detalhes. */
 .ff-app dialog.ff-gaveta[open] {
-  animation: ff-gaveta 220ms cubic-bezier(0.23, 1, 0.32, 1);
+  animation: ff-gaveta var(--ff-movimento) var(--ff-curva-entrada);
 }
 
-/* Gaveta da ajuda (0.6): entra pela direita no desktop; abaixo de 600 px é sheet (regra mais abaixo). */
+/* Gaveta de detalhes (ajuda): entra pela direita; abaixo de 600 px ocupa a largura disponível (regra mais abaixo). */
 .ff-app dialog.ff-gaveta.ff-gaveta-direita {
   margin: 0 0 0 auto;
   width: min(440px, 92vw);
-  border-radius: 14px 0 0 14px;
-  border-left: 1px solid var(--ff-linha-forte);
+  border-radius: var(--ff-raio-modal) 0 0 var(--ff-raio-modal);
+  border-left: 1px solid var(--ff-linha);
   border-right: 0;
 }
 .ff-app dialog.ff-gaveta.ff-gaveta-direita[open] {
-  animation: ff-gaveta-direita 220ms cubic-bezier(0.23, 1, 0.32, 1);
+  animation: ff-gaveta-direita var(--ff-movimento) var(--ff-curva-entrada);
 }
 
 /* Linha alvo de um link (busca ⌘K leva ao insumo na lista). */
@@ -316,10 +390,10 @@ html:has(.ff-app[data-tema='escuro']) {
   background-color: var(--ff-ativo);
 }
 
-@keyframes ff-entrada {
+@keyframes ff-camada {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(-7px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -329,7 +403,7 @@ html:has(.ff-app[data-tema='escuro']) {
 @keyframes ff-gaveta-direita {
   from {
     opacity: 0;
-    transform: translateX(12px);
+    transform: translateX(28px);
   }
   to {
     opacity: 1;
@@ -339,11 +413,16 @@ html:has(.ff-app[data-tema='escuro']) {
 @keyframes ff-gaveta {
   from {
     opacity: 0;
-    transform: translateX(-12px);
+    transform: translateX(-28px);
   }
   to {
     opacity: 1;
     transform: none;
+  }
+}
+@keyframes ff-fundo {
+  from {
+    opacity: 0;
   }
 }
 
@@ -355,8 +434,8 @@ html:has(.ff-app[data-tema='escuro']) {
     max-width: 100%;
     height: auto;
     max-height: 88dvh;
-    border-radius: 14px 14px 0 0;
-    border: 1px solid var(--ff-linha-forte);
+    border-radius: var(--ff-raio-modal) var(--ff-raio-modal) 0 0;
+    border: 1px solid var(--ff-linha);
     border-bottom: 0;
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -398,10 +477,12 @@ html:has(.ff-app[data-tema='escuro']) {
   }
 }
 
+/* Movimento reduzido: nada anima nem transiciona; estado, foco e resultado ficam iguais. O ::backdrop não é alcançado por `*`. */
 @media (prefers-reduced-motion: reduce) {
   .ff-app *,
   .ff-app *::before,
-  .ff-app *::after {
+  .ff-app *::after,
+  .ff-app dialog::backdrop {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
@@ -425,6 +506,20 @@ html:has(.ff-app[data-tema='escuro']) {
     --ff-suave: 60 60 60;
     --ff-linha: rgb(0 0 0 / 0.25);
     --ff-linha-forte: rgb(0 0 0 / 0.45);
+    /* O papel não herda o tema escuro: estado, farol, destaque e seus fundos voltam aos valores do claro. */
+    --ff-acento: 188 56 46;
+    --ff-marca: 188 56 46;
+    --ff-erro: 188 56 46;
+    --ff-ok: 66 118 91;
+    --ff-atencao: 146 102 38;
+    --ff-farol-azul: 47 93 138;
+    --ff-farol-verde: 22 101 52;
+    --ff-farol-amarelo: 111 99 0;
+    --ff-farol-laranja: 176 68 0;
+    --ff-farol-vermelho: 196 21 34;
+    --ff-destaque: 255 255 255;
+    --ff-ok-fundo: 255 255 255;
+    --ff-atencao-fundo: 255 255 255;
     color-scheme: light;
     background: #fff;
     color: #000;

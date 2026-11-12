@@ -886,7 +886,7 @@ function CardDeAjuda({
       aria-describedby={progresso ? `${id}-p` : undefined}
       data-ponto-de-ajuda={ponto.id}
       onKeyDown={aoTeclar}
-      className="fixed inset-x-3 z-40 flex max-h-[min(60dvh,28rem,var(--ff-teto-do-card,100dvh))] flex-col [@media(max-height:600px)]:max-h-[min(50dvh,var(--ff-teto-do-card,100dvh))] rounded-[14px] border border-linha-forte bg-painel shadow-[0_12px_32px_-12px_rgba(10,10,10,0.35)] sm:inset-x-auto sm:right-5 sm:w-[min(380px,calc(100vw-2.5rem))]"
+      className="fixed inset-x-3 z-40 flex max-h-[min(60dvh,28rem,var(--ff-teto-do-card,100dvh))] flex-col [@media(max-height:600px)]:max-h-[min(50dvh,var(--ff-teto-do-card,100dvh))] rounded-cartao border border-linha bg-painel shadow-[var(--ff-sombra)] sm:inset-x-auto sm:right-5 sm:w-[min(380px,calc(100vw-2.5rem))]"
       style={{ bottom: teclado > 0 ? `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${teclado}px)` : 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
       {/* O topo (com o X) e o rodapé (Encerrar ajuda, Continuar) ficam sempre à vista; só o texto rola num card alto. */}

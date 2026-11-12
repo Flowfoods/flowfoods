@@ -9,7 +9,7 @@ import { acaoDefinirSenha, type EstadoSenha } from '../../actions';
 
 const ROTULO = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-suave';
 const CAMPO =
-  'w-full rounded-[7px] border border-linha-forte bg-campo px-3.5 py-3 text-[15px] text-texto outline-none transition placeholder:text-suave/70 focus:border-texto/50 aria-[invalid=true]:border-erro';
+  'w-full rounded-[7px] border border-linha-forte bg-campo px-3.5 py-3 text-[15px] text-texto outline-none transition placeholder:text-suave focus:border-texto/50 aria-[invalid=true]:border-erro';
 
 function Botao({ texto }: { texto: string }) {
   const { pending } = useFormStatus();

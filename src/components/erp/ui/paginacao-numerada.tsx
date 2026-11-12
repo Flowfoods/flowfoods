@@ -7,7 +7,7 @@
 import Link from 'next/link';
 import { paginasVisiveis } from '@/lib/erp/paginacao';
 
-const ALVO = 'ff-transicao inline-flex min-h-11 min-w-11 items-center justify-center rounded-[7px] px-3 text-sm font-semibold tabular-nums';
+const ALVO = 'ff-transicao inline-flex min-h-11 min-w-11 items-center justify-center rounded-botao px-3 text-sm font-semibold tabular-nums';
 const NORMAL = `${ALVO} border border-linha-forte text-texto hover:border-texto/35 hover:bg-texto/5`;
 const ATUAL = `${ALVO} border border-texto bg-forte text-texto`;
 const DESABILITADO = `${ALVO} pointer-events-none border border-linha text-suave opacity-55`;

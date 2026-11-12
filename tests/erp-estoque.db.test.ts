@@ -188,7 +188,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     const doOperador = modulosDoParceiro(alcanceDe('OPERADOR', ['x']), '/erp', NENHUM_MODULO_LIBERADO);
     const estoque = doOperador.find((m) => m.chave === 'estoque')!;
     expect(estoque.href).toBe('/erp/estoque');
-    expect(estoque.fase).toBeUndefined();
+    // Fora do catálogo "Em breve" (os módulos sem tela são os que não têm destino).
+    expect(doOperador.filter((m) => !m.href).map((m) => m.chave)).not.toContain('estoque');
   });
 
   it('sem estoque aberto, a nota não mexe no estoque (como na 1.5)', async () => {

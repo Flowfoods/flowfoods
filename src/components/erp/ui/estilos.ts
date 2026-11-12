@@ -7,12 +7,14 @@
 export type Variante = 'primario' | 'secundario' | 'perigo' | 'fantasma';
 
 const BASE =
-  'ff-transicao inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[7px] px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-55 sm:min-h-10';
+  'ff-transicao inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-botao px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-55 sm:min-h-10';
 
 const VARIANTES: Record<Variante, string> = {
-  primario: 'bg-acao text-white hover:bg-acao-hover',
-  secundario: 'border border-linha-forte text-texto hover:border-texto/35 hover:bg-texto/5',
-  perigo: 'border border-erro/45 text-erro hover:bg-erro/10',
+  primario: 'bg-acao text-sobre-acao hover:bg-acao-hover',
+  // Sobre o fundo da página o botão é uma superfície (como na prévia aprovada); dentro de um painel, some na dele.
+  secundario: 'border border-linha-forte bg-painel text-texto hover:border-texto/35 hover:bg-forte',
+  // Sob o ponteiro, a superfície de destaque (par aprovado do vermelho): a 10 % sobre o fundo da página o texto caía a 4,35:1.
+  perigo: 'border border-erro/45 text-erro hover:bg-destaque',
   fantasma: 'text-suave hover:bg-texto/5 hover:text-texto',
 };
 
@@ -27,7 +29,7 @@ export function classeDeBotao(variante: Variante = 'secundario', extra = ''): st
  */
 export function classeDeBotaoDaCozinha(variante: Variante = 'secundario', extra = ''): string {
   // Quebra a linha em vez de vazar: o nome de quem está com o lote pode ser longo.
-  return `ff-transicao inline-flex min-h-14 items-center justify-center gap-2 rounded-[7px] px-5 py-2 text-center text-base font-semibold disabled:cursor-not-allowed disabled:opacity-55 ${VARIANTES[variante]} ${extra}`;
+  return `ff-transicao inline-flex min-h-14 items-center justify-center gap-2 rounded-botao px-5 py-2 text-center text-base font-semibold disabled:cursor-not-allowed disabled:opacity-55 ${VARIANTES[variante]} ${extra}`;
 }
 
 /** Link de texto (canto de painel, "ver tudo"): sublinhado discreto, sem seta colada. */

@@ -2,11 +2,11 @@
  * Superfícies do design system do ERP (um só kit para /erp e /rodolfo).
  *
  * Profundidade por borda fina + UMA camada de superfície (`painel` sobre
- * `fundo`); sombra só no que flutua (diálogo, gaveta). Cards de 14 px. Número
- * grande em Gelasio, tabular; o resto em Libre Franklin. Cor de status só no
- * selo e no texto, sempre com palavra (cor nunca é o único sinal). Vermelho é
- * o único acento de marca: aparece no indicador do menu, no filete do topo e
- * no botão principal — nunca como fundo de bloco.
+ * `fundo`); sombra só no que flutua (diálogo, gaveta, popover). Cards de 16 px
+ * (padrão aprovado em 09/11/2026). Número grande em Gelasio, tabular; o resto
+ * em Libre Franklin. Cor de status só no selo e no texto, sempre com palavra
+ * (cor nunca é o único sinal). Vermelho é o único acento de marca: aparece no
+ * filete do topo, no foco e no botão principal — nunca como fundo de bloco.
  */
 
 import Link from 'next/link';
@@ -32,12 +32,12 @@ export function Painel({
   semRespiro?: boolean;
 }) {
   return (
-    <section id={id} className={`min-w-0 rounded-[14px] border border-linha bg-painel ${className}`}>
+    <section id={id} className={`min-w-0 rounded-cartao border border-linha bg-painel ${className}`}>
       {(titulo || acessorio) && (
         <header className="flex min-h-12 items-center justify-between gap-3 border-b border-linha px-4 py-2.5 sm:px-5">
           {titulo && (
             <div className="min-w-0">
-              <h2 className="text-[13px] font-semibold text-texto">{titulo}</h2>
+              <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-texto">{titulo}</h2>
               {subtitulo && <p className="mt-0.5 text-[12px] leading-snug text-suave">{subtitulo}</p>}
             </div>
           )}
@@ -91,7 +91,7 @@ export function Metrica({
       {children}
     </>
   );
-  const caixa = 'flex min-w-0 flex-col rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5';
+  const caixa = 'flex min-w-0 flex-col rounded-cartao border border-linha bg-painel px-4 py-3.5 sm:px-5';
   return href ? (
     <Link href={href} className={`${caixa} ff-transicao hover:border-linha-forte`}>
       {corpo}
@@ -112,12 +112,19 @@ const TONS: Record<Tom, string> = {
 };
 
 /**
- * Selo de situação: sempre com texto. Borda e texto na cor, fundo neutro.
+ * `cheio`: o fundo do par aprovado (cor + fundo, ≥ 4,5:1 nos dois temas) com a borda inteira; o erro usa a superfície de
+ * destaque (4,8:1 no claro, 5,6:1 no escuro).
+ */
+const FUNDO_CHEIO: Record<Tom, string> = { ok: 'bg-ok-fundo border-ok', alerta: 'bg-atencao-fundo border-atencao', erro: 'bg-destaque border-erro', neutro: 'bg-forte' };
+
+/**
+ * Selo de situação: sempre com texto. Borda e texto na cor, sobre a superfície
+ * (opaca: o contraste da palavra não depende de onde o selo está pousado).
  * `cheio` (1.10): o estado mais grave de uma escala (prejuízo) ganha o fundo
  * tingido e a borda inteira — grita mais que o alerta ao lado.
  */
 export function Selo({ tom = 'neutro', cheio = false, children }: { tom?: Tom; cheio?: boolean; children: ReactNode }) {
-  const fundo = cheio ? { ok: 'bg-ok/15 border-ok', alerta: 'bg-atencao/15 border-atencao', erro: 'bg-erro/15 border-erro', neutro: 'bg-texto/10' }[tom] : tom === 'erro' ? '' : 'bg-texto/[0.03]'; // erro sem tinta: no tema escuro #F2323F sobre o fundo tingido cai abaixo de 4,5:1
+  const fundo = cheio ? FUNDO_CHEIO[tom] : 'bg-painel';
   return (
     <span
       className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-[7px] border px-2 py-0.5 text-[12px] font-semibold ${TONS[tom]} ${fundo}`}
@@ -153,7 +160,7 @@ export function Aviso({ tom = 'neutro', titulo, children }: { tom?: Tom; titulo:
   return (
     <div
       role="status"
-      className="flex items-start gap-3 rounded-[14px] border border-linha bg-painel px-4 py-3 text-sm sm:px-5"
+      className="flex items-start gap-3 rounded-cartao border border-linha bg-painel px-4 py-3 text-sm sm:px-5"
     >
       <span className="flex h-5 shrink-0 items-center">
         <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full ${ponto}`} />
