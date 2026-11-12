@@ -101,13 +101,21 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   sem cartão nem borda: ícone de cor cheia (a cor da área, desenho claro,
   44 px), nome em 14/600 e função curta em 12 px, centralizados. Quatro
   colunas na barra do desktop e duas na gaveta do celular (coluna mínima de
-  120 px, inclusive a 320 px). Área atual = bloco preenchido no tom da área,
-  contorno na tinta dela, nome em 700 e `aria-current`. Setas andam pela
-  grade; Escape e clique fora fecham; a grade rola por dentro e o painel não
-  passa do pé da tela. O ícone do próprio seletor é o mesmo, de cor cheia;
-  cabeçalho de página e cards do hub seguem com o quadrado tonal. Num
-  grupo separado e nomeado, o catálogo **"Em breve"**: ícone só com contorno
-  tracejado (sem cor de área), nome, finalidade e selo,
+  120 px; só 320 px com barra de rolagem clássica cai para uma). Área atual =
+  bloco preenchido no tom da área, contorno na tinta dela, nome em 700 e
+  `aria-current`; não clareia sob o ponteiro. Setas sem modificador andam
+  pela grade; o anel de foco fica por dentro do bloco (a grade rola). Escape
+  fecha e devolve o foco ao seletor; clique fora fecha. A altura desconta o
+  que fica acima do painel (mais na gaveta), com piso de 200 px: em tela
+  muito baixa quem rola é a gaveta. **A lateral tem camada própria (`z-30`)**
+  para o painel, que cobre o conteúdo, ficar por cima de tudo que a página
+  posiciona (cards, barras fixas `z-20`, links de tabela no toque), e abaixo
+  do véu da ajuda (`z-35`) e das camadas de tela cheia (`z-40`). O ícone do
+  próprio seletor é o mesmo, de cor cheia; cabeçalho de página e cards do hub
+  seguem com o quadrado tonal. Num grupo separado e nomeado, o catálogo
+  **"Em breve"**: bloco sem identidade de área, ícone só com contorno
+  tracejado (enfeite; quem diz o estado é o rótulo e o selo), nome,
+  finalidade e selo,
   como texto. Nunca link, botão, foco, busca ou consulta. Só o público
   autorizado enxerga o catálogo (`veCatalogoEmBreve`): hoje, o nível 1 dentro
   de um parceiro, pela mesma fonte do hub dele; as pessoas do parceiro não

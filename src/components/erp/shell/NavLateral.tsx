@@ -274,9 +274,13 @@ export function AreasDoSeletor({ nav, atual, aoEscolher }: { nav: Navegacao; atu
   const idAreas = useId();
   const idEmBreve = useId();
   return (
-    // A altura desconta o que fica acima do painel (marca, contexto e o próprio seletor): a grade rola por dentro e o painel
-    // nunca passa do pé da tela, nem na gaveta do celular.
-    <div className="max-h-[min(70vh,calc(100dvh-250px))] overflow-y-auto overscroll-contain" onKeyDown={andarPelaGrade}>
+    // A altura desconta o que fica acima do painel: marca, contexto e o próprio seletor (≈ 250 px na barra do desktop); na
+    // gaveta do celular entram ainda o cabeçalho "Menu" e o contexto em até três linhas (≈ 310 px). A grade rola por dentro.
+    // Piso de 200 px: em tela muito baixa (celular deitado) o painel pode passar do pé e quem rola é a gaveta.
+    <div
+      className="max-h-[max(200px,min(70vh,calc(100dvh-250px)))] overflow-y-auto overscroll-contain max-[899px]:max-h-[max(200px,min(70vh,calc(100dvh-310px)))]"
+      onKeyDown={andarPelaGrade}
+    >
       {/* avoid-ai-design-ignore: SD4 — rótulo de grupo em caixa alta, como os grupos do menu (contrato do shell). */}
       <p id={idAreas} className={`${ROTULO_DO_GRUPO} pt-2`}>
         Áreas
@@ -328,23 +332,36 @@ export function AreasDoSeletor({ nav, atual, aoEscolher }: { nav: Navegacao; atu
 
 const ROTULO_DO_GRUPO = 'px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.11em] text-suave';
 const GRADE_DE_MODULOS = 'ff-grade-modulos';
-const BLOCO = 'ff-identidade-modulo ff-bloco-modulo';
+const BLOCO = 'ff-bloco-modulo';
 // Nome e função quebram em linhas (nunca cortam): o bloco cresce com o texto.
 const NOME_DO_BLOCO = 'mt-2.5 block text-[14px] leading-tight text-texto [overflow-wrap:anywhere]';
 const FUNCAO_DO_BLOCO = 'mt-1 block text-[12px] leading-snug text-suave [overflow-wrap:anywhere]';
 
-/** Setas andam pela grade como numa tela de ícones; o Tab continua passando por todos os blocos. */
+/**
+ * Para onde a seta leva na grade: o índice do bloco vizinho, ou `null` quando não há (borda da grade, tecla que não é seta,
+ * bloco fora da lista). Direita e esquerda seguem a ordem de leitura; cima e baixo pulam uma linha (`colunas` blocos).
+ */
+export function vizinhoNaGrade(atual: number, total: number, colunas: number, tecla: string): number | null {
+  const salto = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: Math.max(1, colunas), ArrowUp: -Math.max(1, colunas) }[tecla];
+  if (salto === undefined || atual < 0 || atual >= total) return null;
+  const alvo = atual + salto;
+  return alvo >= 0 && alvo < total ? alvo : null;
+}
+
+/**
+ * Setas andam pela grade como numa tela de ícones; o Tab continua passando por todos os blocos. Com Alt, Ctrl, Cmd ou
+ * Shift a tecla é do navegador (voltar e avançar, por exemplo) e não é tocada; sem vizinho, a rolagem nativa segue.
+ */
 function andarPelaGrade(e: KeyboardEvent<HTMLDivElement>) {
-  const passo = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 0, ArrowUp: 0 }[e.key];
-  if (passo === undefined || !(e.target instanceof HTMLElement) || !e.target.matches('a.ff-bloco-modulo')) return;
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (!(e.target instanceof HTMLElement) || !e.target.matches('a.ff-bloco-modulo')) return;
   const blocos = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('a.ff-bloco-modulo'));
   const topo = (b: HTMLElement) => Math.round(b.getBoundingClientRect().top);
-  const colunas = blocos.filter((b) => topo(b) === topo(blocos[0])).length || 1;
-  const salto = passo || (e.key === 'ArrowDown' ? colunas : -colunas);
-  const alvo = blocos[blocos.indexOf(e.target) + salto];
-  if (!alvo) return;
+  const colunas = blocos.filter((b) => topo(b) === topo(blocos[0])).length;
+  const alvo = vizinhoNaGrade(blocos.indexOf(e.target), blocos.length, colunas, e.key);
+  if (alvo === null) return;
   e.preventDefault();
-  alvo.focus();
+  blocos[alvo].focus();
 }
 
 function BlocoDeModulo({
@@ -369,7 +386,7 @@ function BlocoDeModulo({
       href={href}
       onClick={aoEscolher}
       aria-current={atual ? 'true' : undefined}
-      className={`${BLOCO} ff-transicao`}
+      className={`ff-identidade-modulo ${BLOCO} ff-transicao`}
       style={{ '--cor-modulo': cor } as CSSProperties}
     >
       <IconeDoModulo icone={icone} cor={cor} tamanho={44} variante="cheio" />
@@ -382,7 +399,7 @@ function BlocoDeModulo({
 /**
  * Módulo do catálogo ainda sem tela: nome, finalidade e o selo, como texto. Não é link nem botão, não recebe foco e não
  * dispara nada; quem diz o estado é o rótulo do grupo e a palavra do selo (não há controle para marcar como desabilitado).
- * Sem cor de área: o ícone é só o contorno tracejado.
+ * Sem cor de área: o bloco não carrega a identidade de módulo e o ícone é só o contorno tracejado.
  */
 function BlocoEmBreve({
   nome,

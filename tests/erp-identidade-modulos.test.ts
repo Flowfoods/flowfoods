@@ -113,7 +113,7 @@ describe('Identidade central das áreas no hub e no menu', () => {
     expect(areas).toMatch(/<p id="([^"]+)"[^>]*>Áreas<\/p><ul aria-labelledby="\1" class="ff-grade-modulos">/);
     links(areas).forEach((a, n) => {
       const m = n === 0 ? null : emUso[n - 1];
-      expect(atributo(a[1], 'class')).toContain('ff-bloco-modulo');
+      expect(atributo(a[1], 'class')).toContain('ff-identidade-modulo ff-bloco-modulo');
       expect(atributo(a[1], 'style')).toBe(`--cor-modulo:${m ? m.cor : COR.inicio}`);
       expect(a[2].match(/ff-icone-modulo ff-icone-cheio/g)).toHaveLength(1);
       expect(a[2]).toContain(`>${m ? m.nome : nav.inicio.titulo}</span>`);
@@ -125,6 +125,9 @@ describe('Identidade central das áreas no hub e no menu', () => {
     // Sem cor de área: o ícone do futuro é só o contorno tracejado, nunca o quadrado de cor cheia.
     expect(futuros.match(/ff-icone-modulo ff-icone-futuro/g)).toHaveLength(18);
     expect(futuros).not.toContain('ff-icone-cheio');
+    // O bloco do futuro não carrega a identidade de área: não herda nem deriva cor de módulo.
+    expect(futuros.match(/<div class="ff-bloco-modulo">/g)).toHaveLength(18);
+    expect(futuros).not.toContain('ff-identidade-modulo');
     expect(futuros).not.toMatch(/href=|<a[ >]|<button|tabindex/);
     const itens = futuros.split('<li>').slice(1);
     expect(itens).toHaveLength(18);
