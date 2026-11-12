@@ -41,6 +41,37 @@ describe('leitura de uma página Financial Events v3', () => {
     expect(lida.eventos[2]).toMatchObject({ valorCentavos: 0n, impactoNoRepasse: false });
   });
 
+  it('expõe somente o instante da referência e o dia previsto de repasse, sem identificadores nem dados bancários', () => {
+    const base = { name: 'ORDER_PAYMENT', hasTransferImpact: true, amount: { value: '30.00' } };
+    const instante = '2024-02-29T23:59:59.123456-03:00';
+    const privado = 'descartar-fixture';
+    const evento = {
+      ...base, reference: { id: privado, date: instante, document: privado },
+      settlement: { transactionId: privado, expectedDate: '2024-03-04', accountDetails: { account: privado } },
+    };
+    expect(ler(pagina(evento)).eventos[0]).toEqual({
+      ...ler(pagina(base)).eventos[0], referenciaEm: instante, repassePrevistoEm: '2024-03-04',
+    });
+  });
+
+  it('mantém o valor quando os campos auxiliares faltam ou são inválidos e valida cada data separadamente', () => {
+    const base = { hasTransferImpact: true, amount: { value: '-2.40' } };
+    const semDatas = ler(pagina(base)).eventos[0];
+    const datasInvalidas = [
+      { reference: null, settlement: [] }, { reference: '2026-02-03', settlement: 3 },
+      { reference: { date: '2026-02-29T14:00:00Z' }, settlement: { expectedDate: '2026-02-29' } },
+      { reference: { date: '2026-02-03T14:00:00' }, settlement: { expectedDate: '2026-03-04T00:00:00Z' } },
+      { reference: { date: '2026-02-03T14:00:00+24:00' }, settlement: { expectedDate: '04/03/2026' } },
+      { reference: { date: '2026-02-03T14:00:00.' + '1'.repeat(256) + 'Z' }, settlement: { expectedDate: {} } },
+    ];
+    for (const datas of datasInvalidas) expect(ler(pagina({ ...base, ...datas })).eventos[0]).toEqual(semDatas);
+    const instante = '2026-02-03T17:00:00Z';
+    expect(ler(pagina({ ...base, reference: { date: instante }, settlement: {} })).eventos[0])
+      .toEqual({ ...semDatas, referenciaEm: instante });
+    expect(ler(pagina({ ...base, reference: {}, settlement: { expectedDate: '2026-03-04' } })).eventos[0])
+      .toEqual({ ...semDatas, repassePrevistoEm: '2026-03-04' });
+  });
+
   it('uma página vazia conserva os metadados recebidos sem concluir competência', () => {
     expect(ler(pagina())).toEqual({ formato: 'OBJETO', ...pedido, hasNextPage: false, eventos: [] });
   });

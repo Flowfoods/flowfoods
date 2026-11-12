@@ -1,3 +1,12 @@
+import { diaDoPainelValido } from './painel-campos';
+
+/** Instante ISO com fuso explícito. O chamador conserva a representação recebida. */
+export function instanteIsoComFusoValido(valor: unknown): valor is string {
+  if (typeof valor !== 'string' || valor.length > 256) return false;
+  const partes = /^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/i.exec(valor);
+  return partes !== null && diaDoPainelValido(partes[1]);
+}
+
 /** Datas civis do Analytics: intervalo [dia, dia seguinte), sem normalizar datas inexistentes. */
 export function diaSeguinte(dia: string): string | null {
   if (typeof dia !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dia) || dia < '0001-01-01' || dia >= '9999-12-31') return null;

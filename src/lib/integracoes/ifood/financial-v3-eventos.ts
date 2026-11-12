@@ -1,5 +1,6 @@
 import { lerIdDaLojaIfood } from '../core/campos';
 import { diaDoPainelValido } from './painel-campos';
+import { instanteIsoComFusoValido } from './datas';
 import { decimalFinancialEmCentavos, ErroFinancialSimulado, MAX_CARACTERES_DECIMAL_FINANCIAL } from './financial-dominio';
 import { lerJsonFinancialV3, NumeroJsonFinancial } from './financial-v3-json';
 
@@ -18,6 +19,8 @@ export interface EventoV3 {
   readonly periodo: { readonly inicio: string | null; readonly fim: string | null } | null;
   readonly impactoNoRepasse: boolean | null;
   readonly valorCentavos: bigint | null;
+  readonly referenciaEm?: string;
+  readonly repassePrevistoEm?: string;
   readonly cobranca?: { readonly baseCentavos: bigint | null; readonly percentual: string | null };
 }
 
@@ -106,8 +109,12 @@ function lerEvento(valor: unknown, merchantId?: string): EventoV3 {
   const idRecebedor = objeto(recebedor) ? recebedor.merchantId : null;
   const nome = textoOpcional(valor.name);
   const cobranca = lerCobranca(nome, valor.billing);
+  const referencia = objeto(valor.reference) ? valor.reference.date : null;
+  const previsao = objeto(valor.settlement) ? valor.settlement.expectedDate : null;
   return {
     ...(cobranca && { cobranca }),
+    ...(instanteIsoComFusoValido(referencia) && { referenciaEm: referencia }),
+    ...(diaDoPainelValido(previsao) && { repassePrevistoEm: previsao }),
     ...(merchantId && idRecebedor != null && lerIdDaLojaIfood(idRecebedor) !== merchantId ? { recebedorForaDaLoja: true } : {}),
     nome, gatilho: textoOpcional(valor.trigger), produto: textoOpcional(valor.product),
     competencia, periodo: lerPeriodo(valor.period), impactoNoRepasse: impacto ?? null, valorCentavos: lerValor(valor.amount),

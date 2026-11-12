@@ -1,17 +1,17 @@
 /** Ensaio local das consultas Financial com respostas fictícias independentes. */
-import { gzipSync } from 'node:zlib';
+import { gerarArquivoMensalSimulado, identidadeSimulada } from '../src/lib/integracoes/ifood/financial-v3-arquivo-simulado';
 import { simularTaxasMensais } from './integracao-financial-taxas-simuladas';
 import { simularCustoAntecipacao } from './integracao-financial-custo-antecipacao-simulado';
+import { exportarConciliacaoSimulada } from './integracao-financial-exportar';
 import { lerArquivoConciliacaoV3 } from '../src/lib/integracoes/ifood/financial-v3-arquivo';
 import { compararConciliacaoEventosV3 } from '../src/lib/integracoes/ifood/financial-v3-comparacao';
 import { conciliarLiquidacaoMensalV3 } from '../src/lib/integracoes/ifood/financial-v3-liquidacao-mensal';
 import {
   consultarAntecipacoesFinancialV3, consultarEventosFinancialV3, consultarLiquidacoesFinancialV3, consultarVendasFinancialV3,
-  solicitarConciliacaoFinancialV3, acompanharConciliacaoFinancialV3,
 } from '../src/lib/integracoes/ifood/financial-v3-consultas';
 import type { Transporte } from '../src/lib/integracoes/ifood/transporte';
 
-const intervalo = { merchantId: '00000000-0000-4000-8000-000000000001', inicio: '2026-02-02', fim: '2026-02-08' };
+const intervalo = { merchantId: identidadeSimulada.merchant, inicio: '2026-02-02', fim: '2026-02-08' };
 const periodo = { beginDate: intervalo.inicio, endDate: intervalo.fim };
 const mes = { merchantId: intervalo.merchantId, inicio: '2026-02-01', fim: '2026-02-28' };
 
@@ -66,35 +66,7 @@ const respostasFicticias: Transporte = async pedido => {
 };
 
 async function simularProtocoloMensal(eventosDaSemana: Awaited<ReturnType<typeof consultarEventosFinancialV3>>) {
-  const consulta = { merchantId: intervalo.merchantId, competencia: '2026-02' };
-  const requestId = '00000000-0000-4000-8000-000000000002';
-  const rota = '/financial/v3.0/merchants/' + consulta.merchantId + '/reconciliation/on-demand';
-  let leituras = 0;
-  const transporte: Transporte = async pedido => {
-    const caminho = new URL(pedido.url).pathname;
-    const eco = { merchantId: consulta.merchantId, competence: consulta.competencia };
-    if (pedido.metodo === 'POST' && caminho === rota) {
-      return { status: 200, cabecalhos: {}, corpo: JSON.stringify({ ...eco, requestId }) };
-    }
-    if (pedido.metodo !== 'GET' || caminho !== rota + '/' + requestId) throw new Error('Protocolo fora do cenário.');
-    if (++leituras === 1) return { status: 202, cabecalhos: {}, corpo: '' };
-    const corpo = leituras === 2 ? { ...eco, id: requestId, status: 'enqueue' }
-      : { ...eco, id: requestId, status: 'processed', downloadPath: 'https://example.invalid/conciliacao.csv.gz' };
-    return { status: 200, cabecalhos: {}, corpo: JSON.stringify(corpo) };
-  };
-  const solicitacao = await solicitarConciliacaoFinancialV3(consulta, transporte);
-  if (solicitacao.estado === 'CONFLITO_SEM_PROTOCOLO') throw new Error('Protocolo ausente no cenário.');
-  const esperasSimuladasMs: number[] = [];
-  const acompanhamento = await acompanharConciliacaoFinancialV3(solicitacao.protocolo, transporte, async ms => { esperasSimuladasMs.push(ms); });
-  const csv = [
-    'valor;competencia;pedido_associado_ifood;loja_id;impacto_no_repasse',
-    ['30.00', consulta.competencia, 'pedido-simulado', consulta.merchantId, 'SIM'].join(';'),
-    ['-3.00', consulta.competencia, 'pedido-simulado', consulta.merchantId, 'SIM'].join(';'),
-    ['4.00', consulta.competencia, '', consulta.merchantId, 'NAO'].join(';'),
-  ].join('\r\n');
-  const arquivoInjetado = {
-    protocolo: solicitacao.protocolo, bytes: gzipSync(csv), totaisInformados: { linhas: 3, pedidos: 1 },
-  };
+  const { solicitacao, acompanhamento, arquivoInjetado, esperasSimuladasMs } = await gerarArquivoMensalSimulado();
   const arquivo = await lerArquivoConciliacaoV3(acompanhamento, arquivoInjetado);
   const evidenciaArquivo = {
     protocolo: solicitacao.protocolo, produto: 'IFOOD', moeda: 'BRL', coberturaCompleta: true, apuracaoEncerrada: true,
@@ -116,10 +88,7 @@ async function simularProtocoloMensal(eventosDaSemana: Awaited<ReturnType<typeof
 }
 
 async function simularLiquidacaoMensal() {
-  const identidade = {
-    parceiro: 'parceiro-simulado', loja: 'loja-simulada', merchant: mes.merchantId,
-    produto: 'IFOOD', moeda: 'BRL' as const, competencia: '2026-02',
-  };
+  const identidade = identidadeSimulada;
   const consulta = { ...mes, filtro: 'APURACAO' as const };
   const evidenciaEventos = { identidade, consulta: mes, coberturaCompleta: true, apuracaoEncerrada: true };
   const evidenciaLiquidacao = { identidade, consulta, coberturaCompleta: true, apuracaoEncerrada: true, saldoIntegralDaIdentidade: true };
@@ -155,7 +124,17 @@ async function simularLiquidacaoMensal() {
 }
 
 async function executar() {
-  if (process.argv.length > 2) throw new Error('Use npm run integracao:financial-simular sem argumentos.');
+  const args = process.argv.slice(2);
+  if (args.length === 2 && args[0] === '--exportar-conciliacao' && args[1].trim()) {
+    const { solicitacao, acompanhamento, arquivoInjetado } = await gerarArquivoMensalSimulado();
+    const identidade = identidadeSimulada;
+    const exportacao = await exportarConciliacaoSimulada(args[1], { origem: 'SIMULACAO',
+      pedido: { identidade, protocolo: solicitacao.protocolo }, acompanhamento, arquivo: { ...arquivoInjetado, identidade },
+    });
+    console.log(JSON.stringify(exportacao, serializarCentavos, 2));
+    return;
+  }
+  if (args.length) throw new Error('Use npm run integracao:financial-simular ou acrescente -- --exportar-conciliacao <diretório existente>.');
   const eventos = await consultarEventosFinancialV3(intervalo, transporteEventos('30.00'));
   const liquidacoes = await consultarLiquidacoesFinancialV3({ ...intervalo, filtro: 'APURACAO' }, respostasFicticias);
   const antecipacoes = await consultarAntecipacoesFinancialV3({ ...intervalo, filtro: 'PAGAMENTO_ANTECIPADO' }, respostasFicticias);
@@ -166,7 +145,11 @@ async function executar() {
   const custoDeAntecipacao = await simularCustoAntecipacao();
   console.log(JSON.stringify({ origem: 'SIMULACAO', moedaDoCenario: 'BRL', eventos, liquidacoes, antecipacoes, vendas, conciliacao,
     conciliacaoDeLiquidacao, comparacaoDeTaxas, custoDeAntecipacao },
-    (_chave, valor) => typeof valor === 'bigint' ? valor.toString() : valor, 2));
+    serializarCentavos, 2));
+}
+
+function serializarCentavos(_chave: string, valor: unknown) {
+  return typeof valor === 'bigint' ? valor.toString() : valor;
 }
 
 executar().catch((erro: Error) => { console.error(erro.message); process.exitCode = 1; });

@@ -67,7 +67,10 @@ export default async function IntegracoesDoParceiroNoNivel1(
       <PageHeader icone="canais" cor={COR.parceiros} titulo={`Integrações · ${parceiro.nome}`} subtitulo="Nível 1 · lojas do iFood, módulos e liberação deste parceiro" />
 
       <AvisoDoFeito texto={feito} />
-      {liberado && <Link href={painelHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver painel iFood por período</Link>}
+      {liberado && <nav aria-label="Conferências iFood" className="flex flex-wrap gap-x-6">
+        <Link href={painelHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver painel iFood por período</Link>
+        <Link href={`/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}/financial${lojaDaConsulta ? `?loja=${encodeURIComponent(lojaDaConsulta)}` : ''}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Conferir financeiro do iFood</Link>
+      </nav>}
       <PainelSituacaoAnalytics resultado={situacao} teste={parceiro.homologacaoDeIntegracao} base={`/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}`} baseFaturamento={`/rodolfo/erp/${encodeURIComponent(parceiro.slug)}/faturamento`} />
       {!podeEscrever && (
         <Aviso tom="alerta" titulo="Só leitura">
