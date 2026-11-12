@@ -135,6 +135,8 @@ export function rotaRelativa(caminho: string): string | null {
   let resto: string | null = null;
   if (limpo === '/erp') resto = '';
   else if (limpo.startsWith('/erp/')) resto = limpo.slice('/erp/'.length);
+  // No nível 1 a conferência Financial fica na central do parceiro.
+  else if (/^\/rodolfo\/integracoes\/[^/]+\/financial$/.test(limpo)) resto = 'integracoes/financial';
   else {
     const m = /^\/rodolfo\/erp\/[^/]+(?:\/(.*))?$/.exec(limpo);
     if (m) resto = m[1] ?? '';

@@ -100,6 +100,13 @@ describe('0.6 · o gate: ajuda sempre atualizada', () => {
     expect(entradaDoCaminho('/rodolfo/erp/casa-alfa/estoque/contagens', ENTRADAS)?.chave).toBe('estoque-contagens');
   });
 
+  it('a conferência Financial usa a mesma ajuda na consulta do parceiro e na central do nível 1', () => {
+    for (const caminho of ['/erp/integracoes/financial?loja=uma', '/rodolfo/integracoes/casa-alfa/financial?exemplo=conforme']) {
+      expect(entradaDoCaminho(caminho, ENTRADAS)?.chave).toBe('integracoes-financial');
+    }
+    expect(entradaDoCaminho('/rodolfo/integracoes/financial', ENTRADAS)).toBeNull();
+  });
+
   it('o registro cumpre as regras: chaves, versões, permissões do catálogo, jargão, frases', () => {
     expect(problemasDoRegistro()).toEqual([]);
     for (const e of ENTRADAS) for (const b of [...e.aula, ...(e.secoes ?? []).flatMap((s) => s.blocos)]) for (const p of b.para ?? []) expect(TODAS_AS_PERMISSOES).toContain(p);

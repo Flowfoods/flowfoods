@@ -1978,6 +1978,26 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'integracoes-financial',
+    area: 'rede',
+    rotas: ['integracoes/financial'],
+    titulo: 'Conferência financeira do iFood',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha a loja e o mês para conferir as fontes dos repasses, taxas e antecipações.' },
+      { texto: 'Sem dados indica que falta uma fonte conciliada para aquela loja no mês consultado.' },
+      { texto: 'Abra o exemplo simulado para comparar os valores ou baixar o arquivo de um pedido fictício.' },
+    ],
+    secoes: [{
+      id: 'conferir-uma-diferenca',
+      titulo: 'Conferir uma diferença',
+      blocos: [
+        { texto: 'No exemplo com divergência, compare a comissão configurada com a cobrada. A diferença aparece no confronto dos eventos com o arquivo mensal e com a liquidação.' },
+        { texto: 'Abra os detalhes das fontes para ver quem recebeu o pagamento, quais eventos afetam o repasse e quando o título foi pago.' },
+      ],
+    }],
+  },
+  {
     chave: 'equipe',
     area: 'rede',
     rotas: ['equipe'],
