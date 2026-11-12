@@ -4,20 +4,16 @@ import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Campo, CAMPO } from '@/components/erp/ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
-import { Painel } from '@/components/erp/ui/superficies';
 
 export type ConexaoParaEnvio = { id: string; nome: string; modeloHref: string };
 
-export function EnvioFontesFinancial({ conexoes, base, loja, competencia, retorno }: {
-  conexoes: ConexaoParaEnvio[]; base: string; loja: string; competencia: string; retorno: string;
+export function EnvioFontesFinancial({ conexao, base, loja, competencia, retorno }: {
+  conexao: ConexaoParaEnvio; base: string; loja: string; competencia: string; retorno: string;
 }) {
   const router = useRouter();
-  const [escolha, escolher] = useState(conexoes[0]?.id ?? '');
-  const conexao = conexoes.find(c => c.id === escolha) ?? conexoes[0];
   const [ocupado, ocupar] = useState(false);
   const [aviso, avisar] = useState<{ ok: boolean; texto: string } | null>(null);
   const enviando = useRef(false);
-  if (!conexao) return null;
   const query = new URLSearchParams({ loja, conexao: conexao.id, competencia });
   const destino = `${base}/fontes?${query}`;
 
@@ -59,14 +55,7 @@ export function EnvioFontesFinancial({ conexoes, base, loja, competencia, retorn
     }
   }
 
-  return <Painel titulo="Registrar fontes para conferência" subtitulo="Envio manual pela central FlowFoods · até 2 MiB por arquivo.">
-    <div className="space-y-4">
-      <Campo id="fontes-conexao" rotulo="Conexão iFood">
-        <select id="fontes-conexao" className={CAMPO} value={conexao.id} disabled={ocupado}
-          onChange={e => { escolher(e.target.value); avisar(null); }}>
-          {conexoes.map(c => <option value={c.id} key={c.id}>{c.nome}</option>)}
-        </select>
-      </Campo>
+  return <div className="space-y-4">
       <details className="rounded-[7px] border border-linha">
         <summary className="min-h-11 cursor-pointer p-3 text-sm font-medium">Como preparar o manifesto</summary>
         <div className="space-y-2 px-3 pb-3 text-[13px] text-suave">
@@ -84,6 +73,5 @@ export function EnvioFontesFinancial({ conexoes, base, loja, competencia, retorn
         <button type="submit" disabled={ocupado} className={classeDeBotao('primario')}>{ocupado ? 'Registrando…' : 'Registrar recebimento'}</button>
       </form>
       {aviso && <p role={aviso.ok ? 'status' : 'alert'} className={`break-words text-sm ${aviso.ok ? 'text-ok' : 'text-erro'}`}>{aviso.texto}</p>}
-    </div>
-  </Painel>;
+    </div>;
 }

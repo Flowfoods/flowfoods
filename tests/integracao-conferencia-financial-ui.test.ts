@@ -80,6 +80,26 @@ describe('tela de conferência Financial · fontes e navegação', () => {
     expect(await html({}, base)).not.toContain('Registrar recebimento');
   });
 
+  it('os links nativos de conexão mantêm a mesma escolha no manifesto e na ação de envio', async () => {
+    ler.mockResolvedValue({ ...consulta, conexoes: [
+      { ...consulta.conexoes[0], id: 'primeira', merchantDoModelo: 'merchant-1' },
+      { ...consulta.conexoes[0], id: 'segunda', merchantDoModelo: 'merchant-2' },
+    ] });
+    const renderizar = async (conexao: string) => renderToStaticMarkup(await TelaConferenciaFinancial({
+      ctx, central: '/rodolfo/integracoes/rede', busca: { conexao }, permitirEnvio: true,
+    }));
+    const tela = await renderizar('segunda');
+    expect(tela).toContain('conexao=primeira#envio-fontes');
+    expect(tela).toContain('conexao=segunda#envio-fontes');
+    expect(tela).toContain('/financial/fontes?loja=loja-consulta&amp;conexao=segunda&amp;competencia=2026-06');
+    expect(tela).not.toContain('/financial/fontes?loja=loja-consulta&amp;conexao=primeira');
+    const href = /data:application\/json;charset=utf-8;base64,([\w+=/]+)/.exec(tela);
+    expect(JSON.parse(Buffer.from(href![1], 'base64').toString()).escopo).toMatchObject({ conexaoId: 'segunda', merchantId: 'merchant-2' });
+    const fora = await renderizar('fora');
+    expect(fora).toContain('Escolha uma conexão disponível');
+    expect(fora).not.toContain('multipart/form-data');
+  });
+
   it.each([{ exemplo: 'desconhecido' }, { exemplo: ['conforme', 'divergente'] }])('recusa um cenário inválido ou repetido', async ({ exemplo }) => {
     const tela = await html({ exemplo });
     expect(tela).toContain('Cenário inválido');

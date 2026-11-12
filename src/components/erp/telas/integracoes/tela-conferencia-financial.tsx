@@ -108,6 +108,8 @@ export async function TelaConferenciaFinancial({ ctx, central, busca, permitirEn
     ? consulta.recibos.itens.find(r => r.id === busca.recibo) : undefined;
   const envio = permitirEnvio && ctx.alcance.nivel === 'FLOWFOODS' && consulta.ok && cenario === undefined
     ? conexoesParaEnvio(consulta, ctx.parceiro.id) : [];
+  const selecionada = busca.conexao === undefined ? envio[0] : envio.find(c => c.id === busca.conexao);
+  const retornoDaConexao = selecionada ? `${retorno}&conexao=${encodeURIComponent(selecionada.id)}` : retorno;
   const valido = cenario === 'conforme' || cenario === 'divergente' || cenario === 'incompleto';
   const exemplo = consulta.ok && consulta.loja && valido ? await montarExemploConferenciaFinancial(cenario) : null;
   const hrefDaCentral = consulta.ok && consulta.loja ? `${central}?loja=${encodeURIComponent(consulta.loja.id)}` : central;
@@ -127,9 +129,23 @@ export async function TelaConferenciaFinancial({ ctx, central, busca, permitirEn
         {falha && <div id="aviso-envio"><Aviso tom="alerta" titulo="Confira o envio">{falha}</Aviso></div>}
         {reciboVisivel && <Aviso titulo="Recibo disponível na consulta">Pacote recebido para conferência. Recibo {reciboVisivel.id}.</Aviso>}
         <ConsultaDaLoja consulta={consulta} base={base} />
-        {consulta.loja && <RecibosFontesFinancial consulta={consulta} retorno={retorno} destaque={reciboVisivel?.id} />}
-        {consulta.loja && envio.length > 0 && <EnvioFontesFinancial key={retorno} conexoes={envio} base={base}
-          loja={consulta.loja.id} competencia={consulta.competencia} retorno={retorno} />}
+        {consulta.loja && <RecibosFontesFinancial consulta={consulta} retorno={retornoDaConexao} destaque={reciboVisivel?.id} />}
+        {consulta.loja && envio.length > 0 && <Painel id="envio-fontes" titulo="Registrar fontes para conferência"
+          subtitulo="Envio manual pela central FlowFoods · até 2 MiB por arquivo.">
+          <div className="space-y-4">
+            <div className="text-sm"><p className="font-semibold">Conexão iFood</p>
+              {envio.length === 1 && selecionada ? <p className="mt-1">{selecionada.nome}</p>
+                : <nav aria-label="Escolher conexão iFood para envio" className="mt-1 flex flex-wrap gap-2">
+                  {envio.map(c => <Link key={c.id} prefetch={false} aria-current={selecionada?.id === c.id ? 'page' : undefined}
+                    href={`${retorno}&conexao=${encodeURIComponent(c.id)}#envio-fontes`}
+                    className={classeDeBotao(selecionada?.id === c.id ? 'primario' : 'secundario')}>{c.nome}</Link>)}
+                </nav>}
+            </div>
+            {selecionada ? <EnvioFontesFinancial key={retornoDaConexao} conexao={selecionada} base={base}
+              loja={consulta.loja.id} competencia={consulta.competencia} retorno={retornoDaConexao} />
+              : <Aviso tom="alerta" titulo="Escolha uma conexão disponível">O modelo e o envio usam a conexão selecionada.</Aviso>}
+          </div>
+        </Painel>}
         {consulta.loja && <Link prefetch={false} href={`${retorno}&exemplo=conforme`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver exemplo com dados simulados</Link>}
       </>}
   </div>;

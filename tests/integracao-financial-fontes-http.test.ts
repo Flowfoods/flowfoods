@@ -78,12 +78,20 @@ describe('recebimento HTTP das fontes mensais', () => {
       registrar.mockResolvedValueOnce({ ok: true, reciboId: 'recibo-fixture', reenvio });
       const r = await receberPacoteFinancial(nativo(), ctx, origem);
       expect(r.status).toBe(303);
-      expect(r.headers.get('location')).toBe('/rodolfo/integracoes/sintetico/financial?loja=loj&competencia=2024-02&recibo=recibo-fixture#recibo-recibo-fixture');
+      expect(r.headers.get('location')).toBe('/rodolfo/integracoes/sintetico/financial?loja=loj&competencia=2024-02&conexao=con&recibo=recibo-fixture#recibo-recibo-fixture');
     }
     registrar.mockResolvedValueOnce({ ok: false, motivo: 'pacote-invalido', mensagem: 'Arquivo incompatível.' });
     const erro = await receberPacoteFinancial(nativo(), ctx, origem);
     expect(erro.status).toBe(303);
-    expect(erro.headers.get('location')).toBe('/rodolfo/integracoes/sintetico/financial?loja=loj&competencia=2024-02&erroEnvio=422#aviso-envio');
+    expect(erro.headers.get('location')).toBe('/rodolfo/integracoes/sintetico/financial?loja=loj&competencia=2024-02&conexao=con&erroEnvio=422#aviso-envio');
     expect((await receberPacoteFinancial(nativo(), null, origem)).headers.get('location')).toBe('/rodolfo/login');
   });
+
+  it.each(['application/json', 'application/json, text/html;q=0', 'text/html;q=0.1, application/json;q=0.9', '*/*'])(
+    'preserva o contrato JSON quando HTML não tem preferência (%s)', async accept => {
+      registrar.mockResolvedValue({ ok: true, reciboId: 'recibo-fixture', reenvio: true });
+      const r = await receberPacoteFinancial(requisicao(partes(), url, { accept }), ctx, origem);
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ reciboId: 'recibo-fixture', reenvio: true });
+    });
 });

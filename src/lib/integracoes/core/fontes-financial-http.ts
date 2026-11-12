@@ -5,6 +5,7 @@ import { pode } from '@/lib/erp/permissoes';
 import { diaDoPainelValido } from '../ifood/painel-campos';
 import { LIMITE_ARQUIVO_FONTES_FINANCIAL, LIMITE_MANIFESTO_FONTES_FINANCIAL } from '../ifood/financial-v3-pacote-fontes';
 import { registrarFontesFinancial } from './fontes-financial';
+import { formularioFinancialPedeHtml } from './fontes-financial-navegacao';
 
 // Margem apenas para as duas partes e os cabeçalhos do multipart.
 const LIMITE_DO_ENVIO = LIMITE_ARQUIVO_FONTES_FINANCIAL + LIMITE_MANIFESTO_FONTES_FINANCIAL + 64 * 1024;
@@ -65,7 +66,7 @@ async function processarPacoteFinancial(req: Request, ctx: ContextoDoParceiro | 
 /** O post nativo, inclusive antes da hidratação, volta à tela por GET. O fetch do formulário pede JSON. */
 export async function receberPacoteFinancial(req: Request, ctx: ContextoDoParceiro | null, origemDoErp: string) {
   const resultado = await processarPacoteFinancial(req, ctx, origemDoErp);
-  if (!req.headers.get('accept')?.includes('text/html') || req.headers.get('origin') !== origemDoErp) return resultado;
+  if (!formularioFinancialPedeHtml(req.headers) || req.headers.get('origin') !== origemDoErp) return resultado;
   const cabecalhos = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
   if (!ctx) return new Response(null, { status: 303, headers: { ...cabecalhos, Location: '/rodolfo/login' } });
 
@@ -73,8 +74,10 @@ export async function receberPacoteFinancial(req: Request, ctx: ContextoDoParcei
   const destino = new URL(`/rodolfo/integracoes/${encodeURIComponent(ctx.parceiro.slug)}/financial`, origemDoErp);
   const loja = campoUnico(query, 'loja');
   const mes = campoUnico(query, 'competencia');
+  const conexao = campoUnico(query, 'conexao');
   if (loja) destino.searchParams.set('loja', loja);
   if (mes && diaDoPainelValido(mes + '-01')) destino.searchParams.set('competencia', mes);
+  if (conexao) destino.searchParams.set('conexao', conexao);
   if (resultado.ok) {
     const { reciboId } = await resultado.json();
     destino.searchParams.set('recibo', reciboId);
