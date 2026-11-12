@@ -94,7 +94,7 @@ describe('Identidade central das áreas no hub e no menu', () => {
     expect(links(noMenu).map((a) => atributo(a[1], 'href'))).toEqual([nav.inicio.href, nav.inicio.href, ...emUso.map((m) => m.href)]);
   });
 
-  it('seletor de áreas: em uso com link e a atual marcada; "Em breve" num grupo separado, com nome, finalidade e selo, sem link', () => {
+  it('seletor de áreas em grade: em uso com link e a atual marcada; "Em breve" num grupo separado, com nome, finalidade e selo, sem link', () => {
     // Para a dona (sem catálogo): só as áreas em uso, nenhum grupo "Em breve".
     const daDona = renderToStaticMarkup(createElement(AreasDoSeletor, { nav, atual: emUso[2], aoEscolher: () => {} }));
     expect(daDona).not.toContain('Em breve');
@@ -108,8 +108,23 @@ describe('Identidade central das áreas no hub e no menu', () => {
     expect(links(areas).map((a) => atributo(a[1], 'href'))).toEqual([nav.inicio.href, ...emUso.map((m) => m.href)]);
     expect(links(areas).filter((a) => atributo(a[1], 'aria-current') === 'true').map((a) => atributo(a[1], 'href'))).toEqual([emUso[2].href]);
     for (const m of emBreve) expect(areas).not.toContain(m.nome);
+    // Grade de módulos (12/11): grupo com rótulo visível; cada área é um bloco com o ícone de cor cheia, o nome e a função
+    // curta. O estado da atual está no bloco (aria-current), sem marca de seleção avulsa.
+    expect(areas).toMatch(/<p id="([^"]+)"[^>]*>Áreas<\/p><ul aria-labelledby="\1" class="ff-grade-modulos">/);
+    links(areas).forEach((a, n) => {
+      const m = n === 0 ? null : emUso[n - 1];
+      expect(atributo(a[1], 'class')).toContain('ff-bloco-modulo');
+      expect(atributo(a[1], 'style')).toBe(`--cor-modulo:${m ? m.cor : COR.inicio}`);
+      expect(a[2].match(/ff-icone-modulo ff-icone-cheio/g)).toHaveLength(1);
+      expect(a[2]).toContain(`>${m ? m.nome : nav.inicio.titulo}</span>`);
+      expect(a[2]).toContain(`>${m ? (m.resumo ?? m.subtitulo) : 'Todas as áreas'}</span>`);
+    });
+    expect(areas).not.toMatch(/lucide-check|ff-icone-futuro/);
     // Em breve: lista ligada ao rótulo do grupo; cada item é texto (nome, finalidade, selo), nunca controle.
-    expect(futuros).toMatch(/^<ul aria-labelledby="[^"]+">/);
+    expect(futuros).toMatch(/^<ul aria-labelledby="[^"]+" class="ff-grade-modulos">/);
+    // Sem cor de área: o ícone do futuro é só o contorno tracejado, nunca o quadrado de cor cheia.
+    expect(futuros.match(/ff-icone-modulo ff-icone-futuro/g)).toHaveLength(18);
+    expect(futuros).not.toContain('ff-icone-cheio');
     expect(futuros).not.toMatch(/href=|<a[ >]|<button|tabindex/);
     const itens = futuros.split('<li>').slice(1);
     expect(itens).toHaveLength(18);

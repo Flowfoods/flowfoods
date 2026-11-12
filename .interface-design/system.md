@@ -96,8 +96,18 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   rolagem fina: as duas colunas cabem também com a barra clássica.
   Seletor de área no topo; grupos com botão `aria-expanded`; fase no rodapé.
   < 900 px: gaveta com a mesma grade.
-- **Seletor de áreas** lista as áreas em uso (links, a atual marcada) e, num
-  grupo separado e nomeado, o catálogo **"Em breve"**: nome, finalidade e selo,
+- **Seletor de áreas** abre a **grade de módulos** (referência de 12/11/2026):
+  painel flutuante de 620 px sob o seletor, com um bloco por área em uso,
+  sem cartão nem borda: ícone de cor cheia (a cor da área, desenho claro,
+  44 px), nome em 14/600 e função curta em 12 px, centralizados. Quatro
+  colunas na barra do desktop e duas na gaveta do celular (coluna mínima de
+  120 px, inclusive a 320 px). Área atual = bloco preenchido no tom da área,
+  contorno na tinta dela, nome em 700 e `aria-current`. Setas andam pela
+  grade; Escape e clique fora fecham; a grade rola por dentro e o painel não
+  passa do pé da tela. O ícone do próprio seletor é o mesmo, de cor cheia;
+  cabeçalho de página e cards do hub seguem com o quadrado tonal. Num
+  grupo separado e nomeado, o catálogo **"Em breve"**: ícone só com contorno
+  tracejado (sem cor de área), nome, finalidade e selo,
   como texto. Nunca link, botão, foco, busca ou consulta. Só o público
   autorizado enxerga o catálogo (`veCatalogoEmBreve`): hoje, o nível 1 dentro
   de um parceiro, pela mesma fonte do hub dele; as pessoas do parceiro não

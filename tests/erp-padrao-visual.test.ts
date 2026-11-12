@@ -330,6 +330,49 @@ describe('padrão visual · popover ancorado sempre dentro da tela', () => {
   });
 });
 
+describe('padrão visual · grade de módulos do seletor de áreas', () => {
+  it('colunas pela largura do painel, sem cartão nem borda; o bloco cresce com o texto', () => {
+    const grade = regra('.ff-app .ff-grade-modulos');
+    expect(grade).toMatch(/display:\s*grid/);
+    // 120 px de coluna mínima. Largura útil = painel − borda (2) − respiro (12): quatro colunas no painel de 620 px da barra
+    // e duas na gaveta do celular (287 px a 390 de tela; 262 px a 320), também com 15 px de barra de rolagem clássica.
+    expect(grade).toMatch(/grid-template-columns:\s*repeat\(auto-fill, minmax\(min\(100%, 120px\), 1fr\)\)/);
+    const colunas = (painel: number, barra = 0) => Math.floor((painel - 14 - barra + 4) / (120 + 4));
+    expect([colunas(620), colunas(620, 15), colunas(287), colunas(287, 15), colunas(262)]).toEqual([4, 4, 2, 2, 2]);
+    // A grade rola por dentro e o painel não passa do pé da tela.
+    expect(readFileSync('src/components/erp/shell/NavLateral.tsx', 'utf8')).toContain('max-h-[min(70vh,calc(100dvh-250px))] overflow-y-auto');
+    const bloco = regra('.ff-app .ff-bloco-modulo');
+    expect(bloco).toMatch(/border:\s*1px solid transparent/);
+    expect(bloco).toMatch(/border-radius:\s*var\(--ff-raio-nav\)/);
+    expect(bloco).not.toMatch(/overflow|max-height|-webkit-line-clamp|text-overflow/);
+    expect(readFileSync('src/components/erp/shell/NavLateral.tsx', 'utf8')).toContain('largura="w-[620px] max-[899px]:w-full"');
+  });
+
+  it('área atual: bloco preenchido com contorno na tinta da área (forma), além do peso e do aria-current', () => {
+    const atual = regra(".ff-app .ff-bloco-modulo[aria-current='true']");
+    expect(atual).toMatch(/background-color:\s*var\(--ff-modulo-realce\)/);
+    expect(atual).toMatch(/border-color:\s*var\(--ff-modulo-tinta\)/);
+    expect(regra(".ff-app .ff-bloco-modulo[aria-current='true'] .ff-bloco-nome")).toMatch(/font-weight:\s*700/);
+    expect(regra('.ff-app a.ff-bloco-modulo:hover')).toMatch(/background-color:\s*var\(--ff-modulo-fundo\)/);
+  });
+
+  it('ícone de cor cheia: o desenho claro fica ≥ 3:1 sobre toda a paleta das áreas; o futuro não usa cor de área', () => {
+    const cheio = regra('.ff-app .ff-icone-modulo.ff-icone-cheio');
+    expect(cheio).toMatch(/background-color:\s*var\(--cor-modulo\)/);
+    expect(cheio).toMatch(/color:\s*rgb\(var\(--ff-sobre-acao\)\)/);
+    // O desenho é o mesmo token nos dois temas e a cor da área não muda com o tema: uma conta vale para os dois.
+    expect(CLARO['sobre-acao']).toBe(ESCURO['sobre-acao']);
+    for (const [area, cor] of Object.entries(COR)) {
+      expect(contraste(canais(CLARO['sobre-acao']), hex(cor)), `desenho sobre ${area} (${cor})`).toBeGreaterThanOrEqual(3);
+    }
+    const futuro = regra('.ff-app .ff-icone-modulo.ff-icone-futuro');
+    expect(futuro).toMatch(/border:\s*1\.5px dashed var\(--ff-linha-forte\)/);
+    expect(futuro).toMatch(/background-color:\s*transparent/);
+    expect(futuro).toMatch(/color:\s*rgb\(var\(--ff-suave\)\)/);
+    expect(futuro).not.toContain('--cor-modulo');
+  });
+});
+
 describe('padrão visual · selo "Em breve"', () => {
   it('é texto (nunca link nem botão); o cadeado tem leitura própria', () => {
     const simples = renderToStaticMarkup(createElement(SeloEmBreve));
