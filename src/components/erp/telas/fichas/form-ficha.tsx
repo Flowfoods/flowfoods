@@ -590,6 +590,7 @@ function FormFichaBase({
                         opcoes={opcoesDoSeletor}
                         aoEscolher={(v) => mudarLinha(l.chave, { escolha: v })}
                         rotulo={`Insumo ou pré-preparo ${n + 1}`}
+                        desabilitado={travado}
                         invalido={!!erro}
                         descritoPor={erro ? `${idBase}-item-${n}-erro` : undefined}
                       />

@@ -53,6 +53,10 @@ const liquidacaoSchema = z.strictObject({
 }).refine(e => e.cobertura.estado !== 'AUSENTE' || e.valorReais === null);
 
 export type IdentidadeFinancialSimulada = Readonly<z.infer<typeof identidadeSchema>>;
+export function identidadeFinancialSimuladaValida(valor: unknown): valor is IdentidadeFinancialSimulada {
+  return identidadeSchema.safeParse(valor).success;
+}
+
 export type CoberturaFinancialSimulada = Readonly<z.infer<typeof coberturaSchema>>;
 export type EntradaEventosFinancialSimulados = z.infer<typeof eventosSchema>;
 export type EntradaLiquidacaoFinancialSimulada = z.infer<typeof liquidacaoSchema>;
