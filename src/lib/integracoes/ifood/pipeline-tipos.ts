@@ -42,7 +42,7 @@ export interface PaginaDoTransporte {
   versaoContrato?: 1;
 }
 export interface FalhaAnalytics {
-  codigo: Classificacao['tipo'] | 'contrato' | 'limite-local' | 'posse-perdida';
+  codigo: Classificacao['tipo'] | 'contrato' | 'limite-local' | 'posse-perdida' | 'configuracao';
   http?: number | null;
   requestId?: string | null;
   naoAntesDe?: string;
@@ -57,3 +57,5 @@ export const LIMITE_BYTES_JANELA = 32 * 1024 * 1024;
 export const LIMITE_GRUPOS_JANELA = 50_000;
 export const LEASE_SEGUNDOS = 120;
 export const PRIORIDADE: Record<TipoJanela, number> = { ACESSO: 0, D1: 1, REVISAO: 2, HISTORICO: 3 };
+/** A ordenação por perfil precede este valor. Só vale até a aquisição da releitura diária pedida. */
+export const PRIORIDADE_RELEITURA_DIARIA = 0;

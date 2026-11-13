@@ -1,6 +1,7 @@
 /** Executor real + cliente HTTP real; somente repositório e transporte em memória, nenhum banco/rede. */
 import { describe, expect, it, vi } from 'vitest';
 import { armazemEmMemoria, ServicoDeToken, type AppParaToken } from '@/lib/integracoes/ifood/auth';
+import { ErroDeCofre } from '@/lib/integracoes/core/cofre';
 import { METRICAS_DIARIAS } from '@/lib/integracoes/ifood/analytics';
 import { executarTarefaAnalytics, type RepositorioDoExecutorAnalytics } from '@/lib/integracoes/ifood/pipeline-executor';
 import { ErroPipelineAnalytics, LIMITE_BYTES_JANELA, type TarefaAnalytics } from '@/lib/integracoes/ifood/pipeline-tipos';
@@ -134,6 +135,22 @@ describe('INT-1.8C · executor marginal usa a fila/cota existentes', () => {
 });
 
 describe('executor Analytics: cobertura e recibos', () => {
+  it.each(['endereço', 'token'] as const)('encerra erro de configuração de %s antes do POST sem atribuir HTTP nem expor o erro', async origem => {
+    const m = montar(), t = tarefa();
+    if (origem === 'token') vi.spyOn(m.http.tokens, 'token').mockRejectedValue(new ErroDeCofre('detalhe privado de teste'));
+    const env = origem === 'endereço' ? { ...ENV, IFOOD_API_BASE: 'https://exemplo.invalid' } : ENV;
+    expect(await executarTarefaAnalytics(t, { repositorio: m.repositorio, http: { ...m.http, env } })).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(m.repositorio.falhar).toHaveBeenCalledExactlyOnceWith(t, { codigo: 'configuracao' });
+    expect(m.transporte).not.toHaveBeenCalled(); expect(m.repositorio.publicar).not.toHaveBeenCalled();
+  });
+  it('propaga falha do registro em vez de confirmar encerramento sem persistência', async () => {
+    const m = montar(), t = tarefa();
+    vi.spyOn(m.http.tokens, 'token').mockRejectedValue(new ErroDeCofre('detalhe privado de teste'));
+    vi.mocked(m.repositorio.falhar).mockRejectedValue(new ErroPipelineAnalytics('POSSE', 'Tentativa substituída.'));
+    await expect(executarTarefaAnalytics(t, m)).rejects.toMatchObject({ codigo: 'POSSE' });
+    expect(m.repositorio.falhar).toHaveBeenCalledExactlyOnceWith(t, { codigo: 'configuracao' });
+    expect(m.transporte).not.toHaveBeenCalled();
+  });
   it('guarda bytes originais em ordem e só publica depois da última página; identidade TEST não é convertida', async () => {
     const original = `  ${JSON.stringify(pagina(1, 2))}\n`;
     const m = montar([{ ...json(null), corpo: original }, json(pagina(2, 2))]);

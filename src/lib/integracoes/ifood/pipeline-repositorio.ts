@@ -13,7 +13,7 @@ import { diaSeguinte } from './datas';
 import { classificar } from './respostas';
 import { sinalizarFaturamentoAnalytics } from './faturamento-pendencias';
 import {
-  ErroPipelineAnalytics, LEASE_SEGUNDOS, LIMITE_BYTES_JANELA, LIMITE_GRUPOS_JANELA, PRIORIDADE,
+  ErroPipelineAnalytics, LEASE_SEGUNDOS, LIMITE_BYTES_JANELA, LIMITE_GRUPOS_JANELA, PRIORIDADE, PRIORIDADE_RELEITURA_DIARIA,
   type FalhaAnalytics, type JanelaAnalytics, type PaginaDoTransporte, type TarefaAnalytics, type TipoJanela,
 } from './pipeline-tipos';
 
@@ -134,7 +134,11 @@ export function criarRepositorioAnalytics(cliente: ClienteDoParceiro, posse: Pos
           if (!a[0]?.ok) continue;
           const rows = await tx.sql<{ id: string }>`UPDATE "IntegracaoExecucao" SET estado = 'EXECUTANDO',
             geracao = geracao + 1, dono = ${posse.id}, "leaseAte" = clock_timestamp() + ${LEASE_SEGUNDOS} * interval '1 second',
-            "iniciadaEm" = clock_timestamp(), "concluidaEm" = NULL, "ultimoErro" = NULL, "atualizadoEm" = clock_timestamp()
+            prioridade = CASE WHEN perfil = 'diario' AND prioridade = ${PRIORIDADE_RELEITURA_DIARIA}::int
+              THEN CASE tipo WHEN 'D1' THEN ${PRIORIDADE.D1}::int WHEN 'REVISAO' THEN ${PRIORIDADE.REVISAO}::int ELSE ${PRIORIDADE.HISTORICO}::int END
+              ELSE prioridade END,
+            "iniciadaEm" = clock_timestamp(), "concluidaEm" = NULL, "ultimoErro" = NULL, "ultimoHttp" = NULL, "ultimoRequestId" = NULL,
+            "atualizadoEm" = clock_timestamp()
             WHERE "parceiroId" = ${tx.parceiroId} AND id = ${c.id} AND "naoAntesDe" <= clock_timestamp()
               AND (estado IN ('PLANEJADA','AGUARDANDO') OR (estado = 'EXECUTANDO' AND "leaseAte" < clock_timestamp() AND dono <> ${posse.id}))
             RETURNING id`;

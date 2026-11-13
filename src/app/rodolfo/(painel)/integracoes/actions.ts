@@ -19,6 +19,8 @@ import { exigirNivel1, exigirParceiro } from '@/lib/erp/contexto';
 import { mudarLiberacao } from '@/lib/erp/liberacao';
 import { registrarApp } from '@/lib/integracoes/core/apps';
 import { registrarParecerApp } from '@/lib/integracoes/core/homologacao';
+import { solicitarReleituraAnalytics } from '@/lib/integracoes/core/releitura-analytics';
+import type { PedidoReleituraAnalytics } from '@/lib/integracoes/core/situacao-analytics-campos';
 import { marcarParceiroDeHomologacao } from '@/lib/integracoes/core/central';
 import { desligarConexao, ligarConexao, mudarModulo, prepararModulo } from '@/lib/integracoes/core/conexoes';
 import type { EstadoForm } from '@/components/erp/ui/campos';
@@ -42,6 +44,16 @@ function revalidar(slug?: string) {
 function voltarCom(slug: string, feito: CodigoFeito): never {
   revalidar(slug);
   redirect(`/rodolfo/integracoes/${encodeURIComponent(slug)}?feito=${feito}`);
+}
+
+export async function acaoSolicitarReleitura(slug: string, pedido: PedidoReleituraAnalytics, anterior: EstadoForm): Promise<EstadoForm> {
+  const ctx = await exigirParceiro(slug);
+  const r = await solicitarReleituraAnalytics(ctx, pedido);
+  if (!r.ok) return recusa(proxima(anterior), r.mensagem);
+  const base = `/rodolfo/integracoes/${encodeURIComponent(ctx.parceiro.slug)}`;
+  revalidatePath(base);
+  const consulta = new URLSearchParams({ loja: pedido.lojaId, dia: pedido.dia, feito: 'releitura' });
+  redirect(`${base}?${consulta}`);
 }
 
 export async function acaoRegistrarParecer(appId: string, versao: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {

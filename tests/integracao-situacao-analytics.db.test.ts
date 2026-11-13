@@ -2,21 +2,28 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ContextoDoParceiro } from '@/lib/erp/contexto-base';
 const URL_TESTE = process.env.ERP_DB_TESTE;
+const central = vi.hoisted(() => ({ exigirParceiro: vi.fn<(slug: string) => Promise<ContextoDoParceiro>>(), revalidar: vi.fn() }));
+vi.mock('@/lib/erp/contexto', () => ({ exigirParceiro: central.exigirParceiro }));
+vi.mock('next/cache', () => ({ revalidatePath: central.revalidar }));
+vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw Object.assign(new Error('REDIRECT'), { url }); } }));
 vi.mock('@/lib/db', async () => {
   const { PrismaClient: P } = await import('@prisma/client');
   const real = await vi.importActual<typeof import('@/lib/db')>('@/lib/db');
   return { prisma: real.travarTenant(new P({ datasources: { db: { url: process.env.ERP_DB_TESTE ?? 'postgresql://sem-banco/x' } } })) };
 });
 import { prisma } from '@/lib/db';
+import { acaoSolicitarReleitura } from '@/app/rodolfo/(painel)/integracoes/actions';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { resolverAlcance, type Alcance, type Permissao } from '@/lib/erp/permissoes';
+import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance, type Permissao } from '@/lib/erp/permissoes';
 import { mudarLiberacao } from '@/lib/erp/liberacao';
 import { obterDia } from '@/lib/erp/faturamento';
 import { aplicarFaturamentoAnalytics } from '@/lib/erp/faturamento-integracao';
 import { desligarConexao, mudarModulo } from '@/lib/integracoes/core/conexoes';
 import { pausarAnalytics } from '@/lib/integracoes/core/controle-analytics';
 import { lerOrigemAnalyticsNoFaturamento, lerSituacaoAnalyticsDaLoja } from '@/lib/integracoes/core/situacao-analytics';
+import type { PedidoReleituraAnalytics } from '@/lib/integracoes/core/situacao-analytics-campos';
 import { agendarJanela, criarRepositorioAnalytics } from '@/lib/integracoes/ifood/pipeline-repositorio';
 import { criarPeriodoFechadoDeTeste, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 import { assumirPosseFinanceira, bucketFinanceiro, DIA_FINANCEIRO, massaFinanceira, publicarFinanceiro, type MassaFinanceira } from './integracao-faturamento-apoio';
@@ -57,6 +64,186 @@ describe.skipIf(!URL_TESTE)('INT-1.8A · fotografia e isolamento reais', { timeo
   const massa = () => massaFinanceira(db, inventario);
   const aplicar = (m: MassaFinanceira, c = m.cliente) => aplicarFaturamentoAnalytics(c, lider.posse, { lojaId: m.lojaId, dia: DIA }, () => true);
   const ler = (m: MassaFinanceira, c = m.cliente, a = al(m.lojaId)) => lerSituacaoAnalyticsDaLoja(c, a, contexto(m), { lojaId: m.lojaId, dia: DIA });
+
+  async function centralDaMassa(m: MassaFinanceira) {
+    const parceiro = await db.parceiroFlow.findUniqueOrThrow({ where: { id: m.cliente.parceiroId } });
+    const ctx: ContextoDoParceiro = { parceiro, sessao: { userId: 'operador-sintetico', autorNome: inventario.autor },
+      alcance: ALCANCE_FLOWFOODS, cliente: m.cliente, podeEscrever: true, bloqueio: null };
+    central.exigirParceiro.mockImplementation(async slug => { if (slug !== parceiro.slug) throw new Error('Sessão inválida.'); return ctx; });
+    return ctx;
+  }
+  function pedidoPara(m: MassaFinanceira, estado: PedidoReleituraAnalytics['estado'], geracao = 1): PedidoReleituraAnalytics {
+    return { lojaId: m.lojaId, conexaoId: m.conexaoId, dia: DIA, estado, geracao };
+  }
+  async function enviar(slug: string, pedido: PedidoReleituraAnalytics) {
+    try { return (await acaoSolicitarReleitura(slug, pedido, null))?.erros?.geral; }
+    catch (e) { if (e instanceof Error && 'url' in e && typeof e.url === 'string') return e.url; throw e; }
+  }
+  const historicoReleitura = (m: MassaFinanceira) => m.cliente.historicoAlteracao.findMany({ where: { acao: 'PEDIU_RELEITURA' } });
+  async function podeReagendar(m: MassaFinanceira) {
+    const r = await ler(m, m.cliente, ALCANCE_FLOWFOODS);
+    if (!r.ok || !r.situacao) throw new Error('Fixture sem situação de loja.');
+    return r.situacao.fontes.find(f => f.chave === m.conexaoId)?.tentativa?.nivel1?.podeReagendar;
+  }
+
+  it('ação N1 concorrente reaproveita o dia/fonte, retém filtro e autoria e reaplica o mesmo conteúdo uma única vez', async () => {
+    const m = await massa(), ctx = await centralDaMassa(m), slug = ctx.parceiro.slug;
+    const antes = await publicarFinanceiro(m, lider.posse); await aplicar(m);
+    const lancamento = await m.cliente.faturamentoLancamento.findFirstOrThrow();
+    const pedido = pedidoPara(m, 'SUCESSO', antes.tarefa.geracao);
+    const destino = `/rodolfo/integracoes/${slug}?loja=${m.lojaId}&dia=${DIA}&feito=releitura`;
+    const saidas = await Promise.all([enviar(slug, pedido), enviar(slug, pedido)]);
+    expect(saidas.filter(s => s === destino)).toHaveLength(1);
+    expect(saidas.find(s => s !== destino)).toContain('janela mudou');
+    expect(central.revalidar).toHaveBeenCalledWith(`/rodolfo/integracoes/${slug}`);
+    expect(await historicoReleitura(m)).toMatchObject([{ autorNome: inventario.autor, entidadeId: m.moduloId, depois: { data: DIA, geracao: 1, execucaoId: antes.tarefa.id, usuarioId: ctx.sessao.userId } }]);
+    expect(await m.cliente.integracaoExecucao.findMany()).toMatchObject([{ id: antes.tarefa.id, geracao: 1, estado: 'PLANEJADA', prioridade: 0 }]);
+    expect(await m.cliente.faturamentoLancamento.findMany()).toEqual([lancamento]);
+
+    const repo = criarRepositorioAnalytics(m.cliente, lider.posse, () => true), t = await repo.adquirir();
+    if (!t) throw new Error('A fila não adquiriu a releitura.');
+    expect(t).toMatchObject({ id: antes.tarefa.id, parceiroId: m.cliente.parceiroId, moduloId: m.moduloId, lojaId: m.lojaId, perfil: 'diario', geracao: 2 });
+    const emAndamento = await ler(m, m.cliente, ALCANCE_FLOWFOODS);
+    expect(emAndamento).toMatchObject({ situacao: { fontes: [{ tentativa: { estado: 'EXECUTANDO', nivel1: { geracao: 2, paginasConfirmadas: 0, podeReagendar: false } } }] } });
+    expect(JSON.stringify(await ler(m))).not.toMatch(/nivel1|paginasConfirmadas|inicioDaGeracao/);
+    await repo.salvarPagina(t, { pagina: 1, http: 200, requestId: null, corpoOriginal: JSON.stringify({ data: [bucketFinanceiro()], currentPage: 1, size: 1, totalItems: 1, totalPages: 1 }) });
+    expect(await ler(m, m.cliente, ALCANCE_FLOWFOODS)).toMatchObject({ situacao: { fontes: [{ tentativa: { nivel1: { geracao: 2, paginasConfirmadas: 1 } } }] } });
+    expect(await repo.publicar(t)).toBe('sem-mudanca');
+    expect(await aplicar(m)).toMatchObject({ estado: 'igual' });
+    // O mesmo estado SUCESSO voltou, mas o antigo clique ainda não se aplica à nova geração.
+    expect(await enviar(slug, pedido)).toContain('janela mudou');
+    expect(await m.cliente.integracaoSnapshot.count()).toBe(1);
+    expect(await m.cliente.integracaoFaturamentoDia.count()).toBe(1);
+    expect(await m.cliente.faturamentoLancamento.findMany()).toEqual([lancamento]);
+    expect(await historicoReleitura(m)).toHaveLength(1);
+  });
+
+  it('ação revalida o nível, o contexto, o vínculo de produção, a liberação e o dia, sem criar primeira leitura', async () => {
+    const m = await massa(), ctx = await centralDaMassa(m), slug = ctx.parceiro.slug, outro = await massa();
+    const pedido = pedidoPara(m, 'SUCESSO');
+    await expect(enviar('slug-forjado', pedido)).rejects.toThrow('Sessão inválida');
+    expect(await enviar(slug, pedido)).toContain('janela mudou');
+    expect(await m.cliente.integracaoExecucao.count()).toBe(0);
+    const { tarefa } = await publicarFinanceiro(m, lider.posse);
+    const antes = await m.cliente.integracaoExecucao.findUniqueOrThrow({ where: { id: tarefa.id } });
+    for (const campos of [{ alcance: todas }, { bloqueio: 'Suspenso' }, { podeEscrever: false }, { cliente: doParceiro(m.cliente.parceiroId, db, { somenteLeitura: true }) },
+      { parceiro: { ...ctx.parceiro, homologacaoDeIntegracao: true } }, { cliente: outro.cliente }]) {
+      central.exigirParceiro.mockResolvedValueOnce({ ...ctx, ...campos });
+      expect(await enviar(slug, pedido)).toContain('escrita de nível 1');
+    }
+    for (const campos of [{ lojaId: outro.lojaId }, { conexaoId: outro.conexaoId }]) {
+      expect(await enviar(slug, { ...pedido, ...campos })).toContain('indisponível');
+    }
+    for (const campos of [{ dia: '2999-01-01' }, { dia: '2026-02-30' }, { dia: '' }, { geracao: 0 }]) {
+      expect(await enviar(slug, { ...pedido, ...campos })).toContain('dia já encerrado');
+    }
+    await prisma.integracaoApp.update({ where: { id: m.appId }, data: { estadoHomologacao: 'PENDENTE' } });
+    expect(await podeReagendar(m)).toBe(false);
+    expect(await enviar(slug, pedido)).toContain('indisponível');
+    await prisma.integracaoApp.update({ where: { id: m.appId }, data: { estadoHomologacao: 'HOMOLOGADO' } });
+    await mudarLiberacao(m.cliente, 'integracao', false, inventario.autor);
+    expect(await enviar(slug, pedido)).toContain('indisponível');
+    await mudarLiberacao(m.cliente, 'integracao', true, inventario.autor);
+    await desligarConexao(m.cliente, m.conexaoId, inventario.autor);
+    expect(await podeReagendar(m)).toBe(false);
+    expect(await enviar(slug, pedido)).toContain('indisponível');
+    expect(await m.cliente.integracaoExecucao.findUnique({ where: { id: tarefa.id } })).toEqual(antes);
+    expect(await historicoReleitura(m)).toEqual([]);
+  });
+
+  it('espera local, 429, pausa e prazo inválido continuam protegidos contra um pedido forjado', async () => {
+    const m = await massa(), ctx = await centralDaMassa(m), slug = ctx.parceiro.slug;
+    const { tarefa } = await publicarFinanceiro(m, lider.posse);
+    const where = { id: tarefa.id };
+    const pedido = pedidoPara(m, 'SUCESSO');
+    const futura = new Date('2099-11-01T10:00:00Z');
+    await pausarAnalytics(true, inventario.autor);
+    expect(await podeReagendar(m)).toBe(false);
+    expect(await enviar(slug, pedido)).toContain('indisponível');
+    await pausarAnalytics(false, inventario.autor);
+    await m.cliente.integracaoExecucao.update({ where, data: { naoAntesDe: futura } });
+    expect(await podeReagendar(m)).toBe(false);
+    expect(await enviar(slug, pedido)).toContain('janela mudou');
+    expect(await m.cliente.integracaoExecucao.findUnique({ where })).toMatchObject({ estado: 'SUCESSO', geracao: 1, naoAntesDe: futura });
+    await m.cliente.integracaoExecucao.update({ where, data: { naoAntesDe: new Date(0), estado: 'AGUARDANDO', ultimoErro: 'limite', ultimoHttp: 429 } });
+    await prisma.integracaoControle.update({ where: { id: 'IFOOD_ANALYTICS' }, data: { bloqueadaAte: futura } });
+    expect(await podeReagendar(m)).toBe(false);
+    expect(await enviar(slug, pedido)).toContain('indisponível');
+    await prisma.integracaoControle.update({ where: { id: 'IFOOD_ANALYTICS' }, data: { bloqueadaAte: null } });
+    expect(await enviar(slug, pedido)).toContain('janela mudou');
+    expect(await enviar(slug, { ...pedido, estado: 'AGUARDANDO' })).toContain('dia já encerrado');
+    await m.cliente.integracaoExecucao.update({ where, data: { estado: 'FALHA', ultimoErro: 'prazo-invalido' } });
+    expect(await podeReagendar(m)).toBe(false);
+    expect(await enviar(slug, { ...pedido, estado: 'FALHA' })).toContain('janela mudou');
+    expect(await historicoReleitura(m)).toEqual([]);
+  });
+
+  it('a releitura histórica precede outro D1 dentro do perfil e consome essa prioridade ao ser adquirida', async () => {
+    const m = await massa(), ctx = await centralDaMassa(m);
+    const diario = { moduloId: m.moduloId, dia: DIA, ciclo: '2026-10-20', fuso: 'America/Sao_Paulo', unidade: 'REAL' as const };
+    await agendarJanela(m.cliente, { ...diario, tipo: 'HISTORICO' });
+    const repo = criarRepositorioAnalytics(m.cliente, lider.posse, () => true), antiga = await repo.adquirir();
+    if (!antiga) throw new Error('Faltou a janela do histórico.');
+    await repo.falhar(antiga, { codigo: 'requisicao-invalida', http: 400, requestId: 'referencia-anterior' });
+    await agendarJanela(m.cliente, { ...diario, dia: '2026-10-20', tipo: 'D1' });
+    expect(await enviar(ctx.parceiro.slug, pedidoPara(m, 'FALHA'))).toContain('feito=releitura');
+    const nova = await repo.adquirir();
+    expect(nova).toMatchObject({ id: antiga.id, tipo: 'HISTORICO', geracao: 2 });
+    expect(await m.cliente.integracaoExecucao.findUnique({ where: { id: antiga.id } })).toMatchObject({
+      estado: 'EXECUTANDO', prioridade: 3, ultimoHttp: null, ultimoRequestId: null, ultimoErro: null,
+    });
+    expect(await ler(m, m.cliente, ALCANCE_FLOWFOODS)).toMatchObject({ situacao: { fontes: [{ tentativa: { nivel1: { geracao: 2, paginasConfirmadas: 0 } } }] } });
+    expect(await m.cliente.integracaoExecucao.findFirst({ where: { tipo: 'D1' } })).toMatchObject({ estado: 'PLANEJADA', geracao: 0, prioridade: 1 });
+  });
+
+  it('lease vivo, posse antiga ainda viva e reaquisição do worker são cercados por geração; lease órfão é recuperável', async () => {
+    const m = await massa(), ctx = await centralDaMassa(m), slug = ctx.parceiro.slug;
+    await agendarJanela(m.cliente, { moduloId: m.moduloId, tipo: 'D1', dia: DIA, ciclo: '2026-10-20', fuso: 'America/Sao_Paulo', unidade: 'REAL' });
+    const original = criarRepositorioAnalytics(m.cliente, lider.posse, () => true), t = await original.adquirir();
+    if (!t) throw new Error('Teste sem janela adquirida.');
+    const where = { id: t.id }, pedido = pedidoPara(m, 'EXECUTANDO', t.geracao);
+    expect(await podeReagendar(m)).toBe(false);
+    expect(await enviar(slug, pedido)).toContain('janela mudou');
+    const vencido = { leaseAte: new Date(0) };
+    await m.cliente.integracaoExecucao.update({ where, data: vencido });
+    expect(await podeReagendar(m)).toBe(false);
+    expect(await enviar(slug, pedido)).toContain('janela mudou');
+    expect(await original.adquirir()).toBeNull();
+    lider.liberar(); await lider.encerrada;
+    lider = await assumirPosseFinanceira(URL_TESTE!);
+    expect(await podeReagendar(m)).toBe(true);
+    expect(await enviar(slug, pedido)).toContain('feito=releitura');
+    const atual = criarRepositorioAnalytics(m.cliente, lider.posse, () => true);
+    const nova = await atual.adquirir();
+    expect(nova).toMatchObject({ id: t.id, geracao: 2, perfil: 'diario' });
+    await expect(original.renovar(t)).rejects.toMatchObject({ codigo: 'POSSE' });
+    expect(await enviar(slug, pedido)).toContain('janela mudou');
+    expect(await m.cliente.integracaoExecucao.findMany()).toMatchObject([{ id: t.id, estado: 'EXECUTANDO', geracao: 2, dono: lider.posse.id }]);
+    expect(await historicoReleitura(m)).toHaveLength(1);
+  });
+
+  it('loja multimarca mantém o aviso de ambiguidade e só oferece a fonte independente, inclusive em centavos', async () => {
+    const m = await massa(), ctx = await centralDaMassa(m), slug = ctx.parceiro.slug;
+    const antiga = await massaFinanceira(db, inventario, { cliente: m.cliente, lojaId: m.lojaId });
+    await publicarFinanceiro(antiga, lider.posse);
+    await desligarConexao(m.cliente, antiga.conexaoId, inventario.autor);
+    const religada = await massaFinanceira(db, inventario, { cliente: m.cliente, lojaId: m.lojaId, merchantId: antiga.merchantId });
+    await publicarFinanceiro(religada, lider.posse);
+    await agendarJanela(m.cliente, { moduloId: m.moduloId, dia: DIA, tipo: 'D1', ciclo: '2026-10-20', fuso: 'America/Sao_Paulo', unidade: 'CENTAVO' });
+    const repo = criarRepositorioAnalytics(m.cliente, lider.posse, () => true), t = await repo.adquirir();
+    if (!t || t.moduloId !== m.moduloId) throw new Error('Faltou a janela independente.');
+    await repo.falhar(t, { codigo: 'configuracao' });
+    const situacao = await ler(m, m.cliente, ALCANCE_FLOWFOODS);
+    expect(situacao).toMatchObject({ situacao: { cobertura: 'vinculo-ambiguo' } });
+    expect(await podeReagendar(religada)).toBe(false);
+    expect(await podeReagendar(m)).toBe(true);
+    // Mesmo conhecendo as chaves de uma janela elegível, outro portão só recebe false.
+    const outro = await massa();
+    expect(await outro.cliente.sql<{ ok: boolean }>`SELECT erp_integracao_pode_reler_dia(${m.cliente.parceiroId}, ${m.lojaId}, ${t.id}, 1) AS ok`).toEqual([{ ok: false }]);
+    expect(await enviar(slug, pedidoPara(religada, 'SUCESSO'))).toContain('janela mudou');
+    expect(await enviar(slug, pedidoPara(m, 'FALHA'))).toContain('feito=releitura');
+    expect(await m.cliente.integracaoExecucao.findUnique({ where: { id: t.id } })).toMatchObject({ estado: 'PLANEJADA', unidade: 'CENTAVO' });
+  });
 
   it('sem as permissões/modulo ou com loja/tenant forjados não devolve situação', async () => {
     const m = await massa(), outro = await massa(); await publicarFinanceiro(m, lider.posse);

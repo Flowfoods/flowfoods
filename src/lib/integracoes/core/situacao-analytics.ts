@@ -1,4 +1,4 @@
-/** INT-1.8A: leitura operacional por loja/dia. Sem Kpi, payload, app, token ou transporte. */
+/** Leitura operacional por loja/dia. A Central conta páginas sem carregar seu conteúdo. */
 import { ErroDeRelatorio, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { filtroDeLojas, pode, recusa, type Alcance } from '@/lib/erp/permissoes';
 import { moduloLiberado } from '@/lib/erp/liberacao';
@@ -84,11 +84,21 @@ export async function lerSituacaoAnalyticsDaLoja(
       if (conflito.length !== 1 || typeof conflito[0].ambigua !== 'boolean') return indisponivel();
       const modulos = conexoes.flatMap(c => c.modulos.map(m => m.id));
       const data = new Date(`${dia}T00:00:00.000Z`);
+      const nivel1 = alcance.nivel === 'FLOWFOODS' && ambiente === 'PRODUCAO';
       const execucoes = modulos.length ? await tx.integracaoExecucao.findMany({
         where: { moduloId: { in: modulos }, dia: data, perfil: 'diario' },
-        select: { id: true, moduloId: true, estado: true, fuso: true, iniciadaEm: true, concluidaEm: true, naoAntesDe: true, ultimoErro: true },
+        select: { id: true, moduloId: true, estado: true, fuso: true, iniciadaEm: true, concluidaEm: true, naoAntesDe: true, ultimoErro: true,
+          ...(nivel1 ? { geracao: true } : {}) },
       }) : [];
       if (execucoes.some(e => e.fuso !== 'America/Sao_Paulo')) return indisponivel();
+      const contagens = nivel1 && execucoes.length ? await tx.integracaoPayload.groupBy({
+        by: ['execucaoId'], where: { OR: execucoes.map(e => ({ execucaoId: e.id, geracao: e.geracao })) }, _count: { _all: true },
+      }) : [];
+      const paginas = new Map(contagens.map(p => [p.execucaoId, p._count._all]));
+      const elegiveis = nivel1 && !cliente.somenteLeitura && execucoes.length ? await tx.sql<{ id: string }>`SELECT e.id
+        FROM "IntegracaoExecucao" e WHERE e."parceiroId" = ${tx.parceiroId} AND e.id = ANY(${execucoes.map(e => e.id)}::text[])
+        AND erp_integracao_pode_reler_dia(${tx.parceiroId}, ${loja.id}, e.id, e.geracao)` : [];
+      const paraReleitura = new Set(elegiveis.map(e => e.id));
       const snapshots = execucoes.length ? await tx.integracaoSnapshot.findMany({
         where: { execucaoId: { in: execucoes.map(e => e.id) }, situacao: { in: ['PUBLICADO', 'PENDENTE_PERIODO'] } },
         orderBy: { geracao: 'desc' }, distinct: ['execucaoId', 'situacao'],
@@ -107,11 +117,15 @@ export async function lerSituacaoAnalyticsDaLoja(
         const publicada = snapshots.find(s => s.execucaoId === e?.id && s.situacao === 'PUBLICADO');
         const pendente = snapshots.find(s => s.execucaoId === e?.id && s.situacao === 'PENDENTE_PERIODO');
         const estado: EstadoDaTentativaAnalytics = e && ESTADOS.has(e.estado) ? e.estado as EstadoDaTentativaAnalytics : 'DESCONHECIDO';
+        const detalhe = nivel1 && e ? { nivel1: {
+          geracao: e.geracao, paginasConfirmadas: paginas.get(e.id) ?? 0, inicioDaGeracao: iso(e.iniciadaEm),
+          podeReagendar: paraReleitura.has(e.id),
+        } } : {};
         return {
           chave: c.id, nome: c.nomeExterno, marca: c.marca?.nome ?? null, vinculada: c.estado === 'ATIVA', aplicada: aplicadas.has(c.id),
           acesso: mensagemDoAcessoAnalytics(modulo?.estado ?? null, c.estado === 'ATIVA'),
           // O planejador conserva o início antigo ao reagendar. Ele não é o início da nova tentativa prevista.
-          tentativa: e ? { estado, mensagem: mensagemDaTentativaAnalytics(estado, e.ultimoErro), iniciadaEm: estado === 'PLANEJADA' ? null : iso(e.iniciadaEm), concluidaEm: estado === 'PLANEJADA' ? null : iso(e.concluidaEm), naoAntesDe: estado === 'AGUARDANDO' ? iso(e.naoAntesDe) : null } : null,
+          tentativa: e ? { estado, mensagem: mensagemDaTentativaAnalytics(estado, e.ultimoErro), iniciadaEm: estado === 'PLANEJADA' ? null : iso(e.iniciadaEm), concluidaEm: estado === 'PLANEJADA' ? null : iso(e.concluidaEm), naoAntesDe: estado === 'AGUARDANDO' ? iso(e.naoAntesDe) : null, ...detalhe } : null,
           versaoDisponivel: publicada ? { publicadaEm: publicada.criadoEm.toISOString() } : null,
           revisaoPendente: !!pendente && (!publicada || pendente.geracao > publicada.geracao),
         };
