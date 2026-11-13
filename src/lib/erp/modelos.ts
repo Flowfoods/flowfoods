@@ -74,6 +74,7 @@ export const MODELOS_DE_TENANT = [
   'integracaoFaturamentoDia',
   'integracaoFaturamentoFonte',
   'integracaoReciboFinancial',
+  'integracaoSomasFinancial',
   'liberacaoDeModulo',
 ] as const;
 
@@ -145,6 +146,7 @@ export const RELACOES_DE_TENANT = [
   'erpIntegracaoFaturamentoDias',
   'erpIntegracaoFaturamentoFontes',
   'erpIntegracaoRecibosFinancial',
+  'erpIntegracaoSomasFinancial',
   'erpLiberacoesDeModulo',
 ] as const;
 
