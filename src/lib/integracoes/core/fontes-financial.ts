@@ -71,8 +71,15 @@ export async function registrarFontesFinancial(ctx: ContextoDoParceiro, entrada:
       });
       const existente = await tx.integracaoReciboFinancial.findUniqueOrThrow({
         where: { parceiroId_conexaoId_competencia_pacoteSha256: { parceiroId, conexaoId, competencia, pacoteSha256: recibo.pacoteSha256 } },
-        select: { id: true },
+        select: { id: true, manifestoSha256: true },
       });
+      // O hash do conjunto já confere os bytes do gzip e das páginas. O manifesto
+      // reformatado também identifica o recibo, mas só o original completa o legado.
+      if (existente.manifestoSha256 === recibo.manifestoSha256) {
+        await tx.integracaoSomasFinancial.createMany({
+          data: { parceiroId, reciboId: existente.id, ...recibo.somas }, skipDuplicates: true,
+        });
+      }
       return { ok: true, reciboId: existente.id, reenvio: salvo.count === 0 };
     });
   } catch (erro) {
@@ -91,6 +98,7 @@ export type ResumoReciboFontesFinancial = Pick<ReciboPacoteFontesFinancial,
   ambiente: EscopoFontesFinancial['ambiente'];
   competencia: string;
   recebidoEm: Date;
+  somas: ReciboPacoteFontesFinancial['somas'] | null;
   origem: 'MANUAL_DECLARADA';
   situacao: 'RECEBIDO_PARA_CONFERENCIA';
 };
@@ -99,6 +107,7 @@ const resumo = {
   id: true, conexaoId: true, ambiente: true, competencia: true, produto: true, origem: true, situacao: true, recebidoEm: true,
   requestIdSha256: true, arquivoSha256: true, manifestoSha256: true, eventosSha256: true, vigenciasSha256: true, pacoteSha256: true,
   linhasArquivo: true, pedidosDistintos: true, paginasEventos: true, quantidadeEventos: true, vigencias: true,
+  somas: { select: { arquivoCentavos: true, eventosCentavos: true } },
 } satisfies Prisma.IntegracaoReciboFinancialSelect;
 
 const metadadosDoRecibo = z.object({

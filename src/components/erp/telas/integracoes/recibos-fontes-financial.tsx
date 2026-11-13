@@ -2,7 +2,8 @@ import Link from 'next/link';
 import type { ResultadoConferenciaFinancial } from '@/lib/integracoes/core/conferencia-financial';
 import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Contagem, Painel } from '@/components/erp/ui/superficies';
-import { diaAnalytics, instanteAnalytics } from './formato-analytics';
+import { diaAnalytics, dinheiroAnalytics, instanteAnalytics } from './formato-analytics';
+import { MedidaFinancial } from './medidas-conferencia-financial';
 
 type Consulta = Extract<ResultadoConferenciaFinancial, { ok: true }>;
 const taxa = (bp: number) => `${(bp / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
@@ -25,6 +26,17 @@ export function RecibosFontesFinancial({ consulta, retorno, destaque }: { consul
               {([['Linhas do arquivo', r.linhasArquivo], ['Pedidos distintos', r.pedidosDistintos], ['Páginas de eventos', r.paginasEventos], ['Eventos', r.quantidadeEventos]] as const)
                 .map(([nome, n]) => <div key={nome}><dt className="text-suave">{nome}</dt><dd className="font-semibold tabular-nums">{n.toLocaleString('pt-BR')}</dd></div>)}
             </dl>
+            <section aria-label="Comparação do arquivo mensal com os eventos">
+              <h3 className="font-semibold">Lançamentos com impacto no repasse</h3>
+              {r.somas ? <>
+                <dl className="mt-2 grid gap-3 sm:grid-cols-3">
+                  <MedidaFinancial rotulo="Arquivo mensal" valor={dinheiroAnalytics(r.somas.arquivoCentavos)} />
+                  <MedidaFinancial rotulo="Eventos financeiros" valor={dinheiroAnalytics(r.somas.eventosCentavos)} />
+                  <MedidaFinancial rotulo="Eventos menos arquivo" valor={dinheiroAnalytics((BigInt(r.somas.eventosCentavos) - BigInt(r.somas.arquivoCentavos)).toString())} />
+                </dl>
+                <p className="mt-2 text-suave">Os totais consideram os arquivos deste envio. O fechamento da competência exige conferir a cobertura das duas fontes.</p>
+              </> : <p className="mt-1 text-suave">Somas indisponíveis neste recibo. Reapresente o pacote original à FlowFoods para calculá-las.</p>}
+            </section>
             <section aria-label="Vigências declaradas">
               <h3 className="font-semibold">Vigências declaradas</h3>
               <ul className="mt-1 divide-y divide-linha">{r.vigencias.map(v => <li key={v.inicio} className="grid gap-x-4 gap-y-0.5 py-1.5 sm:grid-cols-[minmax(0,2fr)_1fr_1fr]">

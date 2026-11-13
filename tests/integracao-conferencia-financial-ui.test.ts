@@ -54,12 +54,17 @@ describe('tela de conferência Financial · fontes e navegação', () => {
       origem: 'MANUAL_DECLARADA' as const, situacao: 'RECEBIDO_PARA_CONFERENCIA' as const, recebidoEm: new Date('2026-07-03T15:00:00Z'),
       requestIdSha256: '1'.repeat(64), arquivoSha256: '2'.repeat(64), manifestoSha256: '3'.repeat(64),
       eventosSha256: '4'.repeat(64), vigenciasSha256: '5'.repeat(64), pacoteSha256: '6'.repeat(64),
-      linhasArquivo: 8, pedidosDistintos: 3, paginasEventos: 1, quantidadeEventos: 5,
+      linhasArquivo: 8, pedidosDistintos: 3, paginasEventos: 1, quantidadeEventos: 5, somas: null,
       vigencias: [{ inicio: '2026-06-01', fim: '2026-06-30', comissaoBp: 850, pagamentoBp: 315 }] };
     ler.mockResolvedValue({ ...consulta, fonteMensal: 'RECEBIDA_PARA_CONFERENCIA', recibos: { total: 13, paginas: 2, pagina: 1, itens: [recibo] } });
     const tela = await html({ loja: loja.id, competencia: '2026-06', pagina: '1' });
     for (const texto of ['Recibos de fontes', 'Recebido para conferência', '13 recibos', 'Produto DELIVERY', '8,5%', '3,15%', recibo.arquivoSha256, 'pagina=2#recibos']) expect(tela).toContain(texto);
     expect(tela).not.toMatch(/Registrar recebimento|Baixar modelo do manifesto|R\$/);
+    expect(tela).toContain('Somas indisponíveis neste recibo');
+    const comSomas = { ...recibo, somas: { arquivoCentavos: '-1250', eventosCentavos: '-1251' } };
+    ler.mockResolvedValue({ ...consulta, fonteMensal: 'RECEBIDA_PARA_CONFERENCIA', recibos: { total: 1, paginas: 1, pagina: 1, itens: [comSomas] } });
+    const comValores = await html({ loja: loja.id, competencia: '2026-06' });
+    for (const texto of ['Lançamentos com impacto no repasse', '−R$ 12,50', '−R$ 12,51', 'Eventos menos arquivo', '−R$ 0,01']) expect(comValores).toContain(texto);
     const foco = await html({ recibo: recibo.id }, '/rodolfo/integracoes/qa');
     expect(foco).toContain('Recibo disponível na consulta');
     expect(foco).toMatch(/<details[^>]*\bopen/);

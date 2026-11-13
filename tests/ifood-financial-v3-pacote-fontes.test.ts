@@ -51,6 +51,7 @@ describe('recebimento manual das fontes Financial por loja e competência', () =
       eventosSha256: expect.stringMatching(/^[0-9a-f]{64}$/), pacoteSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
       vigenciasSha256: expect.stringMatching(/^[0-9a-f]{64}$/), vigencias: f.manifesto.configuracao.vigencias,
       paginasEventos: 2, quantidadeEventos: 2, linhasArquivo: 2, pedidosDistintos: 1,
+      somas: { arquivoCentavos: '8800', eventosCentavos: '-2400' },
     });
     expect(JSON.stringify(recibo)).not.toMatch(/PROTOCOLO-FICTICIO|pedido-sintetico|PII-FICTICIO|https:|ORDER_COMMISSION|100\.00/);
   });
@@ -67,6 +68,19 @@ describe('recebimento manual das fontes Financial por loja e competência', () =
     expect((await preparar(f)).pacoteSha256).toBe(a.pacoteSha256);
     f.manifesto.arquivo.requestId += '-2';
     expect((await preparar(f)).pacoteSha256).not.toBe(a.pacoteSha256);
+  });
+
+  it('soma apenas impacto no repasse e conserva centavos superiores a int64', async () => {
+    const f = criarFontesFinancial();
+    substituirArquivo(f, csv => csv.replace('100.00;', '92233720368547758.09;').replace('-12.00;', '-0.01;'));
+    alterarCorpo(f, c => {
+      const original = c.financialEvents[0];
+      c.financialEvents = [
+        { ...original, amount: { value: '92233720368547758.08', currency: 'BRL' } },
+        { ...original, hasTransferImpact: false },
+      ];
+    });
+    expect((await preparar(f)).somas).toEqual({ arquivoCentavos: '9223372036854775808', eventosCentavos: '9223372036854775808' });
   });
 
   it('os bytes da página, do arquivo e os valores das vigências participam da impressão do conjunto', async () => {
@@ -117,6 +131,7 @@ describe('recebimento manual das fontes Financial por loja e competência', () =
     f.manifesto.configuracao.vigencias[0].comissaoBp = 0;
     alterarCorpo(f, c => { c.financialEvents = []; });
     expect(await preparar(f)).toMatchObject({ linhasArquivo: 0, pedidosDistintos: 0, paginasEventos: 1, quantidadeEventos: 0,
+      somas: { arquivoCentavos: '0', eventosCentavos: '0' },
       vigencias: [{ inicio: '2024-02-01', fim: '2024-02-29', comissaoBp: 0, pagamentoBp: 0 }],
     });
     f.manifesto.eventos = [];
