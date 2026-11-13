@@ -5,6 +5,7 @@ import {
 } from './analytics';
 import { conferirIdentidadePagamentos, consultaPagamentos, normalizarPagamentosAnalytics } from './analytics-pagamentos';
 import { conferirIdentidadeComplementares, consultaComplementares, normalizarComplementaresAnalytics } from './analytics-complementares';
+import { ErroDeCofre } from '../core/cofre';
 import { criarClienteIfood, type OpcoesDoCliente } from './http';
 import { caminhoDosKpis } from './leitura-test';
 import {
@@ -129,6 +130,7 @@ export async function executarTarefaAnalytics(tarefa: TarefaAnalytics, o: Opcoes
     }
     return falhar({ codigo: 'limite-local' });
   } catch (erro) {
+    if (erro instanceof ErroDeCofre) return falhar({ codigo: 'configuracao' });
     if (erro instanceof ErroContratoAnalytics) return falhar({ codigo: 'contrato', ...metadados });
     if (erro instanceof ErroPipelineAnalytics && (erro.codigo === 'CORPO' || erro.codigo === 'LIMITE')) {
       return falhar({ codigo: erro.codigo === 'LIMITE' ? 'limite-local' : 'contrato', ...metadados });

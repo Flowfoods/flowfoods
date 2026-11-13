@@ -7,6 +7,16 @@ export interface ContextoServidorAnalytics { parceiroId: string; homologacaoDeIn
 export interface EntradaSituacaoAnalytics { lojaId?: unknown; dia?: unknown }
 export interface LojaDaSituacaoAnalytics { id: string; nome: string; ativa: boolean }
 export type EstadoDaTentativaAnalytics = 'PLANEJADA' | 'EXECUTANDO' | 'SUCESSO' | 'FALHA' | 'AGUARDANDO' | 'PENDENTE_PERIODO' | 'DESCONHECIDO';
+export interface PedidoReleituraAnalytics {
+  lojaId: string;
+  conexaoId: string;
+  dia: string;
+  estado: EstadoDaTentativaAnalytics;
+  geracao: number;
+}
+export function estadoParaReleitura(estado: unknown): boolean {
+  return estado === 'SUCESSO' || estado === 'FALHA' || estado === 'PENDENTE_PERIODO' || estado === 'EXECUTANDO';
+}
 export interface TentativaDaSituacaoAnalytics {
   estado: EstadoDaTentativaAnalytics;
   mensagem: MensagemDaSituacaoAnalytics;
@@ -14,6 +24,8 @@ export interface TentativaDaSituacaoAnalytics {
   concluidaEm: string | null;
   /** Limite mínimo persistido, somente quando aguarda; não define o horário de execução. */
   naoAntesDe: string | null;
+  /** Somente a Central de produção. As páginas são da geração indicada, inclusive após uma retomada. */
+  nivel1?: { geracao: number; paginasConfirmadas: number; inicioDaGeracao: string | null; podeReagendar: boolean };
 }
 export interface FonteDaSituacaoAnalytics {
   chave: string;
@@ -95,6 +107,7 @@ export function mensagemDaTentativaAnalytics(estado: EstadoDaTentativaAnalytics,
   }
   if (estado === 'DESCONHECIDO') return { rotulo: 'Situação a conferir', explicacao: 'Não foi possível interpretar a situação desta tentativa.', tom: 'alerta' };
   switch (erro) {
+    case 'configuracao': return { rotulo: 'Configuração da coleta a conferir', explicacao: 'A FlowFoods precisa conferir a configuração do coletor antes de solicitar outra leitura.', tom: 'erro' };
     case 'sem-permissao': return { rotulo: 'Acesso recusado', explicacao: 'O iFood recusou o acesso nesta tentativa. Confira a autorização da loja com a FlowFoods.', tom: 'erro' };
     case 'nao-autenticado': return { rotulo: 'Autenticação recusada', explicacao: 'A FlowFoods precisa conferir a autenticação desta leitura.', tom: 'erro' };
     case 'requisicao-invalida': return { rotulo: 'Pedido de leitura recusado', explicacao: 'A FlowFoods precisa conferir o pedido de leitura enviado ao iFood.', tom: 'erro' };
