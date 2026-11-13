@@ -20,11 +20,17 @@ import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance, type Permissao } from
 import { mudarLiberacao } from '@/lib/erp/liberacao';
 import { obterDia } from '@/lib/erp/faturamento';
 import { aplicarFaturamentoAnalytics } from '@/lib/erp/faturamento-integracao';
+import { appPorId } from '@/lib/integracoes/core/apps';
+import { armazemDoBanco } from '@/lib/integracoes/core/armazem-token';
 import { desligarConexao, mudarModulo } from '@/lib/integracoes/core/conexoes';
 import { pausarAnalytics } from '@/lib/integracoes/core/controle-analytics';
 import { lerOrigemAnalyticsNoFaturamento, lerSituacaoAnalyticsDaLoja } from '@/lib/integracoes/core/situacao-analytics';
 import type { PedidoReleituraAnalytics } from '@/lib/integracoes/core/situacao-analytics-campos';
+import { ServicoDeToken } from '@/lib/integracoes/ifood/auth';
+import { Limitador } from '@/lib/integracoes/ifood/limitador';
+import { executarTarefaAnalytics } from '@/lib/integracoes/ifood/pipeline-executor';
 import { agendarJanela, criarRepositorioAnalytics } from '@/lib/integracoes/ifood/pipeline-repositorio';
+import type { PedidoHttp } from '@/lib/integracoes/ifood/transporte';
 import { criarPeriodoFechadoDeTeste, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 import { assumirPosseFinanceira, bucketFinanceiro, DIA_FINANCEIRO, massaFinanceira, publicarFinanceiro, type MassaFinanceira } from './integracao-faturamento-apoio';
 
@@ -85,6 +91,50 @@ describe.skipIf(!URL_TESTE)('INT-1.8A · fotografia e isolamento reais', { timeo
     if (!r.ok || !r.situacao) throw new Error('Fixture sem situação de loja.');
     return r.situacao.fontes.find(f => f.chave === m.conexaoId)?.tentativa?.nivel1?.podeReagendar;
   }
+
+  it('encerra a falta de credencial na geração adquirida, orienta só a Central e publica a mesma janela após correção', async () => {
+    const m = await massa(), ctx = await centralDaMassa(m);
+    await agendarJanela(m.cliente, { moduloId: m.moduloId, dia: DIA, ciclo: '2026-10-20', tipo: 'D1', fuso: 'America/Sao_Paulo', unidade: 'REAL' });
+    const repositorio = criarRepositorioAnalytics(m.cliente, lider.posse, () => true);
+    const primeira = await repositorio.adquirir(), app = await appPorId(m.appId);
+    if (!primeira || !app) throw new Error('Sem execução ou app na fixture.');
+    const env: Record<string, string> = { INTEGRACAO_IFOOD_ATIVA: 'true', INTEGRACAO_CHAVE_CIFRAGEM: 'a'.repeat(64) };
+    const transporte = vi.fn(async (p: PedidoHttp) => {
+      const dados = p.url.endsWith('/oauth/token') ? { accessToken: 'token-sintetico', expiresIn: 3600 }
+        : { data: [bucketFinanceiro()], currentPage: 1, size: 1, totalItems: 1, totalPages: 1 };
+      return { status: 200, cabecalhos: {}, corpo: JSON.stringify(dados) };
+    });
+    const limitador = new Limitador();
+    const tokens = new ServicoDeToken({ armazem: armazemDoBanco, transporte, limitador, env });
+    const http = { app: { ...app, homologacao: app.estadoHomologacao }, tokens, limitador, transporte, env };
+    expect(await executarTarefaAnalytics(primeira, { repositorio, http })).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(transporte).not.toHaveBeenCalled();
+    expect(await m.cliente.integracaoExecucao.findMany()).toMatchObject([{
+      id: primeira.id, geracao: primeira.geracao, estado: 'FALHA', ultimoErro: 'configuracao-credencial-ausente', ultimoHttp: null, ultimoRequestId: null, dono: null, leaseAte: null,
+    }]);
+    expect(await m.cliente.integracaoPayload.count()).toBe(0);
+    expect(await m.cliente.integracaoSnapshot.count()).toBe(0);
+    expect(await m.cliente.integracaoConexaoModulo.findUnique({ where: { id: m.moduloId } })).toMatchObject({ estado: 'ATIVO', ultimoErro: null });
+    expect(await repositorio.adquirir()).toBeNull();
+    const central = await ler(m, m.cliente, ALCANCE_FLOWFOODS), loja = await ler(m);
+    expect(central).toMatchObject({ situacao: { fontes: [{ tentativa: {
+      mensagem: { explicacao: 'Disponibilize a credencial do app ao coletor.' }, nivel1: { paginasConfirmadas: 0, podeReagendar: true },
+    } }] } });
+    expect(loja).toMatchObject({ situacao: { fontes: [{ tentativa: { mensagem: { explicacao: 'A FlowFoods precisa conferir a configuração do coletor antes de solicitar outra leitura.' } } }] } });
+    expect(JSON.stringify([central, loja])).not.toMatch(/configuracao-credencial|IFOOD_BI_CLIENT_SECRET|Dokploy|Falta a variável/);
+    expect(JSON.stringify(loja)).not.toMatch(/nivel1|credencial do app/);
+
+    env[app.nomeDoSegredo] = 'credencial-sintetica';
+    expect(await enviar(ctx.parceiro.slug, pedidoPara(m, 'FALHA', primeira.geracao))).toContain('feito=releitura');
+    const nova = await repositorio.adquirir();
+    if (!nova) throw new Error('A releitura não foi adquirida.');
+    expect(nova).toMatchObject({ id: primeira.id, geracao: primeira.geracao + 1, moduloId: m.moduloId, lojaId: m.lojaId });
+    expect(await executarTarefaAnalytics(nova, { repositorio, http })).toEqual({ estado: 'publicada', paginas: 1 });
+    expect(transporte).toHaveBeenCalledTimes(2);
+    expect(await m.cliente.integracaoExecucao.findMany()).toMatchObject([{ id: primeira.id, estado: 'SUCESSO', ultimoErro: null }]);
+    expect(await m.cliente.integracaoSnapshot.count()).toBe(1);
+    expect(await historicoReleitura(m)).toHaveLength(1);
+  });
 
   it('ação N1 concorrente reaproveita o dia/fonte, retém filtro e autoria e reaplica o mesmo conteúdo uma única vez', async () => {
     const m = await massa(), ctx = await centralDaMassa(m), slug = ctx.parceiro.slug;

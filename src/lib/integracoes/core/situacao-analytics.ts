@@ -125,7 +125,7 @@ export async function lerSituacaoAnalyticsDaLoja(
           chave: c.id, nome: c.nomeExterno, marca: c.marca?.nome ?? null, vinculada: c.estado === 'ATIVA', aplicada: aplicadas.has(c.id),
           acesso: mensagemDoAcessoAnalytics(modulo?.estado ?? null, c.estado === 'ATIVA'),
           // O planejador conserva o início antigo ao reagendar. Ele não é o início da nova tentativa prevista.
-          tentativa: e ? { estado, mensagem: mensagemDaTentativaAnalytics(estado, e.ultimoErro), iniciadaEm: estado === 'PLANEJADA' ? null : iso(e.iniciadaEm), concluidaEm: estado === 'PLANEJADA' ? null : iso(e.concluidaEm), naoAntesDe: estado === 'AGUARDANDO' ? iso(e.naoAntesDe) : null, ...detalhe } : null,
+          tentativa: e ? { estado, mensagem: mensagemDaTentativaAnalytics(estado, e.ultimoErro, nivel1), iniciadaEm: estado === 'PLANEJADA' ? null : iso(e.iniciadaEm), concluidaEm: estado === 'PLANEJADA' ? null : iso(e.concluidaEm), naoAntesDe: estado === 'AGUARDANDO' ? iso(e.naoAntesDe) : null, ...detalhe } : null,
           versaoDisponivel: publicada ? { publicadaEm: publicada.criadoEm.toISOString() } : null,
           revisaoPendente: !!pendente && (!publicada || pendente.geracao > publicada.geracao),
         };

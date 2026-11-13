@@ -2,6 +2,7 @@ import type { IdentidadeAnalytics, UnidadeMonetariaAnalytics } from './analytics
 import type { IdentidadePagamentos } from './analytics-pagamentos';
 import type { IdentidadeComplementares } from './analytics-complementares';
 import type { Classificacao } from './respostas';
+import type { DiagnosticoDoColetor } from '../core/diagnostico-coletor';
 
 export type TipoJanela = 'D1' | 'REVISAO' | 'HISTORICO' | 'ACESSO';
 export interface JanelaAnalytics {
@@ -42,7 +43,7 @@ export interface PaginaDoTransporte {
   versaoContrato?: 1;
 }
 export interface FalhaAnalytics {
-  codigo: Classificacao['tipo'] | 'contrato' | 'limite-local' | 'posse-perdida' | 'configuracao';
+  codigo: Classificacao['tipo'] | 'contrato' | 'limite-local' | 'posse-perdida' | 'configuracao' | DiagnosticoDoColetor;
   http?: number | null;
   requestId?: string | null;
   naoAntesDe?: string;
