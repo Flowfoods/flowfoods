@@ -29,7 +29,7 @@ function pagina(n = 1, total = 1, id = `grupo-${n}`, size = 1) {
   return { data: total === 0 ? [] : [grupo(id)], currentPage: n, size, totalItems: total, totalPages: total === 0 ? 0 : Math.ceil(total / size) };
 }
 const json = (dados: unknown, status = 200, cabecalhos: Record<string, string> = {}): RespostaHttp => ({ status, cabecalhos: { 'x-request-id': 'id-sintetico', ...cabecalhos }, corpo: JSON.stringify(dados) });
-function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())]) {
+function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())], env: Record<string, string | undefined> = ENV) {
   const eventos: string[] = [], pedidos: PedidoHttp[] = [], sonos: number[] = [];
   const repositorio: RepositorioDoExecutorAnalytics = {
     renovar: vi.fn(async () => { eventos.push('renovar'); }),
@@ -50,8 +50,8 @@ function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())]) {
   });
   const dormir = async (ms: number) => { sonos.push(ms); };
   const limitador = new Limitador(() => AGORA, dormir);
-  const tokens = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte, limitador, env: ENV, relogio: () => AGORA });
-  const http = { app: APP, tokens, limitador, transporte, env: ENV, relogio: () => AGORA, dormir, maxTentativas: 6, esperaMaximaMs: 999_999 };
+  const tokens = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte, limitador, env, relogio: () => AGORA });
+  const http = { app: APP, tokens, limitador, transporte, env, relogio: () => AGORA, dormir, maxTentativas: 6, esperaMaximaMs: 999_999 };
   return { repositorio, http, eventos, pedidos, sonos, transporte };
 }
 
@@ -135,11 +135,27 @@ describe('INT-1.8C · executor marginal usa a fila/cota existentes', () => {
 });
 
 describe('executor Analytics: cobertura e recibos', () => {
-  it.each(['endereço', 'token'] as const)('encerra erro de configuração de %s antes do POST sem atribuir HTTP nem expor o erro', async origem => {
+  it.each([
+    { codigo: 'configuracao-referencia-invalida', env: {}, nomeDoSegredo: 'referencia-sintetica-invalida' },
+    { codigo: 'configuracao-credencial-ausente', env: { IFOOD_BI_CLIENT_SECRET: undefined } },
+    { codigo: 'configuracao-chave-ausente', env: { INTEGRACAO_CHAVE_CIFRAGEM: undefined } },
+    { codigo: 'configuracao-chave-invalida', env: { INTEGRACAO_CHAVE_CIFRAGEM: 'chave-invalida-sintetica' } },
+    { codigo: 'configuracao-base-invalida', env: { IFOOD_API_BASE: 'https://exemplo.invalid' } },
+  ])('persiste somente $codigo e não envia OAuth ou Analytics', async ({ codigo, env, nomeDoSegredo }) => {
+    const m = montar([], { ...ENV, IFOOD_BI_CLIENT_SECRET: 'credencial-sintetica', ...env });
+    const t = tarefa();
+    t.identidade.ambiente = 'PRODUCAO';
+    const app: AppParaToken = { ...APP, ambiente: 'PRODUCAO', homologacao: 'HOMOLOGADO', nomeDoSegredo: nomeDoSegredo ?? 'IFOOD_BI_CLIENT_SECRET' };
+    expect(await executarTarefaAnalytics(t, { repositorio: m.repositorio, http: { ...m.http, app } })).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(m.repositorio.falhar).toHaveBeenCalledExactlyOnceWith(t, { codigo });
+    expect(m.transporte).not.toHaveBeenCalled();
+    expect(m.repositorio.salvarPagina).not.toHaveBeenCalled();
+    expect(m.repositorio.publicar).not.toHaveBeenCalled();
+  });
+  it.each([undefined, 'detalhe-privado-desconhecido', 'constructor'])('mantém a falha genérica do cofre para código legado ou desconhecido %#', async codigo => {
     const m = montar(), t = tarefa();
-    if (origem === 'token') vi.spyOn(m.http.tokens, 'token').mockRejectedValue(new ErroDeCofre('detalhe privado de teste'));
-    const env = origem === 'endereço' ? { ...ENV, IFOOD_API_BASE: 'https://exemplo.invalid' } : ENV;
-    expect(await executarTarefaAnalytics(t, { repositorio: m.repositorio, http: { ...m.http, env } })).toEqual({ estado: 'falhou', paginas: 0 });
+    vi.spyOn(m.http.tokens, 'token').mockRejectedValue(Object.assign(new ErroDeCofre('detalhe privado de teste'), { codigo }));
+    expect(await executarTarefaAnalytics(t, m)).toEqual({ estado: 'falhou', paginas: 0 });
     expect(m.repositorio.falhar).toHaveBeenCalledExactlyOnceWith(t, { codigo: 'configuracao' });
     expect(m.transporte).not.toHaveBeenCalled(); expect(m.repositorio.publicar).not.toHaveBeenCalled();
   });

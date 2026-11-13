@@ -48,6 +48,25 @@ describe('INT-1.8A · campos e mensagens operacionais', () => {
     expect(texto).not.toContain('segredo-teste');
     expect(texto).not.toContain('cofre');
   });
+  it.each([
+    ['configuracao-referencia-invalida', 'Corrija a referência da credencial no cadastro do app.'],
+    ['configuracao-credencial-ausente', 'Disponibilize a credencial do app ao coletor.'],
+    ['configuracao-chave-ausente', 'Disponibilize ao coletor a chave que protege os tokens.'],
+    ['configuracao-chave-invalida', 'Confira o formato da chave que protege os tokens.'],
+    ['configuracao-base-invalida', 'Confira o endereço da API oficial usado pelo coletor.'],
+  ])('reserva a orientação de %s ao nível 1', (codigo, explicacao) => {
+    const generica = mensagemDaTentativaAnalytics('FALHA', 'configuracao');
+    expect(mensagemDaTentativaAnalytics('FALHA', codigo, true)).toEqual({ ...generica, explicacao });
+    expect(mensagemDaTentativaAnalytics('FALHA', codigo)).toEqual(generica);
+  });
+  it('mostra mensagem genérica para legado e não projeta texto desconhecido em nenhum nível', () => {
+    expect(mensagemDaTentativaAnalytics('FALHA', 'configuracao', true)).toEqual(mensagemDaTentativaAnalytics('FALHA', 'configuracao'));
+    for (const nivel1 of [true, false]) {
+      for (const codigo of ['constructor', 'configuracao-sem-mapeamento']) {
+        expect(mensagemDaTentativaAnalytics('FALHA', codigo, nivel1)).toEqual(mensagemDaTentativaAnalytics('FALHA', null));
+      }
+    }
+  });
 });
 
 describe('INT-1.8A · domínio operacional e projeção', () => {

@@ -1,4 +1,6 @@
 /** INT-1.8A: contratos operacionais. Não contêm métricas, payloads ou configuração de apps. */
+import { ehDiagnosticoDoColetor, orientacaoDoColetor } from './diagnostico-coletor';
+
 export type TomDaSituacaoAnalytics = 'ok' | 'alerta' | 'erro' | 'neutro';
 export interface MensagemDaSituacaoAnalytics { rotulo: string; explicacao: string; tom: TomDaSituacaoAnalytics }
 
@@ -95,7 +97,7 @@ export function mensagemDoAcessoAnalytics(estado: string | null, vinculada: bool
   }
 }
 
-export function mensagemDaTentativaAnalytics(estado: EstadoDaTentativaAnalytics, erro: string | null): MensagemDaSituacaoAnalytics {
+export function mensagemDaTentativaAnalytics(estado: EstadoDaTentativaAnalytics, erro: string | null, nivel1 = false): MensagemDaSituacaoAnalytics {
   if (estado === 'PLANEJADA') return { rotulo: 'Leitura prevista', explicacao: 'Há uma leitura prevista para este dia, ainda sem horário definido.', tom: 'neutro' };
   if (estado === 'EXECUTANDO') return { rotulo: 'Leitura em andamento', explicacao: 'A tentativa está em andamento. Aguarde a confirmação da versão disponível.', tom: 'neutro' };
   if (estado === 'SUCESSO') return { rotulo: 'Tentativa concluída', explicacao: 'A tentativa foi concluída. A data da versão disponível pode ser anterior se o conteúdo não mudou.', tom: 'ok' };
@@ -106,8 +108,12 @@ export function mensagemDaTentativaAnalytics(estado: EstadoDaTentativaAnalytics,
     return { rotulo: 'Aguardando nova tentativa', explicacao: 'A leitura aguarda nova tentativa. O limite de espera não garante execução naquele horário.', tom: 'alerta' };
   }
   if (estado === 'DESCONHECIDO') return { rotulo: 'Situação a conferir', explicacao: 'Não foi possível interpretar a situação desta tentativa.', tom: 'alerta' };
+  const orientacao = ehDiagnosticoDoColetor(erro) ? orientacaoDoColetor(erro) : null;
+  if (erro === 'configuracao' || orientacao) return {
+    rotulo: 'Configuração da coleta a conferir', tom: 'erro',
+    explicacao: nivel1 && orientacao ? orientacao : 'A FlowFoods precisa conferir a configuração do coletor antes de solicitar outra leitura.',
+  };
   switch (erro) {
-    case 'configuracao': return { rotulo: 'Configuração da coleta a conferir', explicacao: 'A FlowFoods precisa conferir a configuração do coletor antes de solicitar outra leitura.', tom: 'erro' };
     case 'sem-permissao': return { rotulo: 'Acesso recusado', explicacao: 'O iFood recusou o acesso nesta tentativa. Confira a autorização da loja com a FlowFoods.', tom: 'erro' };
     case 'nao-autenticado': return { rotulo: 'Autenticação recusada', explicacao: 'A FlowFoods precisa conferir a autenticação desta leitura.', tom: 'erro' };
     case 'requisicao-invalida': return { rotulo: 'Pedido de leitura recusado', explicacao: 'A FlowFoods precisa conferir o pedido de leitura enviado ao iFood.', tom: 'erro' };
