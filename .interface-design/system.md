@@ -105,12 +105,17 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   bloco preenchido no tom da área, contorno na tinta dela, nome em 700 e
   `aria-current`; não clareia sob o ponteiro. Setas sem modificador andam
   pela grade; o anel de foco fica por dentro do bloco (a grade rola). Escape
-  fecha e devolve o foco ao seletor; clique fora fecha. A altura desconta o
+  fecha e devolve o foco ao seletor; clique fora fecha; o foco que sai pelo
+  Tab fecha e fica onde foi (vale para todo `Popover`). A altura desconta o
   que fica acima do painel (mais na gaveta), com piso de 200 px: em tela
   muito baixa quem rola é a gaveta. **A lateral tem camada própria (`z-30`)**
   para o painel, que cobre o conteúdo, ficar por cima de tudo que a página
   posiciona (cards, barras fixas `z-20`, links de tabela no toque), e abaixo
-  do véu da ajuda (`z-35`) e das camadas de tela cheia (`z-40`). O ícone do
+  do véu da ajuda (`z-35`) e das camadas de tela cheia (`z-40`). **Regra:**
+  nada que uma tela posiciona passa de `z-20`; exceções registradas: camadas
+  de tela cheia (`fixed inset-0`, `z-40`) e a lista do seletor de item das
+  fichas (`z-30`, presa ao campo e fechada por toque fora e pelo foco que
+  sai, então nunca aberta junto com a grade). O ícone do
   próprio seletor é o mesmo, de cor cheia; cabeçalho de página e cards do hub
   seguem com o quadrado tonal. Num grupo separado e nomeado, o catálogo
   **"Em breve"**: bloco sem identidade de área, ícone só com contorno

@@ -8,12 +8,12 @@
  * - popover ancorado desliza para caber na tela; abrir e fechar não chamam o servidor;
  * - escopo: nada disto chega ao site nem ao Portal (`.ff-site`, `globals.css`).
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import config from '../tailwind.config';
-import { ajusteParaCaber } from '@/components/erp/shell/Popover';
+import { ajusteParaCaber, foraDaCaixa } from '@/components/erp/shell/Popover';
 import { SeloEmBreve } from '@/components/erp/ui/em-breve';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { CAMPO } from '@/components/erp/ui/campos';
@@ -312,13 +312,22 @@ describe('padrão visual · popover ancorado sempre dentro da tela', () => {
     expect(ajusteParaCaber({ esquerda: 12, direita: 332 }, 320)).toBe(0);
   });
 
-  it('abre por botão real, fecha por Escape e por toque fora, e não chama o servidor para abrir ou fechar', () => {
+  it('abre por botão real, fecha por Escape, por toque fora e pelo foco que sai, e não chama o servidor para abrir ou fechar', () => {
     const fonte = readFileSync('src/components/erp/shell/Popover.tsx', 'utf8');
     expect(fonte).toMatch(/aria-expanded=\{aberto\}/);
     expect(fonte).toMatch(/aria-controls=\{id\}/);
     expect(fonte).toMatch(/addEventListener\('pointerdown', fora\)/);
     expect(fonte).toMatch(/e\.key === 'Escape'/);
     expect(fonte).toMatch(/botao\.current\?\.focus\(\)/);
+    // Tab para fora (12/11): o foco que sai da caixa (botão + painel) fecha o painel e fica onde foi; sem destino, quem fecha é
+    // o toque fora. O painel não fica aberto por cima de onde o foco foi parar.
+    expect(fonte).toMatch(/onBlur=\{\(e\) => \{\s*if \(aberto && foraDaCaixa\(e\.currentTarget, e\.relatedTarget\)\) setAberto\(false\);\s*\}\}/);
+    const dentro = { id: 'dentro' } as unknown as Node;
+    const fora = { id: 'fora' } as unknown as Node;
+    const caixa = { contains: (n: Node | null) => n === dentro };
+    expect(foraDaCaixa(caixa, fora)).toBe(true);
+    expect(foraDaCaixa(caixa, dentro)).toBe(false);
+    expect(foraDaCaixa(caixa, null)).toBe(false);
     expect(fonte).not.toMatch(/fetch\(|use server|from '\.\/acoes'|router\./);
     const dialogo = readFileSync('src/components/erp/ui/Dialogo.tsx', 'utf8');
     expect(dialogo).not.toMatch(/fetch\(|use server|from '[^']*acoes'|router\./);
@@ -369,6 +378,28 @@ describe('padrão visual · grade de módulos do seletor de áreas', () => {
     for (const b of barras) expect(b).toBeLessThan(camada);
     expect(Number(/data-veu-de-ajuda className="[^"]*z-\[(\d+)\]/.exec(readFileSync('src/components/erp/shell/pontos.tsx', 'utf8'))![1])).toBeGreaterThan(camada);
     expect(readFileSync('src/components/erp/shell/Popover.tsx', 'utf8')).toMatch(/ z-40 \$\{largura\}/);
+  });
+
+  it('nenhuma tela passa da camada da lateral: tudo o que o conteúdo posiciona fica abaixo de z-30, com as exceções registradas', () => {
+    // A lateral (z-30) só cobre o conteúdo com o painel da grade aberto. Uma camada ≥ 30 numa tela empataria com ela (e, por
+    // vir depois no DOM, ganharia) ou passaria por cima, e o painel voltaria a ficar por baixo de algo. Varre telas, kit e páginas.
+    const pastas = ['src/components/erp/telas', 'src/components/erp/ui', 'src/app/erp', 'src/app/rodolfo'];
+    const arquivos = pastas.flatMap((d) => (readdirSync(d, { recursive: true }) as string[]).filter((f) => f.endsWith('.tsx')).map((f) => `${d}/${f}`));
+    expect(arquivos.length).toBeGreaterThan(50);
+    const camadas = arquivos.flatMap((arquivo) =>
+      readFileSync(arquivo, 'utf8').split('\n').flatMap((linha) =>
+        [...linha.matchAll(/(?:^|[\s"'`:])z-(?:(\d+)|\[(\d+)\])(?=[\s"'`]|$)/g)].map((m) => ({ arquivo, z: Number(m[1] ?? m[2]), telaCheia: /fixed inset-0/.test(linha) })),
+      ),
+    );
+    expect(camadas.length).toBeGreaterThan(10);
+    const acima = camadas.filter((c) => c.z >= 30);
+    // Exceções registradas: camadas de tela cheia (`fixed inset-0`, z ≥ 35), que cobrem a lateral de propósito; e a lista do
+    // seletor de item das fichas (z-30), presa ao campo e fechada antes de a grade abrir (o toque no seletor é fora dela).
+    const permitidas = acima.filter((c) => (c.telaCheia && c.z >= 35) || (c.arquivo.endsWith('telas/fichas/seletor-de-item.tsx') && c.z === 30));
+    expect(acima.filter((c) => !permitidas.includes(c)), 'camada de tela que alcança a lateral').toEqual([]);
+    expect(permitidas.map((c) => `${c.arquivo.split('/').pop()} z-${c.z}`).sort()).toEqual([
+      'painel-categorias.tsx z-40', 'painel-classificacao.tsx z-40', 'seletor-de-item.tsx z-30',
+    ]);
   });
 
   it('área atual: bloco preenchido com contorno na tinta da área (forma), além do peso e do aria-current', () => {
