@@ -7,7 +7,7 @@ import { mudarLiberacao } from '@/lib/erp/liberacao';
 import { ALCANCE_FLOWFOODS, type Alcance } from '@/lib/erp/permissoes';
 import { doParceiro } from '@/lib/erp/tenant';
 import { listarRecibosFontesFinancial, registrarFontesFinancial } from '@/lib/integracoes/core/fontes-financial';
-import type { EscopoFontesFinancial } from '@/lib/integracoes/ifood/financial-v3-pacote-fontes';
+import { prepararPacoteFontesFinancial, type EscopoFontesFinancial } from '@/lib/integracoes/ifood/financial-v3-pacote-fontes';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 import { criarFontesFinancial } from './fixtures/ifood-financial-pacote';
 
@@ -123,6 +123,8 @@ describe.skipIf(!url)('recibos das fontes Financial no PostgreSQL descartável',
     const consultados = await listar(m);
     expect(consultados).toMatchObject({ total: 2, pagina: 1, paginas: 1 });
     expect(consultados.itens.map(i => i.id)).toEqual([revisao.reciboId, primeira.reciboId]);
+    expect(consultados.itens[0].somas).toEqual({ arquivoCentavos: '8800', eventosCentavos: '-1200' });
+    expect(await cliente.integracaoSomasFinancial.count()).toBe(2);
     expect(consultados.itens[0]).not.toHaveProperty('recebidoPorId');
     expect(consultados.itens[0]).not.toHaveProperty('merchantId');
     expect(await cliente.integracaoExecucao.count()).toBe(0);
@@ -156,6 +158,12 @@ describe.skipIf(!url)('recibos das fontes Financial no PostgreSQL descartável',
         has_table_privilege(current_user, '"IntegracaoReciboFinancial"', 'UPDATE,DELETE,TRUNCATE') AS mudar
         FROM pg_class WHERE oid = to_regclass('"IntegracaoReciboFinancial"')`;
       expect(isolamento).toEqual({ fora: 0n, forca: true, inserir: true, mudar: false });
+      const [somas] = await b.ctx.cliente.sql<{ fora: bigint; restrita: boolean; mudar: boolean }>`SELECT
+        (SELECT count(*) FROM "IntegracaoSomasFinancial" WHERE "reciboId" = ${r.reciboId}) AS fora,
+        relrowsecurity AND relforcerowsecurity AS restrita,
+        has_table_privilege(current_user, '"IntegracaoSomasFinancial"', 'UPDATE,DELETE,TRUNCATE') AS mudar
+        FROM pg_class WHERE oid = to_regclass('"IntegracaoSomasFinancial"')`;
+      expect(somas).toEqual({ fora: 0n, restrita: true, mudar: false });
     }
     const atual = await a.ctx.cliente.integracaoReciboFinancial.findUniqueOrThrow({ where: { id: r.reciboId } });
     await expect(a.ctx.cliente.integracaoReciboFinancial.createMany({
@@ -165,6 +173,32 @@ describe.skipIf(!url)('recibos das fontes Financial no PostgreSQL descartável',
     expect(await listar(a)).toEqual(vazia);
     expect(await registrarFontesFinancial(a.ctx, dados)).toMatchObject({ ok: false, motivo: 'indisponivel' });
     expect(await a.ctx.cliente.integracaoReciboFinancial.count()).toBe(1);
+  }, 30_000);
+
+  it('completa um recibo legado somente com o manifesto original e mantém uma comparação por recibo', async () => {
+    const m = await preparar(), dados = entrada(m.escopo);
+    const { escopo, somas, vigencias, ...recibo } = await prepararPacoteFontesFinancial(m.escopo, dados.arquivoGzip, dados.manifestoJson);
+    const original = await m.ctx.cliente.integracaoReciboFinancial.create({
+      data: { ...escopo, ...recibo, moduloId: m.moduloId, recebidoPorId: autor.userId, vigencias: vigencias.map(v => ({ ...v })) },
+      select: { id: true },
+    });
+    const esperado = { ok: true, reciboId: original.id, reenvio: true };
+    await expect(m.ctx.cliente.integracaoSomasFinancial.createMany({
+      data: { parceiroId: escopo.parceiroId, reciboId: original.id, ...somas, arquivoCentavos: '01' },
+    })).rejects.toThrow(/IFSomas_centavos/);
+    expect(await registrarFontesFinancial(m.ctx, entrada(escopo, 1200, true))).toEqual(esperado);
+    expect((await listar(m)).itens[0].somas).toBeNull();
+    const reenvios = await Promise.all([registrarFontesFinancial(m.ctx, dados), registrarFontesFinancial(m.ctx, dados)]);
+    expect(reenvios).toEqual([esperado, esperado]);
+    expect((await listar(m)).itens[0].somas).toEqual(somas);
+    expect(await m.ctx.cliente.integracaoSomasFinancial.count()).toBe(1);
+    const chave = { parceiroId_reciboId: { parceiroId: escopo.parceiroId, reciboId: original.id } };
+    await expect(m.ctx.cliente.integracaoSomasFinancial.update({ where: chave, data: { arquivoCentavos: '9' } })).rejects.toThrow();
+    await expect(m.ctx.cliente.integracaoSomasFinancial.delete({ where: chave })).rejects.toThrow();
+    await mudarLiberacao(m.ctx.cliente, 'integracao', false, autor.autorNome);
+    await expect(m.ctx.cliente.integracaoSomasFinancial.createMany({
+      data: { parceiroId: escopo.parceiroId, reciboId: original.id, ...somas }, skipDuplicates: true,
+    })).rejects.toThrow(/erp_financial_fontes_indisponiveis/);
   }, 30_000);
 
   it('localiza a página do recibo reenviado dentro do histórico da mesma loja e competência', async () => {

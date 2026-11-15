@@ -1,6 +1,7 @@
 /** Executor real + cliente HTTP real; somente repositório e transporte em memória, nenhum banco/rede. */
 import { describe, expect, it, vi } from 'vitest';
 import { armazemEmMemoria, ServicoDeToken, type AppParaToken } from '@/lib/integracoes/ifood/auth';
+import { ErroDeCofre } from '@/lib/integracoes/core/cofre';
 import { METRICAS_DIARIAS } from '@/lib/integracoes/ifood/analytics';
 import { executarTarefaAnalytics, type RepositorioDoExecutorAnalytics } from '@/lib/integracoes/ifood/pipeline-executor';
 import { ErroPipelineAnalytics, LIMITE_BYTES_JANELA, type TarefaAnalytics } from '@/lib/integracoes/ifood/pipeline-tipos';
@@ -28,7 +29,7 @@ function pagina(n = 1, total = 1, id = `grupo-${n}`, size = 1) {
   return { data: total === 0 ? [] : [grupo(id)], currentPage: n, size, totalItems: total, totalPages: total === 0 ? 0 : Math.ceil(total / size) };
 }
 const json = (dados: unknown, status = 200, cabecalhos: Record<string, string> = {}): RespostaHttp => ({ status, cabecalhos: { 'x-request-id': 'id-sintetico', ...cabecalhos }, corpo: JSON.stringify(dados) });
-function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())]) {
+function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())], env: Record<string, string | undefined> = ENV) {
   const eventos: string[] = [], pedidos: PedidoHttp[] = [], sonos: number[] = [];
   const repositorio: RepositorioDoExecutorAnalytics = {
     renovar: vi.fn(async () => { eventos.push('renovar'); }),
@@ -49,8 +50,8 @@ function montar(roteiro: (RespostaHttp | Error)[] = [json(pagina())]) {
   });
   const dormir = async (ms: number) => { sonos.push(ms); };
   const limitador = new Limitador(() => AGORA, dormir);
-  const tokens = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte, limitador, env: ENV, relogio: () => AGORA });
-  const http = { app: APP, tokens, limitador, transporte, env: ENV, relogio: () => AGORA, dormir, maxTentativas: 6, esperaMaximaMs: 999_999 };
+  const tokens = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte, limitador, env, relogio: () => AGORA });
+  const http = { app: APP, tokens, limitador, transporte, env, relogio: () => AGORA, dormir, maxTentativas: 6, esperaMaximaMs: 999_999 };
   return { repositorio, http, eventos, pedidos, sonos, transporte };
 }
 
@@ -134,6 +135,38 @@ describe('INT-1.8C · executor marginal usa a fila/cota existentes', () => {
 });
 
 describe('executor Analytics: cobertura e recibos', () => {
+  it.each([
+    { codigo: 'configuracao-referencia-invalida', env: {}, nomeDoSegredo: 'referencia-sintetica-invalida' },
+    { codigo: 'configuracao-credencial-ausente', env: { IFOOD_BI_CLIENT_SECRET: undefined } },
+    { codigo: 'configuracao-chave-ausente', env: { INTEGRACAO_CHAVE_CIFRAGEM: undefined } },
+    { codigo: 'configuracao-chave-invalida', env: { INTEGRACAO_CHAVE_CIFRAGEM: 'chave-invalida-sintetica' } },
+    { codigo: 'configuracao-base-invalida', env: { IFOOD_API_BASE: 'https://exemplo.invalid' } },
+  ])('persiste somente $codigo e não envia OAuth ou Analytics', async ({ codigo, env, nomeDoSegredo }) => {
+    const m = montar([], { ...ENV, IFOOD_BI_CLIENT_SECRET: 'credencial-sintetica', ...env });
+    const t = tarefa();
+    t.identidade.ambiente = 'PRODUCAO';
+    const app: AppParaToken = { ...APP, ambiente: 'PRODUCAO', homologacao: 'HOMOLOGADO', nomeDoSegredo: nomeDoSegredo ?? 'IFOOD_BI_CLIENT_SECRET' };
+    expect(await executarTarefaAnalytics(t, { repositorio: m.repositorio, http: { ...m.http, app } })).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(m.repositorio.falhar).toHaveBeenCalledExactlyOnceWith(t, { codigo });
+    expect(m.transporte).not.toHaveBeenCalled();
+    expect(m.repositorio.salvarPagina).not.toHaveBeenCalled();
+    expect(m.repositorio.publicar).not.toHaveBeenCalled();
+  });
+  it.each([undefined, 'detalhe-privado-desconhecido', 'constructor'])('mantém a falha genérica do cofre para código legado ou desconhecido %#', async codigo => {
+    const m = montar(), t = tarefa();
+    vi.spyOn(m.http.tokens, 'token').mockRejectedValue(Object.assign(new ErroDeCofre('detalhe privado de teste'), { codigo }));
+    expect(await executarTarefaAnalytics(t, m)).toEqual({ estado: 'falhou', paginas: 0 });
+    expect(m.repositorio.falhar).toHaveBeenCalledExactlyOnceWith(t, { codigo: 'configuracao' });
+    expect(m.transporte).not.toHaveBeenCalled(); expect(m.repositorio.publicar).not.toHaveBeenCalled();
+  });
+  it('propaga falha do registro em vez de confirmar encerramento sem persistência', async () => {
+    const m = montar(), t = tarefa();
+    vi.spyOn(m.http.tokens, 'token').mockRejectedValue(new ErroDeCofre('detalhe privado de teste'));
+    vi.mocked(m.repositorio.falhar).mockRejectedValue(new ErroPipelineAnalytics('POSSE', 'Tentativa substituída.'));
+    await expect(executarTarefaAnalytics(t, m)).rejects.toMatchObject({ codigo: 'POSSE' });
+    expect(m.repositorio.falhar).toHaveBeenCalledExactlyOnceWith(t, { codigo: 'configuracao' });
+    expect(m.transporte).not.toHaveBeenCalled();
+  });
   it('guarda bytes originais em ordem e só publica depois da última página; identidade TEST não é convertida', async () => {
     const original = `  ${JSON.stringify(pagina(1, 2))}\n`;
     const m = montar([{ ...json(null), corpo: original }, json(pagina(2, 2))]);

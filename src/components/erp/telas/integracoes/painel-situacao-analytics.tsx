@@ -1,7 +1,8 @@
-/** Situação operacional de um dia/loja. Só GET e dados projetados pelo leitor autorizado. */
+/** Situação operacional de um dia/loja. A Central pode incluir a ação da fonte escolhida. */
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type {
-  FonteDaSituacaoAnalytics, MensagemDaSituacaoAnalytics, ResultadoSituacaoAnalytics, SituacaoAnalyticsDaLoja,
+  FonteDaSituacaoAnalytics, MensagemDaSituacaoAnalytics, PedidoReleituraAnalytics, ResultadoSituacaoAnalytics, SituacaoAnalyticsDaLoja,
 } from '@/lib/integracoes/core/situacao-analytics-campos';
 import { ontemDaSituacaoAnalytics } from '@/lib/integracoes/core/situacao-analytics-campos';
 import { Campo, CAMPO } from '@/components/erp/ui/campos';
@@ -17,6 +18,7 @@ export interface PropsPainelSituacaoAnalytics {
   ontem?: string;
   /** Contexto do parceiro no servidor; conserva TEST visível também em erro. */
   teste?: boolean;
+  formularioReleitura?: (pedido: PedidoReleituraAnalytics) => ReactNode;
 }
 
 function Situacao({ mensagem }: { mensagem: MensagemDaSituacaoAnalytics }) {
@@ -31,8 +33,10 @@ const COBERTURA: Record<SituacaoAnalyticsDaLoja['cobertura'], { titulo: string; 
   'vinculo-ambiguo': { titulo: 'A identificação das fontes precisa de conferência.', texto: 'Os vínculos anteriores continuam visíveis; a FlowFoods precisa conferir qual fonte corresponde à loja.', tom: 'alerta' },
 };
 
-function Fonte({ fonte }: { fonte: FonteDaSituacaoAnalytics }) {
+function Fonte({ fonte, releitura }: { fonte: FonteDaSituacaoAnalytics; releitura?: ReactNode }) {
   const tentativa = fonte.tentativa;
+  const detalhe = tentativa?.nivel1;
+  const planejada = tentativa?.estado === 'PLANEJADA';
   return (
     <li className="min-w-0 space-y-4 px-4 py-4 sm:px-5">
       <div className="space-y-1.5">
@@ -57,8 +61,15 @@ function Fonte({ fonte }: { fonte: FonteDaSituacaoAnalytics }) {
               <p className="leading-relaxed">{tentativa.mensagem.explicacao}</p>
               {tentativa.iniciadaEm && <p>Iniciada em <InstanteDaIntegracao valor={tentativa.iniciadaEm} />.</p>}
               {tentativa.concluidaEm && <p>Encerrada em <InstanteDaIntegracao valor={tentativa.concluidaEm} />.</p>}
+              {detalhe && detalhe.geracao > 0 && <div>
+                <p>{planejada ? 'Última geração iniciada' : 'Geração'} {detalhe.geracao}
+                  {planejada && detalhe.inicioDaGeracao && <> em <InstanteDaIntegracao valor={detalhe.inicioDaGeracao} /></>}.</p>
+                {planejada ? <p>Páginas confirmadas da geração {detalhe.geracao}: {detalhe.paginasConfirmadas}.</p>
+                  : <p>{detalhe.paginasConfirmadas === 0 ? 'Nenhuma página confirmada nesta tentativa.' : detalhe.paginasConfirmadas === 1
+                    ? '1 página confirmada nesta tentativa.' : `${detalhe.paginasConfirmadas} páginas confirmadas nesta tentativa.`}</p>}
+              </div>}
               {tentativa.estado === 'AGUARDANDO' && tentativa.naoAntesDe && <p className="text-texto">Nova tentativa não antes de <InstanteDaIntegracao valor={tentativa.naoAntesDe} />. Esse horário é um limite mínimo.</p>}
-              {!tentativa.iniciadaEm && !tentativa.concluidaEm && <p>Ainda sem horário de tentativa registrado.</p>}
+              {planejada ? <p>A próxima tentativa ainda não começou.</p> : !tentativa.iniciadaEm && !tentativa.concluidaEm && <p>Ainda sem horário de tentativa registrado.</p>}
             </> : <p>Nenhuma tentativa registrada para este dia.</p>}
           </dd>
         </div>
@@ -70,11 +81,12 @@ function Fonte({ fonte }: { fonte: FonteDaSituacaoAnalytics }) {
           </dd>
         </div>
       </dl>
+      {releitura}
     </li>
   );
 }
 
-export function PainelSituacaoAnalytics({ resultado, base, baseFaturamento, ontem = ontemDaSituacaoAnalytics(), teste = false }: PropsPainelSituacaoAnalytics) {
+export function PainelSituacaoAnalytics({ resultado, base, baseFaturamento, ontem = ontemDaSituacaoAnalytics(), teste = false, formularioReleitura }: PropsPainelSituacaoAnalytics) {
   const emTeste = teste || (resultado.ok && resultado.ambiente === 'TEST');
   const avisoTeste = emTeste ? <Aviso tom="alerta" titulo="Ambiente TEST — somente homologação.">Estas leituras são de teste e não entram no faturamento.</Aviso> : null;
   if (!resultado.ok) return (
@@ -108,7 +120,15 @@ export function PainelSituacaoAnalytics({ resultado, base, baseFaturamento, onte
       </Painel>
       {s && cobertura && <>
         <Aviso tom={cobertura.tom} titulo={cobertura.titulo}>{cobertura.texto}</Aviso>
-        {s.fontes.length > 0 && <Painel titulo="Fontes deste dia" semRespiro><ul className="min-w-0 divide-y divide-linha">{s.fontes.map(fonte => <Fonte key={fonte.chave} fonte={fonte} />)}</ul></Painel>}
+        {s.fontes.length > 0 && <Painel titulo="Fontes deste dia" semRespiro><ul className="min-w-0 divide-y divide-linha">{s.fontes.map(fonte => {
+          const tentativa = fonte.tentativa;
+          const releitura = !emTeste && !tentativa && formularioReleitura
+            ? <p className="text-[13px] text-suave">A releitura requer uma tentativa anterior para esta fonte e este dia.</p>
+            : !emTeste && tentativa?.nivel1?.podeReagendar && formularioReleitura?.({
+            lojaId: s.loja.id, conexaoId: fonte.chave, dia: s.dia, geracao: tentativa.nivel1.geracao, estado: tentativa.estado,
+          });
+          return <Fonte key={fonte.chave} fonte={fonte} releitura={releitura} />;
+        })}</ul></Painel>}
         <Painel titulo="Aplicação no faturamento">
           <div className="space-y-3 text-[13px] text-suave">
             {emTeste ? <p>Leituras TEST não são aplicadas ao faturamento.</p> : <>

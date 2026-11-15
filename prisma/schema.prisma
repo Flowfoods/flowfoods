@@ -623,6 +623,7 @@ model ParceiroFlow {
   erpIntegracaoFaturamentoDias IntegracaoFaturamentoDia[]
   erpIntegracaoFaturamentoFontes IntegracaoFaturamentoFonte[]
   erpIntegracaoRecibosFinancial IntegracaoReciboFinancial[]
+  erpIntegracaoSomasFinancial IntegracaoSomasFinancial[]
   erpLiberacoesDeModulo       LiberacaoDeModulo[]
 
   // Acesso das pessoas (0.3): FORA do tenant, só por `src/lib/erp/credenciais.ts`
@@ -3318,10 +3319,23 @@ model IntegracaoReciboFinancial {
   paginasEventos    Int
   quantidadeEventos Int
   vigencias         Json
+  somas             IntegracaoSomasFinancial?
 
   @@unique([parceiroId, id], map: "IFRecibo_tenant_key")
   @@unique([parceiroId, conexaoId, competencia, pacoteSha256], map: "IFRecibo_pacote_key")
   @@index([parceiroId, lojaId, ambiente, competencia, recebidoEm(sort: Desc), id(sort: Desc)], map: "IFRecibo_loja_mes_idx")
+}
+
+// Complemento opcional dos recibos antigos, calculado somente ao apresentar as fontes.
+model IntegracaoSomasFinancial {
+  parceiroId     String
+  reciboId       String
+  arquivoCentavos String
+  eventosCentavos String
+  parceiro       ParceiroFlow             @relation(fields: [parceiroId], references: [id], onDelete: Restrict, map: "IFSomas_parceiro_fkey")
+  recibo         IntegracaoReciboFinancial @relation(fields: [parceiroId, reciboId], references: [parceiroId, id], onDelete: Restrict, map: "IFSomas_recibo_fkey")
+
+  @@id([parceiroId, reciboId], map: "IFSomas_pkey")
 }
 
 // Liberação de um módulo do ERP para um parceiro (decisão de Rodolfo de 25/10/2026: "cada módulo liberado individualmente").

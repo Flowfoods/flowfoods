@@ -32,7 +32,10 @@ export function AvisoDoFeito({ texto }: { texto: string | null }) {
   useEffect(() => {
     if (!mostrado) return;
     caixa.current?.focus();
-    rota.current.router.replace(rota.current.caminho, { scroll: false });
+    const consulta = new URLSearchParams(window.location.search);
+    consulta.delete('feito');
+    const destino = consulta.size ? `${rota.current.caminho}?${consulta}` : rota.current.caminho;
+    rota.current.router.replace(destino, { scroll: false });
   }, [mostrado]);
 
   useEffect(() => {

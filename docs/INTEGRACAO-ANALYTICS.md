@@ -182,9 +182,16 @@ homologação. O painel exige os mesmos dois acessos e uma fotografia RR+RO.
 Conferir o estado da execução, geração, HTTP, requestId, `naoAntesDe` e o
 último snapshot pelo contexto do parceiro. Não imprimir o corpo inteiro em
 logs nem consultar outro parceiro. Preservar os recibos para análise do
-contrato. Após corrigir o motivo de uma falha terminal, o próximo ciclo diário
-reagenda as janelas ainda na revisão; retomada manual de histórico antigo
-fica para os controles administrativos da próxima fatia.
+contrato. Na Situação da Central de nível 1, selecione a loja de produção e o
+dia encerrado em São Paulo. Cada fonte mostra a geração, o início e quantas
+páginas dessa geração chegaram ao banco. O total de páginas mede o progresso
+da tentativa. Consulte também a versão publicada e a aplicação no faturamento.
+
+“Solicitar releitura do dia” devolve a janela diária existente à fila após uma
+tentativa terminal ou uma execução expirada cuja posse tenha terminado. O
+pedido registra o responsável e respeita a pausa, o prazo do provedor e a
+autorização da fonte. Consulte novamente para acompanhar a próxima geração.
+O pedido requer uma tentativa anterior para a fonte e o dia selecionados.
 
 Não apagar evidências automaticamente:13 meses é meta de cobertura,
 não autorização de retenção/limpeza. Reverter a versão do aplicativo mantém

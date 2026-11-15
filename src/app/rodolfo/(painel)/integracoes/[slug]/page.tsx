@@ -3,7 +3,7 @@
  * marca de parceiro de testes, lojas do iFood ligadas às Lojas e marcas dele, o estado de cada módulo e o histórico. Tudo do
  * parceiro passa pelo portão dele (`exigirParceiro`); parceiro suspenso ou em rascunho só lê.
  *
- * Esta tela só lê o estado persistido. A coleta automática autorizada pertence ao worker.
+ * A Central solicita releitura por fonte e dia. A coleta autorizada pertence ao worker.
  */
 
 import Link from 'next/link';
@@ -22,7 +22,7 @@ import { ListaHistorico } from '@/components/erp/telas/historico/lista-historico
 import { Voltar } from '@/components/erp/telas/cadastro/partes';
 import { TrilhaDaPagina } from '@/components/erp/shell/trilha';
 import { AvisoDoFeito } from '../aviso-feito';
-import { FormAcoesDoModulo, FormDesligar, FormHomologacao, FormLiberacao, FormLigarLoja, FormPrepararModulo } from '../forms';
+import { FormAcoesDoModulo, FormDesligar, FormHomologacao, FormLiberacao, FormLigarLoja, FormPrepararModulo, FormReleituraAnalytics } from '../forms';
 import { ACOES_NA_TELA, ehCodigoFeito, FEITO, QUANDO, TOM_DO_ESTADO } from '../rotulos';
 import { lerSituacaoAnalyticsDaLoja } from '@/lib/integracoes/core/situacao-analytics';
 import { PainelSituacaoAnalytics } from '@/components/erp/telas/integracoes/painel-situacao-analytics';
@@ -71,7 +71,8 @@ export default async function IntegracoesDoParceiroNoNivel1(
         <Link href={painelHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver painel iFood por período</Link>
         <Link href={`/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}/financial${lojaDaConsulta ? `?loja=${encodeURIComponent(lojaDaConsulta)}` : ''}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Conferir financeiro do iFood</Link>
       </nav>}
-      <PainelSituacaoAnalytics resultado={situacao} teste={parceiro.homologacaoDeIntegracao} base={`/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}`} baseFaturamento={`/rodolfo/erp/${encodeURIComponent(parceiro.slug)}/faturamento`} />
+      <PainelSituacaoAnalytics resultado={situacao} teste={parceiro.homologacaoDeIntegracao} base={`/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}`} baseFaturamento={`/rodolfo/erp/${encodeURIComponent(parceiro.slug)}/faturamento`}
+        formularioReleitura={podeEscrever ? pedido => <FormReleituraAnalytics slug={parceiro.slug} pedido={pedido} /> : undefined} />
       {!podeEscrever && (
         <Aviso tom="alerta" titulo="Só leitura">
           Parceiro {parceiro.status === 'SUSPENSO' ? 'suspenso' : 'em rascunho'}: para ligar lojas, mudar módulos ou a liberação, reative o parceiro em Parceiros Flow.

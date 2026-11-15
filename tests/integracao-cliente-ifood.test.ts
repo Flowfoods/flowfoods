@@ -110,6 +110,23 @@ describe('INT-1.3 · o token do app', () => {
     expect(s.dosTokens()).toHaveLength(1);
   });
 
+  it.each([
+    ['', 'configuracao-chave-ausente'],
+    ['formato-invalido-sintetico', 'configuracao-chave-invalida'],
+  ])('preserva o token cifrado durante %s e o recupera depois da correção', async (chave, codigo) => {
+    const m = montar(), emitido = await m.tokens.token(APP_TEST);
+    const guardado = await m.armazem.ler(APP_TEST.id);
+    const env = { ...ENV, INTEGRACAO_CHAVE_CIFRAGEM: chave };
+    const s = servidor();
+    const tokens = new ServicoDeToken({ armazem: m.armazem, transporte: s.transporte, limitador: new Limitador(m.t.relogio, m.t.dormir), env, relogio: m.t.relogio });
+    await expect(tokens.token(APP_TEST)).rejects.toMatchObject({ codigo });
+    await expect(tokens.invalidar(APP_TEST, emitido)).rejects.toMatchObject({ codigo });
+    expect(await m.armazem.ler(APP_TEST.id)).toEqual(guardado);
+    env.INTEGRACAO_CHAVE_CIFRAGEM = ENV.INTEGRACAO_CHAVE_CIFRAGEM;
+    expect(await tokens.token(APP_TEST)).toBe(emitido);
+    expect(s.pedidos).toHaveLength(0);
+  });
+
   it('credencial recusada (401/400): erro claro, sem repetir; sem o segredo no cofre: diz o nome da variável', async () => {
     for (const status of [401, 400]) {
       const m = montar({ token: () => json(status, { error: { code: 'Unauthorized', message: 'invalid' } }) });

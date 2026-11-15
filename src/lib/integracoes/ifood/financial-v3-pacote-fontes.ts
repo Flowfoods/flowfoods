@@ -62,6 +62,7 @@ export interface ReciboPacoteFontesFinancial {
   pedidosDistintos: number;
   paginasEventos: number;
   quantidadeEventos: number;
+  somas: { arquivoCentavos: string; eventosCentavos: string };
   vigencias: VigenciaFontesFinancial[];
 }
 
@@ -158,6 +159,7 @@ function conferirEventos(valor: unknown, escopo: EscopoFontesFinancial, produto:
   if (!Array.isArray(valor) || !valor.length || valor.length > maximoPaginas) throw new ErroPacoteFontesFinancial('EVENTOS');
   const paginas = [];
   let quantidadeEventos = 0;
+  let somaEventos = 0n;
   try {
     for (const [indice, candidata] of valor.entries()) {
       const { consulta, corpo } = ler(paginaSchema, candidata, 'EVENTOS');
@@ -170,13 +172,13 @@ function conferirEventos(valor: unknown, escopo: EscopoFontesFinancial, produto:
         throw new ErroPacoteFontesFinancial('EVENTOS');
       }
       const motivos = new Set<MotivoEventosMensaisV3>();
-      somarEventosMensaisV3({ consulta, paginasLidas: 1, eventos: [...pagina.eventos] }, escopo, produto, motivos);
+      somaEventos += somarEventosMensaisV3({ consulta, paginasLidas: 1, eventos: [...pagina.eventos] }, escopo, produto, motivos);
       if (motivos.size) throw new ErroPacoteFontesFinancial('EVENTOS');
       quantidadeEventos += pagina.eventos.length;
       paginas.push({ consulta, sha256: sha256(corpo) });
     }
   } catch { throw new ErroPacoteFontesFinancial('EVENTOS'); }
-  return { janela: paginas[0].consulta, paginasEventos: paginas.length, quantidadeEventos, eventosSha256: sha256(JSON.stringify(paginas)) };
+  return { janela: paginas[0].consulta, paginasEventos: paginas.length, quantidadeEventos, somaEventos, eventosSha256: sha256(JSON.stringify(paginas)) };
 }
 
 /** Compara fontes entregues manualmente com o escopo obtido no servidor e devolve somente o recibo da conferência. */
@@ -196,12 +198,13 @@ export async function prepararPacoteFontesFinancial(
   try { bytes = copiarGzipConciliacaoV3(arquivoGzip); } catch { throw new ErroPacoteFontesFinancial('ARQUIVO'); }
   const arquivoSha256 = sha256(bytes);
   if (arquivoSha256 !== arquivo.sha256) throw new ErroPacoteFontesFinancial('ARQUIVO');
-  const { janela, paginasEventos, quantidadeEventos, eventosSha256 } = conferirEventos(manifesto.eventos, escopo, arquivo.produto);
+  const { janela, paginasEventos, quantidadeEventos, somaEventos, eventosSha256 } = conferirEventos(manifesto.eventos, escopo, arquivo.produto);
   const { vigencias, vigenciasSha256 } = conferirVigencias(manifesto.configuracao, escopo, janela.inicio, janela.fim);
   let resumo;
   try { resumo = await conferirConteudoArquivoV3(escopo, bytes, { linhas: arquivo.linhas, pedidos: arquivo.pedidos }, arquivo); }
   catch { throw new ErroPacoteFontesFinancial('ARQUIVO'); }
-  if (resumo.linhas > 0 && resumo.valorComImpactoCentavos === null) throw new ErroPacoteFontesFinancial('ARQUIVO');
+  const somaArquivo = resumo.linhas === 0 ? 0n : resumo.valorComImpactoCentavos;
+  if (somaArquivo === null) throw new ErroPacoteFontesFinancial('ARQUIVO');
   const requestIdSha256 = sha256(arquivo.requestId);
   const pacoteSha256 = sha256(JSON.stringify([
     'FINANCIAL_FONTES_MENSAIS_V1', escopo, requestIdSha256, arquivoSha256, eventosSha256, vigenciasSha256,
@@ -210,5 +213,6 @@ export async function prepararPacoteFontesFinancial(
   return {
     versao: 1, escopo, produto: arquivo.produto, requestIdSha256, arquivoSha256, manifestoSha256: sha256(bytesManifesto), eventosSha256, vigenciasSha256, pacoteSha256,
     linhasArquivo: resumo.linhas, pedidosDistintos: resumo.pedidosDistintos, paginasEventos, quantidadeEventos, vigencias,
+    somas: { arquivoCentavos: somaArquivo.toString(), eventosCentavos: somaEventos.toString() },
   };
 }

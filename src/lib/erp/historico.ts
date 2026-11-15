@@ -120,6 +120,7 @@ const ACAO: Record<string, string> = {
   REGISTROU: 'Registrou',
   // INT-1.1
   DESLIGOU: 'Desligou',
+  PEDIU_RELEITURA: 'Solicitou releitura do',
   PREPAROU: 'Preparou',
   LIBEROU: 'Liberou',
   BLOQUEOU: 'Bloqueou',
@@ -604,6 +605,7 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
       continue;
     }
     if (!criacao && JSON.stringify(antes[c]) === JSON.stringify(depois[c])) continue;
+    if (entidade === 'IntegracaoConexaoModulo' && (c === 'usuarioId' || c === 'execucaoId')) continue;
     // A referência completa continua no registro, mas seu id técnico não orienta a casa.
     if (entidade === 'FaturamentoLancamento' && c === 'origemRef'
       && typeof depois[c] === 'string' && depois[c].startsWith('ifood-analytics:')) {

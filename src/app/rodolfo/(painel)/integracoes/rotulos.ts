@@ -29,6 +29,7 @@ export type AcaoDaTela = (typeof ACOES_DA_TELA)[number];
 
 /** O que a página diz no topo depois de uma ação cujo botão some (`?feito=`). */
 export const FEITO = {
+  releitura: 'Releitura na fila para a fonte e o dia selecionados. Consulte a situação para acompanhar o processamento.',
   solicitar: 'Pedido de acesso registrado. Falta a loja aprovar o app no Portal do Parceiro.',
   'cancelar-pedido': 'Pedido de acesso cancelado.',
   autorizar: 'Módulo marcado como autorizado.',

@@ -13,9 +13,10 @@
  */
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import type { DiagnosticoDoColetor } from './diagnostico-coletor';
 
 export class ErroDeCofre extends Error {
-  constructor(mensagem: string) {
+  constructor(mensagem: string, public readonly codigo?: DiagnosticoDoColetor) {
     super(mensagem);
     this.name = 'ErroDeCofre';
   }
@@ -32,10 +33,10 @@ const nomeValido = (nome: string) => typeof nome === 'string' && nome.length <= 
 
 /** O valor do segredo pelo nome da variável. Sem a variável: erro com o nome (nunca com valor). */
 export function lerSegredo(nome: string, env: Ambiente = process.env): string {
-  if (!nomeValido(nome)) throw new ErroDeCofre('Nome de variável do cofre inválido: só IFOOD_<NOME>_CLIENT_SECRET.');
+  if (!nomeValido(nome)) throw new ErroDeCofre('Nome de variável do cofre inválido: só IFOOD_<NOME>_CLIENT_SECRET.', 'configuracao-referencia-invalida');
   const valor = env[nome];
   if (typeof valor !== 'string' || valor.trim() === '') {
-    throw new ErroDeCofre(`Falta a variável ${nome} no cofre (Dokploy → Environment). Sem ela, a integração não autentica.`);
+    throw new ErroDeCofre(`Falta a variável ${nome} no cofre (Dokploy → Environment). Sem ela, a integração não autentica.`, 'configuracao-credencial-ausente');
   }
   return valor.trim();
 }
@@ -48,9 +49,9 @@ export function temSegredo(nome: string, env: Ambiente = process.env): boolean {
 /** A chave de cifragem: 64 caracteres hexadecimais (o que o serviço `segredos` gera) ou base64 de 32 bytes. */
 export function chaveDeCifragem(env: Ambiente = process.env): Buffer {
   const bruto = (env.INTEGRACAO_CHAVE_CIFRAGEM ?? '').trim();
-  if (!bruto) throw new ErroDeCofre('Falta a variável INTEGRACAO_CHAVE_CIFRAGEM (o serviço "segredos" do compose a gera; no painel, 64 caracteres hexadecimais).');
+  if (!bruto) throw new ErroDeCofre('Falta a variável INTEGRACAO_CHAVE_CIFRAGEM (o serviço "segredos" do compose a gera; no painel, 64 caracteres hexadecimais).', 'configuracao-chave-ausente');
   const chave = /^[0-9a-fA-F]{64}$/.test(bruto) ? Buffer.from(bruto, 'hex') : /^[A-Za-z0-9+/]{43}=?$/.test(bruto) ? Buffer.from(bruto, 'base64') : null;
-  if (!chave || chave.length !== 32) throw new ErroDeCofre('INTEGRACAO_CHAVE_CIFRAGEM precisa ter 32 bytes (64 caracteres hexadecimais).');
+  if (!chave || chave.length !== 32) throw new ErroDeCofre('INTEGRACAO_CHAVE_CIFRAGEM precisa ter 32 bytes (64 caracteres hexadecimais).', 'configuracao-chave-invalida');
   return chave;
 }
 
@@ -59,7 +60,7 @@ const b64 = (b: Buffer) => b.toString('base64url');
 
 /** Cifra o texto (o token) amarrado a `contexto` (ex.: "integracao-token:<appId>"). Cada chamada usa um IV novo. */
 export function cifrar(texto: string, contexto: string, chave: Buffer): string {
-  if (chave.length !== 32) throw new ErroDeCofre('Chave de cifragem inválida.');
+  if (chave.length !== 32) throw new ErroDeCofre('Chave de cifragem inválida.', 'configuracao-chave-invalida');
   const iv = randomBytes(12);
   const c = createCipheriv('aes-256-gcm', chave, iv);
   c.setAAD(Buffer.from(contexto, 'utf8'));
@@ -97,13 +98,13 @@ export function baseDaApiIfood(env: Ambiente = process.env): string {
   try {
     u = new URL(bruto);
   } catch {
-    throw new ErroDeCofre('IFOOD_API_BASE não é um endereço válido.');
+    throw new ErroDeCofre('IFOOD_API_BASE não é um endereço válido.', 'configuracao-base-invalida');
   }
   const host = u.hostname.toLowerCase();
   if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '')) {
-    throw new ErroDeCofre('IFOOD_API_BASE precisa ser só https://merchant-api.ifood.com.br, sem caminho, usuário ou parâmetros.');
+    throw new ErroDeCofre('IFOOD_API_BASE precisa ser só https://merchant-api.ifood.com.br, sem caminho, usuário ou parâmetros.', 'configuracao-base-invalida');
   }
-  if (host !== HOST_DA_API_IFOOD) throw new ErroDeCofre(`IFOOD_API_BASE precisa ser https://${HOST_DA_API_IFOOD} (o endereço oficial da API do iFood).`);
+  if (host !== HOST_DA_API_IFOOD) throw new ErroDeCofre(`IFOOD_API_BASE precisa ser https://${HOST_DA_API_IFOOD} (o endereço oficial da API do iFood).`, 'configuracao-base-invalida');
   return `https://${host}`;
 }
 

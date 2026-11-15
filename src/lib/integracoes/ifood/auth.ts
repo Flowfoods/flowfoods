@@ -21,7 +21,7 @@
  */
 
 import { segredoCombinaComAmbiente } from '../core/campos';
-import { baseDaApiIfood, chaveDeCifragem, cifrar, decifrar, ErroDeCofre, integracaoIfoodAtiva, lerSegredo } from '../core/cofre';
+import { baseDaApiIfood, chaveDeCifragem, cifrar, decifrar, integracaoIfoodAtiva, lerSegredo } from '../core/cofre';
 import type { Limitador } from './limitador';
 import { classificar, esperaDoBackoff, FRASE_DA_CLASSIFICACAO, type Classificacao } from './respostas';
 import { FalhaDeRede, type Transporte } from './transporte';
@@ -159,9 +159,10 @@ export class ServicoDeToken {
     await this.o.armazem.comTrava(app.id, async (a) => {
       const g = await a.ler(app.id);
       if (!g) return;
+      const chave = chaveDeCifragem(this.o.env);
       let guardado: string | null;
       try {
-        guardado = decifrar(g.tokenCifrado, contextoDoToken(app.id), chaveDeCifragem(this.o.env));
+        guardado = decifrar(g.tokenCifrado, contextoDoToken(app.id), chave);
       } catch {
         guardado = null;
       }
@@ -169,32 +170,32 @@ export class ServicoDeToken {
     });
   }
 
-  private lerGuardado(app: AppParaToken, g: TokenGuardado | null): TokenNaMemoria | null {
+  private lerGuardado(app: AppParaToken, g: TokenGuardado | null, chave: Buffer): TokenNaMemoria | null {
     if (!g || !this.valido(g.emitidoEm.getTime(), g.expiraEm.getTime())) return null;
     try {
-      const token = decifrar(g.tokenCifrado, contextoDoToken(app.id), chaveDeCifragem(this.o.env));
+      const token = decifrar(g.tokenCifrado, contextoDoToken(app.id), chave);
       return { token, emitidoEm: g.emitidoEm.getTime(), expiraEm: g.expiraEm.getTime() };
-    } catch (e) {
-      if (e instanceof ErroDeCofre && /INTEGRACAO_CHAVE_CIFRAGEM/.test(e.message)) throw e;
+    } catch {
       // Chave trocada ou texto mexido: o guardado não serve; busca outro.
       return null;
     }
   }
 
   private async obter(app: AppParaToken): Promise<string> {
-    const doArmazem = this.lerGuardado(app, await this.o.armazem.ler(app.id));
+    const chave = chaveDeCifragem(this.o.env);
+    const doArmazem = this.lerGuardado(app, await this.o.armazem.ler(app.id), chave);
     if (doArmazem) {
       this.memoria.set(app.id, doArmazem);
       return doArmazem.token;
     }
     const novo = await this.o.armazem.comTrava(app.id, async (a) => {
       // Outro processo pode ter renovado enquanto esperávamos a trava.
-      const relido = this.lerGuardado(app, await a.ler(app.id));
+      const relido = this.lerGuardado(app, await a.ler(app.id), chave);
       if (relido) return relido;
       const r = await this.pedirAoIfood(app);
       const emitidoEm = this.relogio();
       const expiraEm = emitidoEm + Math.min(r.expiresIn, VALIDADE_MAXIMA_S) * 1000;
-      await a.gravar(app.id, { tokenCifrado: cifrar(r.accessToken, contextoDoToken(app.id), chaveDeCifragem(this.o.env)), emitidoEm: new Date(emitidoEm), expiraEm: new Date(expiraEm) });
+      await a.gravar(app.id, { tokenCifrado: cifrar(r.accessToken, contextoDoToken(app.id), chave), emitidoEm: new Date(emitidoEm), expiraEm: new Date(expiraEm) });
       return { token: r.accessToken, emitidoEm, expiraEm };
     });
     this.memoria.set(app.id, novo);

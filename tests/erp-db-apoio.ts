@@ -17,7 +17,7 @@ export const TABELAS_DE_TENANT = MODELOS_DE_TENANT.map((m) => m[0].toUpperCase()
 
 /** Filhos antes dos pais. */
 const ORDEM_DE_LIMPEZA = [
-  'IntegracaoReciboFinancial',
+  'IntegracaoSomasFinancial', 'IntegracaoReciboFinancial',
   'HistoricoAlteracao', 'IntegracaoFaturamentoFonte', 'IntegracaoFaturamentoDia', 'EtiquetaImpressao', 'Etiqueta', 'AberturaDeLote', 'LoteDeInsumo', 'MovimentoEstoque', 'SaldoEstoque', 'ContagemRetratoItem', 'ContagemItem', 'Contagem',
   'ListaProducaoItem', 'ListaProducao', 'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'DocumentoFiscalItem', 'DocumentoFiscal', 'VinculoItemFornecedor', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
   'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'SubsecaoFicha', 'SecaoFicha', 'InsumoVariante', 'FaturamentoLancamento',
@@ -26,7 +26,7 @@ const ORDEM_DE_LIMPEZA = [
 ];
 
 /** Tabelas com gatilho que recusa o DELETE (a limpeza desliga só na transação dela). */
-const SEM_GATILHO_NA_LIMPEZA = ['IntegracaoReciboFinancial', 'IntegracaoFaturamentoFonte', 'IntegracaoFaturamentoDia', 'FaturamentoLancamento', 'KpiIfoodDia', 'IntegracaoSnapshot', 'IntegracaoPagamentoSnapshot', 'IntegracaoDistribuicaoSnapshot', 'IntegracaoPayload', 'DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem', 'CategoriaInsumo', 'ContagemRetratoItem', 'MetaCmvConjunto', 'MetaCmvCategoria', 'Etiqueta', 'EtiquetaImpressao', 'AberturaDeLote'];
+const SEM_GATILHO_NA_LIMPEZA = ['IntegracaoSomasFinancial', 'IntegracaoReciboFinancial', 'IntegracaoFaturamentoFonte', 'IntegracaoFaturamentoDia', 'FaturamentoLancamento', 'KpiIfoodDia', 'IntegracaoSnapshot', 'IntegracaoPagamentoSnapshot', 'IntegracaoDistribuicaoSnapshot', 'IntegracaoPayload', 'DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem', 'CategoriaInsumo', 'ContagemRetratoItem', 'MetaCmvConjunto', 'MetaCmvCategoria', 'Etiqueta', 'EtiquetaImpressao', 'AberturaDeLote'];
 
 export interface PerfilDoBanco {
   superusuario: boolean;

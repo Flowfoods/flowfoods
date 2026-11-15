@@ -60,6 +60,28 @@ describe('INT-1.8A · situação operacional apresentada sem dinheiro ou ação 
     const falha = html(resultado(situacao({ fontes: [fonte({ tentativa: { ...t, estado: 'FALHA' } })] })));
     expect(falha).not.toContain('Nova tentativa não antes de');
   });
+  it('na Central, mostra geração e páginas confirmadas e envia só a fonte/dia vistos', () => {
+    const f = fonte();
+    const t = { ...f.tentativa!, nivel1: { geracao: 4, paginasConfirmadas: 0, inicioDaGeracao: f.tentativa!.iniciadaEm, podeReagendar: true } };
+    const formularioReleitura = vi.fn(() => createElement('button', {}, 'Solicitar releitura do dia'));
+    const renderizar = (s: SituacaoAnalyticsDaLoja) => renderToStaticMarkup(createElement(PainelSituacaoAnalytics, {
+      ...props, base: '/rodolfo/integracoes/casa', resultado: resultado(s), formularioReleitura,
+    }));
+    const s = situacao({ fontes: [fonte({ tentativa: t })] });
+    const h = renderizar(s);
+    expect(h).toContain('Geração 4');
+    expect(h).toContain('Nenhuma página confirmada nesta tentativa.');
+    expect(h).toContain('Iniciada em'); expect(h).toContain('Solicitar releitura do dia');
+    expect(formularioReleitura).toHaveBeenCalledExactlyOnceWith({ lojaId: s.loja.id, conexaoId: f.chave, dia: s.dia, geracao: 4, estado: t.estado });
+    const planejada = { ...t, iniciadaEm: null, estado: 'PLANEJADA' as const, nivel1: { ...t.nivel1, paginasConfirmadas: 2, podeReagendar: false } };
+    const reagendada = renderizar(situacao({ fontes: [fonte({ tentativa: planejada })] }));
+    expect(reagendada).toContain('Última geração iniciada 4 em');
+    expect(reagendada).toContain('Páginas confirmadas da geração 4: 2.'); expect(reagendada).toContain('A próxima tentativa ainda não começou.');
+    expect(reagendada).not.toContain('Solicitar releitura do dia');
+    expect(renderizar({ ...s, cobertura: 'vinculo-ambiguo' })).toContain('Solicitar releitura do dia');
+    expect(renderizar(situacao({ fontes: [fonte({ tentativa: null })] }))).toContain('A releitura requer uma tentativa anterior');
+    expect(html()).not.toMatch(/Geração|páginas? confirmadas?|Solicitar releitura/);
+  });
   it('não usa o instante da tentativa concluída como data da versão disponível', () => {
     const h = html(resultado(situacao({ fontes: [fonte({ tentativa: { estado: 'SUCESSO', mensagem: mensagemDaTentativaAnalytics('SUCESSO', null), iniciadaEm: null, concluidaEm: '2026-11-07T18:00:00Z', naoAntesDe: null } })] })));
     expect(h).toContain('15:00'); expect(h).toContain('06/11/2026'); expect(h).toContain('09:00');

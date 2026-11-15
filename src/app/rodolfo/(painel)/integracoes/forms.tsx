@@ -21,6 +21,7 @@ import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO, Resultado, type EstadoForm } from '@/components/erp/ui/campos';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { Confirmacao } from '@/components/erp/telas/equipe/escolhas';
+import type { PedidoReleituraAnalytics } from '@/lib/integracoes/core/situacao-analytics-campos';
 import {
   acaoDesligarConexao,
   acaoLigarConexao,
@@ -29,6 +30,7 @@ import {
   acaoMudarModulo,
   acaoPrepararModulo,
   acaoRegistrarApp,
+  acaoSolicitarReleitura,
 } from './actions';
 
 const MODULOS = [
@@ -60,6 +62,18 @@ function Resposta({ estado }: { estado: EstadoForm }) {
     <div data-resposta tabIndex={-1} className="outline-none">
       <Resultado estado={estado} />
     </div>
+  );
+}
+
+export function FormReleituraAnalytics({ slug, pedido }: { slug: string; pedido: PedidoReleituraAnalytics }) {
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoSolicitarReleitura.bind(null, slug, pedido), null);
+  const form = useRef<HTMLFormElement>(null);
+  useFocoDoEnvio(estado, form);
+  return (
+    <FormularioComAcao ref={form} action={enviar} className="space-y-2">
+      <BotaoEnviar variante="secundario" pendente="Solicitando…">Solicitar releitura do dia</BotaoEnviar>
+      <Resposta estado={estado} />
+    </FormularioComAcao>
   );
 }
 
