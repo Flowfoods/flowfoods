@@ -8,12 +8,12 @@
  * - popover ancorado desliza para caber na tela; abrir e fechar não chamam o servidor;
  * - escopo: nada disto chega ao site nem ao Portal (`.ff-site`, `globals.css`).
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import config from '../tailwind.config';
-import { ajusteParaCaber } from '@/components/erp/shell/Popover';
+import { ajusteParaCaber, foraDaCaixa } from '@/components/erp/shell/Popover';
 import { SeloEmBreve } from '@/components/erp/ui/em-breve';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { CAMPO } from '@/components/erp/ui/campos';
@@ -312,13 +312,22 @@ describe('padrão visual · popover ancorado sempre dentro da tela', () => {
     expect(ajusteParaCaber({ esquerda: 12, direita: 332 }, 320)).toBe(0);
   });
 
-  it('abre por botão real, fecha por Escape e por toque fora, e não chama o servidor para abrir ou fechar', () => {
+  it('abre por botão real, fecha por Escape, por toque fora e pelo foco que sai, e não chama o servidor para abrir ou fechar', () => {
     const fonte = readFileSync('src/components/erp/shell/Popover.tsx', 'utf8');
     expect(fonte).toMatch(/aria-expanded=\{aberto\}/);
     expect(fonte).toMatch(/aria-controls=\{id\}/);
     expect(fonte).toMatch(/addEventListener\('pointerdown', fora\)/);
     expect(fonte).toMatch(/e\.key === 'Escape'/);
     expect(fonte).toMatch(/botao\.current\?\.focus\(\)/);
+    // Tab para fora (12/11): o foco que sai da caixa (botão + painel) fecha o painel e fica onde foi; sem destino, quem fecha é
+    // o toque fora. O painel não fica aberto por cima de onde o foco foi parar.
+    expect(fonte).toMatch(/onBlur=\{\(e\) => \{\s*if \(aberto && foraDaCaixa\(e\.currentTarget, e\.relatedTarget\)\) setAberto\(false\);\s*\}\}/);
+    const dentro = { id: 'dentro' } as unknown as Node;
+    const fora = { id: 'fora' } as unknown as Node;
+    const caixa = { contains: (n: Node | null) => n === dentro };
+    expect(foraDaCaixa(caixa, fora)).toBe(true);
+    expect(foraDaCaixa(caixa, dentro)).toBe(false);
+    expect(foraDaCaixa(caixa, null)).toBe(false);
     expect(fonte).not.toMatch(/fetch\(|use server|from '\.\/acoes'|router\./);
     const dialogo = readFileSync('src/components/erp/ui/Dialogo.tsx', 'utf8');
     expect(dialogo).not.toMatch(/fetch\(|use server|from '[^']*acoes'|router\./);
@@ -327,6 +336,127 @@ describe('padrão visual · popover ancorado sempre dentro da tela', () => {
     expect(dialogo).toMatch(/onCancel=/);
     expect(dialogo).toMatch(/aria-label=\{titulo\}/);
     expect(dialogo).toMatch(/\(destino\?\.current \?\? antes\)\?\.focus\(\)/);
+  });
+});
+
+describe('padrão visual · grade de módulos do seletor de áreas', () => {
+  const navLateral = readFileSync('src/components/erp/shell/NavLateral.tsx', 'utf8');
+  const shell = readFileSync('src/components/erp/shell/Shell.tsx', 'utf8');
+
+  it('colunas pela largura do painel, sem cartão nem borda; o bloco cresce com o texto', () => {
+    const grade = regra('.ff-app .ff-grade-modulos');
+    expect(grade).toMatch(/display:\s*grid/);
+    expect(grade).toMatch(/grid-template-columns:\s*repeat\(auto-fill, minmax\(min\(100%, 120px\), 1fr\)\)/);
+    // A conta das colunas sai dos números reais: o vão da grade e a borda (1 px de cada lado) e o respiro (`p-1.5`) do painel.
+    const vao = Number(/gap:\s*(\d+)px/.exec(grade)![1]);
+    expect(vao).toBe(4);
+    expect(readFileSync('src/components/erp/shell/Popover.tsx', 'utf8')).toMatch(/max-w-\[calc\(100vw-24px\)\] border border-linha bg-painel p-1\.5 /);
+    const colunas = (painel: number, barra = 0) => Math.floor((painel - 2 - 12 - barra + vao) / (120 + vao));
+    // Barra do desktop: painel de 620 px, com e sem barra de rolagem clássica (15 px). Gaveta do celular: 287 px a 390 de
+    // tela e 262 px a 320. Só 320 px com barra clássica cai para uma coluna (registrado como limite).
+    expect([colunas(620), colunas(620, 15), colunas(287), colunas(287, 15), colunas(262), colunas(262, 15)]).toEqual([4, 4, 2, 2, 2, 1]);
+    expect(navLateral).toContain('largura="w-[620px] max-[899px]:w-full"');
+    const bloco = regra('.ff-app .ff-bloco-modulo');
+    expect(bloco).toMatch(/border:\s*1px solid transparent/);
+    expect(bloco).toMatch(/border-radius:\s*var\(--ff-raio-nav\)/);
+    expect(bloco).not.toMatch(/overflow|max-height|-webkit-line-clamp|text-overflow/);
+    // A grade rola por dentro: a altura desconta o que fica acima do painel (mais na gaveta), com piso para tela baixa.
+    expect(navLateral).toContain('max-h-[max(200px,min(70vh,calc(100dvh-250px)))] overflow-y-auto');
+    expect(navLateral).toContain('max-[899px]:max-h-[max(200px,min(70vh,calc(100dvh-310px)))]');
+  });
+
+  it('o painel fica por cima do conteúdo: a lateral tem camada própria, abaixo do véu da ajuda e das camadas de tela cheia', () => {
+    // `sticky` cria contexto de empilhamento: sem z-index na lateral, o painel (z-40 dentro dela) ficaria atrás de tudo que a
+    // página posiciona depois dela no DOM (cards do hub, barras fixas z-20, links de tabela no toque).
+    const lateral = /<aside\s+aria-label="Navegação"\s+className="([^"]+)"/.exec(shell)![1];
+    expect(lateral).toMatch(/(^| )sticky /);
+    const camada = Number(/(?:^| )z-(\d+)(?: |$)/.exec(lateral)![1]);
+    expect(camada).toBe(30);
+    // Acima de toda barra fixa ou presa das telas; abaixo do véu da ajuda (35) e do painel do próprio seletor (40).
+    const barras = [...readFileSync('src/components/erp/telas/dre/form-despesa.tsx', 'utf8').matchAll(/data-barra-fixa className="[^"]*z-(\d+)/g)].map((m) => Number(m[1]));
+    expect(barras.length).toBeGreaterThan(0);
+    for (const b of barras) expect(b).toBeLessThan(camada);
+    expect(Number(/data-veu-de-ajuda className="[^"]*z-\[(\d+)\]/.exec(readFileSync('src/components/erp/shell/pontos.tsx', 'utf8'))![1])).toBeGreaterThan(camada);
+    expect(readFileSync('src/components/erp/shell/Popover.tsx', 'utf8')).toMatch(/ z-40 \$\{largura\}/);
+  });
+
+  it('nenhuma tela passa da camada da lateral: tudo o que o conteúdo posiciona fica abaixo de z-30, com as exceções registradas', () => {
+    // A lateral (z-30) só cobre o conteúdo com o painel da grade aberto. Uma camada ≥ 30 numa tela empataria com ela (e, por
+    // vir depois no DOM, ganharia) ou passaria por cima, e o painel voltaria a ficar por baixo de algo. Varre telas, kit e páginas.
+    const pastas = ['src/components/erp/telas', 'src/components/erp/ui', 'src/app/erp', 'src/app/rodolfo'];
+    const arquivos = pastas.flatMap((d) => (readdirSync(d, { recursive: true }) as string[]).filter((f) => f.endsWith('.tsx')).map((f) => `${d}/${f}`));
+    expect(arquivos.length).toBeGreaterThan(50);
+    const camadas = arquivos.flatMap((arquivo) =>
+      readFileSync(arquivo, 'utf8').split('\n').flatMap((linha) =>
+        [...linha.matchAll(/(?:^|[\s"'`:])z-(?:(\d+)|\[(\d+)\])(?=[\s"'`]|$)/g)].map((m) => ({ arquivo, z: Number(m[1] ?? m[2]), telaCheia: /fixed inset-0/.test(linha) })),
+      ),
+    );
+    expect(camadas.length).toBeGreaterThan(10);
+    const acima = camadas.filter((c) => c.z >= 30);
+    // Exceções registradas: camadas de tela cheia (`fixed inset-0`, z ≥ 35), que cobrem a lateral de propósito; e a lista do
+    // seletor de item das fichas (z-30), presa ao campo e fechada antes de a grade abrir (o toque no seletor é fora dela).
+    const permitidas = acima.filter((c) => (c.telaCheia && c.z >= 35) || (c.arquivo.endsWith('telas/fichas/seletor-de-item.tsx') && c.z === 30));
+    expect(acima.filter((c) => !permitidas.includes(c)), 'camada de tela que alcança a lateral').toEqual([]);
+    expect(permitidas.map((c) => `${c.arquivo.split('/').pop()} z-${c.z}`).sort()).toEqual([
+      'painel-categorias.tsx z-40', 'painel-classificacao.tsx z-40', 'seletor-de-item.tsx z-30',
+    ]);
+  });
+
+  it('área atual: bloco preenchido com contorno na tinta da área (forma), além do peso e do aria-current', () => {
+    const atual = regra(".ff-app a.ff-bloco-modulo[aria-current='true']");
+    expect(atual).toMatch(/background-color:\s*var\(--ff-modulo-realce\)/);
+    expect(atual).toMatch(/border-color:\s*var\(--ff-modulo-tinta\)/);
+    expect(regra(".ff-app a.ff-bloco-modulo[aria-current='true'] .ff-bloco-nome")).toMatch(/font-weight:\s*700/);
+    // Ponteiro: o mesmo realce leve do menu, na mesma regra (a especificidade do menu não muda). A atual não clareia: a
+    // regra dela tem a mesma especificidade e vem depois.
+    const ponteiro = '.ff-app :is(.ff-nav-item, a.ff-bloco-modulo):hover';
+    expect(regra(ponteiro)).toMatch(/background-color:\s*var\(--ff-modulo-fundo\)/);
+    expect(css.indexOf(`${ponteiro} {`)).toBeLessThan(css.indexOf(".ff-app a.ff-bloco-modulo[aria-current='true'] {"));
+    expect(css).not.toMatch(/\.ff-app \.ff-nav-item:hover \{/);
+    // Foco por dentro do bloco: a grade rola e cortaria um anel por fora nas bordas.
+    expect(regra('.ff-app a.ff-bloco-modulo:focus-visible')).toMatch(/outline-offset:\s*-3px/);
+  });
+
+  it('setas na grade: vizinho pela ordem de leitura e pela linha; sem vizinho, sem tecla de seta ou com modificador, nada', async () => {
+    const { vizinhoNaGrade } = await import('@/components/erp/shell/NavLateral');
+    // 8 blocos em 4 colunas (barra do desktop).
+    expect(vizinhoNaGrade(0, 8, 4, 'ArrowRight')).toBe(1);
+    expect(vizinhoNaGrade(1, 8, 4, 'ArrowLeft')).toBe(0);
+    expect(vizinhoNaGrade(1, 8, 4, 'ArrowDown')).toBe(5);
+    expect(vizinhoNaGrade(5, 8, 4, 'ArrowUp')).toBe(1);
+    expect(vizinhoNaGrade(3, 8, 4, 'ArrowRight')).toBe(4);
+    // Bordas: não sai da grade (a rolagem nativa segue).
+    expect(vizinhoNaGrade(0, 8, 4, 'ArrowLeft')).toBeNull();
+    expect(vizinhoNaGrade(7, 8, 4, 'ArrowRight')).toBeNull();
+    expect(vizinhoNaGrade(2, 8, 4, 'ArrowUp')).toBeNull();
+    expect(vizinhoNaGrade(6, 8, 4, 'ArrowDown')).toBeNull();
+    // 2 colunas (gaveta), 1 coluna, e a última linha incompleta.
+    expect(vizinhoNaGrade(0, 8, 2, 'ArrowDown')).toBe(2);
+    expect(vizinhoNaGrade(4, 5, 1, 'ArrowUp')).toBe(3);
+    expect(vizinhoNaGrade(1, 5, 4, 'ArrowDown')).toBeNull();
+    expect(vizinhoNaGrade(0, 5, 4, 'ArrowDown')).toBe(4);
+    // Medida de colunas inválida não trava nem anda para o lado errado; bloco fora da lista e outras teclas não fazem nada.
+    expect(vizinhoNaGrade(0, 3, 0, 'ArrowDown')).toBe(1);
+    expect(vizinhoNaGrade(-1, 8, 4, 'ArrowRight')).toBeNull();
+    for (const t of ['Tab', 'Escape', 'Enter', ' ', 'Home', 'a']) expect(vizinhoNaGrade(1, 8, 4, t)).toBeNull();
+    // Alt, Ctrl, Cmd e Shift com seta são do navegador (voltar, avançar, seleção): o tratador sai antes de qualquer conta.
+    expect(navLateral).toMatch(/function andarPelaGrade\([^)]*\) \{\s*if \(e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey \|\| e\.shiftKey\) return;/);
+  });
+
+  it('ícone de cor cheia: o desenho claro fica ≥ 3:1 sobre toda a paleta das áreas; o futuro não usa cor de área', () => {
+    const cheio = regra('.ff-app .ff-icone-modulo.ff-icone-cheio');
+    expect(cheio).toMatch(/background-color:\s*var\(--cor-modulo\)/);
+    expect(cheio).toMatch(/color:\s*rgb\(var\(--ff-sobre-acao\)\)/);
+    // O desenho é o mesmo token nos dois temas e a cor da área não muda com o tema: uma conta vale para os dois.
+    expect(CLARO['sobre-acao']).toBe(ESCURO['sobre-acao']);
+    for (const [area, cor] of Object.entries(COR)) {
+      expect(contraste(canais(CLARO['sobre-acao']), hex(cor)), `desenho sobre ${area} (${cor})`).toBeGreaterThanOrEqual(3);
+    }
+    const futuro = regra('.ff-app .ff-icone-modulo.ff-icone-futuro');
+    expect(futuro).toMatch(/border:\s*1\.5px dashed var\(--ff-linha-forte\)/);
+    expect(futuro).toMatch(/background-color:\s*transparent/);
+    expect(futuro).toMatch(/color:\s*rgb\(var\(--ff-suave\)\)/);
+    expect(futuro).not.toContain('--cor-modulo');
   });
 });
 

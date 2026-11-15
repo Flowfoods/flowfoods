@@ -235,7 +235,7 @@ html:has(.ff-app[data-tema='escuro']) {
 .ff-app .ff-nav-icone {
   color: var(--ff-modulo-tinta);
 }
-.ff-app :is(.ff-nav-item, a.ff-opcao-modulo):hover {
+.ff-app :is(.ff-nav-item, a.ff-bloco-modulo):hover {
   background-color: var(--ff-modulo-fundo);
 }
 
@@ -263,16 +263,59 @@ html:has(.ff-app[data-tema='escuro']) {
   overflow-wrap: anywhere;
   text-wrap: balance;
 }
-.ff-app .ff-opcao-modulo[aria-current='true'] {
+/*
+ * Grade de módulos do seletor de áreas (referência de 12/11/2026): um bloco por área, sem cartão nem borda, com ícone,
+ * nome e função centralizados. As colunas saem da largura do painel (coluna mínima de 120 px): quatro na barra do desktop
+ * (620 px), com ou sem barra de rolagem clássica, e duas na gaveta do celular, inclusive a 320 px. Só a combinação de 320 px
+ * com barra clássica de 15 px cai para uma coluna. O nome não é cortado: quebra em linhas e o bloco cresce.
+ */
+.ff-app .ff-grade-modulos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr));
+  gap: 4px;
+}
+.ff-app .ff-bloco-modulo {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 4px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--ff-raio-nav);
+  text-align: center;
+}
+/* O anel de foco fica por dentro do bloco: a grade rola e cortaria um anel por fora nas bordas (como nas abas da área). */
+.ff-app a.ff-bloco-modulo:focus-visible {
+  outline-offset: -3px;
+}
+/*
+ * Área atual reconhecível por forma (bloco preenchido com contorno na tinta da área, ≥ 3:1), peso e aria-current, além da
+ * cor. Vem depois da regra de ponteiro e com a mesma especificidade: a atual não clareia quando o ponteiro passa.
+ */
+.ff-app a.ff-bloco-modulo[aria-current='true'] {
   background-color: var(--ff-modulo-realce);
-  box-shadow: inset 2px 0 0 var(--ff-modulo-tinta);
-  font-weight: 600;
+  border-color: var(--ff-modulo-tinta);
+}
+.ff-app a.ff-bloco-modulo[aria-current='true'] .ff-bloco-nome {
+  font-weight: 700;
 }
 
 /* Quadrado do ícone: conserva a identidade do módulo no cabeçalho, card e seletor. */
 .ff-app .ff-icone-modulo {
   background-color: color-mix(in srgb, var(--cor-modulo) var(--ff-mistura-icone), transparent);
   color: color-mix(in srgb, var(--cor-modulo) var(--ff-icone-tinta), rgb(var(--ff-texto)));
+}
+/* Cor cheia com o desenho claro (grade e seletor): o desenho fica ≥ 3:1 sobre toda a paleta das áreas, nos dois temas. */
+.ff-app .ff-icone-modulo.ff-icone-cheio {
+  background-color: var(--cor-modulo);
+  color: rgb(var(--ff-sobre-acao));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+}
+/* Catálogo "Em breve": sem cor de área. O contorno é enfeite (não chega a 3:1); quem diz o estado é o rótulo do grupo e o selo. */
+.ff-app .ff-icone-modulo.ff-icone-futuro {
+  border: 1.5px dashed var(--ff-linha-forte);
+  background-color: transparent;
+  color: rgb(var(--ff-suave));
 }
 
 /* Ativo reconhecível por forma (célula preenchida com contorno na tinta da área, ≥ 3:1), peso e aria-current, além da cor. */

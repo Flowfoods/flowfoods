@@ -239,9 +239,14 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           recolhido ? 'min-[900px]:grid-cols-[68px_minmax(0,1fr)]' : 'min-[900px]:grid-cols-[232px_minmax(0,1fr)]'
         }`}
       >
+        {/* z-30: `sticky` cria contexto de empilhamento. Sem camada própria, o painel do seletor (que passa da lateral e cobre
+            o conteúdo) ficaria por baixo do que a página posiciona: cards do hub, barras fixas (z-20), links de tabela no
+            toque. Fica acima de tudo o que as telas posicionam até z-20 (teste em `erp-padrao-visual`); a única exceção, a lista
+            do seletor de item das fichas (z-30), está registrada lá. Abaixo do véu da ajuda (z-35) e das camadas de tela cheia
+            (z-40), que continuam cobrindo a lateral. */}
         <aside
           aria-label="Navegação"
-          className="sticky top-0 hidden h-dvh border-r border-linha bg-lateral min-[900px]:block"
+          className="sticky top-0 z-30 hidden h-dvh border-r border-linha bg-lateral min-[900px]:block"
         >
           <NavLateral
             nav={nav}

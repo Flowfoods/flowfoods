@@ -3,7 +3,9 @@
 /**
  * Painel que abre de um botão (seletor de módulo, visão, notificações, menu
  * do usuário). Botão real com `aria-expanded`/`aria-controls`; Escape fecha e
- * devolve o foco ao botão; clique ou toque fora fecha; trocar de tela fecha.
+ * devolve o foco ao botão; clique ou toque fora fecha; o foco que sai pelo Tab
+ * fecha, sem ser puxado de volta (o painel não fica aberto por cima de onde o
+ * foco foi parar); trocar de tela fecha.
  *
  * Padrão aprovado em 09/11/2026: nasce do acionador (opacidade + 7 px + escala
  * 0,98, 220 ms) e fecha na hora, sem animação de saída. Fica sempre dentro da
@@ -31,6 +33,11 @@ export function ajusteParaCaber(painel: { esquerda: number; direita: number }, t
   if (painel.esquerda < 12) return 12 - painel.esquerda;
   const recuo = Math.min(painel.direita - (telaPx - 12), painel.esquerda - 12);
   return recuo > 0 ? -recuo : 0;
+}
+
+/** O foco foi para um elemento fora da caixa do popover (e não para lugar nenhum). */
+export function foraDaCaixa(caixa: { contains: (n: Node | null) => boolean }, destino: EventTarget | null): boolean {
+  return destino !== null && !caixa.contains(destino as Node);
 }
 
 /** No servidor não há layout para medir: o efeito de antes da pintura só existe no navegador. */
@@ -123,7 +130,15 @@ export function Popover({
   }, [aberto, fixo]);
 
   return (
-    <div ref={caixa} className={`relative ${classeDoWrapper}`}>
+    <div
+      ref={caixa}
+      className={`relative ${classeDoWrapper}`}
+      // Foco que sai da caixa (botão + painel) para outro elemento fecha o painel e fica onde foi. Sem destino (clique em área
+      // que não recebe foco, janela que perde o foco, Safari que não foca botão no clique) quem fecha é o toque fora.
+      onBlur={(e) => {
+        if (aberto && foraDaCaixa(e.currentTarget, e.relatedTarget)) setAberto(false);
+      }}
+    >
       <button
         ref={botao}
         type="button"

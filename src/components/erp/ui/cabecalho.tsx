@@ -14,21 +14,29 @@ import type { ChaveIcone } from '@/lib/erp/modulos';
 import { Icone } from '../shell/icones';
 import { CaixaDaTela } from './caixa-da-tela';
 
+/**
+ * `variante`: `tonal` (padrão) é o quadrado no tom da área, do cabeçalho e dos cards; `cheio` é a cor da área inteira com o
+ * desenho claro, da grade de módulos e do seletor (referência de 12/11/2026); `futuro` é o módulo do catálogo "Em breve",
+ * sem cor de área, só o contorno tracejado.
+ */
 export function IconeDoModulo({
   icone,
   cor,
   tamanho = 40,
+  variante = 'tonal',
 }: {
   icone: ChaveIcone;
   cor: string;
   tamanho?: 32 | 36 | 40 | 44;
+  variante?: 'tonal' | 'cheio' | 'futuro';
 }) {
   const raio = tamanho >= 40 ? 'rounded-[10px]' : 'rounded-[8px]';
+  const forma = variante === 'cheio' ? ' ff-icone-cheio' : variante === 'futuro' ? ' ff-icone-futuro' : '';
   // avoid-ai-design-ignore: K6 — ícone em quadrado arredondado na cor do módulo é a Ref.1/Ref.2 do contrato do shell.
   return (
     <span
       aria-hidden
-      className={`ff-icone-modulo inline-grid shrink-0 place-items-center ${raio}`}
+      className={`ff-icone-modulo${forma} inline-grid shrink-0 place-items-center ${raio}`}
       style={{ '--cor-modulo': cor, width: tamanho, height: tamanho } as CSSProperties}
     >
       <Icone nome={icone} size={Math.round(tamanho * 0.5)} />

@@ -96,8 +96,31 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   rolagem fina: as duas colunas cabem também com a barra clássica.
   Seletor de área no topo; grupos com botão `aria-expanded`; fase no rodapé.
   < 900 px: gaveta com a mesma grade.
-- **Seletor de áreas** lista as áreas em uso (links, a atual marcada) e, num
-  grupo separado e nomeado, o catálogo **"Em breve"**: nome, finalidade e selo,
+- **Seletor de áreas** abre a **grade de módulos** (referência de 12/11/2026):
+  painel flutuante de 620 px sob o seletor, com um bloco por área em uso,
+  sem cartão nem borda: ícone de cor cheia (a cor da área, desenho claro,
+  44 px), nome em 14/600 e função curta em 12 px, centralizados. Quatro
+  colunas na barra do desktop e duas na gaveta do celular (coluna mínima de
+  120 px; só 320 px com barra de rolagem clássica cai para uma). Área atual =
+  bloco preenchido no tom da área, contorno na tinta dela, nome em 700 e
+  `aria-current`; não clareia sob o ponteiro. Setas sem modificador andam
+  pela grade; o anel de foco fica por dentro do bloco (a grade rola). Escape
+  fecha e devolve o foco ao seletor; clique fora fecha; o foco que sai pelo
+  Tab fecha e fica onde foi (vale para todo `Popover`). A altura desconta o
+  que fica acima do painel (mais na gaveta), com piso de 200 px: em tela
+  muito baixa quem rola é a gaveta. **A lateral tem camada própria (`z-30`)**
+  para o painel, que cobre o conteúdo, ficar por cima de tudo que a página
+  posiciona (cards, barras fixas `z-20`, links de tabela no toque), e abaixo
+  do véu da ajuda (`z-35`) e das camadas de tela cheia (`z-40`). **Regra:**
+  nada que uma tela posiciona passa de `z-20`; exceções registradas: camadas
+  de tela cheia (`fixed inset-0`, `z-40`) e a lista do seletor de item das
+  fichas (`z-30`, presa ao campo e fechada por toque fora e pelo foco que
+  sai, então nunca aberta junto com a grade). O ícone do
+  próprio seletor é o mesmo, de cor cheia; cabeçalho de página e cards do hub
+  seguem com o quadrado tonal. Num grupo separado e nomeado, o catálogo
+  **"Em breve"**: bloco sem identidade de área, ícone só com contorno
+  tracejado (enfeite; quem diz o estado é o rótulo e o selo), nome,
+  finalidade e selo,
   como texto. Nunca link, botão, foco, busca ou consulta. Só o público
   autorizado enxerga o catálogo (`veCatalogoEmBreve`): hoje, o nível 1 dentro
   de um parceiro, pela mesma fonte do hub dele; as pessoas do parceiro não
