@@ -95,6 +95,14 @@ describe('janela de módulo · rotas', () => {
     for (const f of ['default.tsx', 'page.tsx', join('[...rota]', 'page.tsx')]) expect(semComentario(ler(join(ESPACO, f))), f).toMatch(ROTA_VAZIA);
   });
 
+  it('o conteúdo do parceiro tem default "não encontrada": o Next exige, porque a rota vazia da janela cobre toda URL', () => {
+    // Estrutura de rotas estrita do Next 16: cada URL coberta por um espaço precisa de página ou default nos outros. As URLs
+    // do parceiro sem página são rotas de arquivo (respondem antes do layout) ou não existem; "não encontrada", como antes.
+    expect(semComentario(ler(join(NIVEL1, 'default.tsx')))).toBe(
+      "import { notFound } from 'next/navigation';\n\nexport default function SemPaginaNoParceiro() {\n  notFound();\n}",
+    );
+  });
+
   it('o quadro confere o parceiro e usa o contexto do topo; o layout do parceiro põe a janela fora da pilha com margem', () => {
     const quadro = ler(join(ESPACO, '(rede)', 'layout.tsx'));
     expect(quadro).toMatch(/await exigirParceiro\(slug\)/);
