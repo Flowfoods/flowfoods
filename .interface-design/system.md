@@ -127,6 +127,17 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   veem módulo futuro até o público delas ser definido. Fora de um parceiro o
   seletor do nível 1 não lista futuros. Na gaveta do celular o painel fica na
   largura dela.
+- **Janela de módulo** (piloto, decisão 526; só nível 1, área Rede e Equipe):
+  a tela abre num diálogo nativo por cima da página, que não sai do lugar
+  (rota interceptada: o link direto e a recarga mostram a tela inteira).
+  Cabeçalho com ícone de cor cheia, nome da área, contexto do topo e os
+  botões Voltar, Minimizar, Expandir e Fechar (44 px); abas da área, as
+  mesmas do menu. Até 1040 px × 88 % da altura; Expandir ocupa a tela; no
+  celular é a tela toda. Alteração não salva pergunta antes de fechar,
+  voltar, trocar de aba ou seguir link, dentro da janela. Minimizar guarda
+  tudo e mostra "Reabrir" no canto. Usa a classe do diálogo do kit (entrada,
+  fundo, movimento reduzido). Pasta `@nome` não cria endereço: os testes que
+  varrem rotas a ignoram.
 - **Barra superior** 64 px, na cor da superfície, borda inferior, sem blur.
 - **Botão** 40 px (44 no celular), padding 16, raio 10, 14 px/600. Um
   primário por tela. Variantes: primario (texto `sobre-acao`), secundario (na

@@ -53,10 +53,13 @@ const GERENTE = resolverAlcance(vinculo({ perfilBase: 'GERENTE' }));
 const OPERADOR = resolverAlcance(vinculo({ perfilBase: 'OPERADOR' }));
 
 // ---------------------------------------------------------------- as rotas do disco
+// Pasta `@nome` é um espaço paralelo do layout (a janela de módulo, decisão 526): não cria endereço. As telas que a janela
+// mostra são as próprias rotas, que já têm entrada; o teste da janela prova que ela só intercepta rotas que existem.
 function paginas(dir: string): string[] {
   let out: string[] = [];
   for (const n of readdirSync(dir)) {
     const p = join(dir, n);
+    if (statSync(p).isDirectory() && n.startsWith('@')) continue;
     if (statSync(p).isDirectory()) out = out.concat(paginas(p));
     else if (/^page\.[jt]sx?$/.test(n)) out.push(p);
   }

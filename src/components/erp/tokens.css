@@ -358,6 +358,36 @@ html:has(.ff-app[data-tema='escuro']) {
   box-shadow: var(--ff-sombra);
   padding: 0;
 }
+/*
+ * Janela de módulo (UX-MOD-2, piloto): a tela de uma área por cima da página. Larga o bastante para tabela e formulário
+ * (até 1040 px) e alta até 88 % da tela; Expandir ocupa a tela inteira, com 8 px de folga. No celular é a tela toda.
+ * O resto (fundo, borda, raio de modal, sombra, entrada de 220 ms, fundo de bloqueio) vem da regra do diálogo do kit,
+ * cuja classe a janela também leva.
+ */
+.ff-app dialog.ff-janela {
+  width: min(1040px, calc(100vw - 48px));
+  max-width: none;
+  height: min(88dvh, 920px);
+  max-height: none;
+  overflow: hidden;
+}
+.ff-app dialog.ff-janela[data-cheia='true'] {
+  width: calc(100vw - 16px);
+  height: calc(100dvh - 16px);
+}
+@media (max-width: 699px) {
+  .ff-app dialog.ff-janela {
+    margin: 0;
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+}
+/* Dentro da janela o título da tela fica menor: a janela já diz a área no cabeçalho dela. */
+.ff-app .ff-janela-corpo h1 {
+  font-size: 22px;
+}
 /* Fundo de bloqueio: só opacidade, 220 ms. O valor repetido cobre o navegador em que o ::backdrop não herda a variável. */
 .ff-app dialog.ff-dialogo::backdrop {
   background: var(--ff-bloqueio, rgb(38 42 35 / 0.32));

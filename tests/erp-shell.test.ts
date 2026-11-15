@@ -659,9 +659,20 @@ describe('ERP 1.1 · rotas dentro e fora do shell', () => {
   });
 
   it('toda página do shell do nível 1 confere a sessão (exigirNivel1 ou exigirParceiro)', () => {
+    const confere = (t: string) => /exigirNivel1\(|exigirParceiro\(/.test(t);
+    const semComentario = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').trim();
     const faltam = arquivos(join(RODOLFO, '(painel)'))
       .filter((f) => f.endsWith('page.tsx'))
-      .filter((f) => !/exigirNivel1\(|exigirParceiro\(/.test(readFileSync(f, 'utf8')));
+      .filter((f) => {
+        const t = readFileSync(f, 'utf8');
+        if (confere(t)) return false;
+        // Janela de módulo (decisão 526): a página interceptada só reexporta a página da rota, que tem de conferir a sessão...
+        const alvo = /^export \{ default \} from '@\/(app\/rodolfo\/[^']+\/page)';$/m.exec(t);
+        if (alvo && f.replace(/\\/g, '/').includes('/@janela/')) return !confere(readFileSync(join('src', `${alvo[1]}.tsx`), 'utf8'));
+        // ...e a rota vazia do espaço da janela não desenha nem consulta nada.
+        const vazia = /^export default function \w+\(\) \{\s*return null;\s*\}$/.test(semComentario(t));
+        return !(vazia && f.replace(/\\/g, '/').includes('/@janela/'));
+      });
     expect(faltam).toEqual([]);
   });
 });
