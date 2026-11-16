@@ -367,10 +367,13 @@ describe('janela de módulo · regras que o roteiro de navegador exercita', () =
     expect(ID_DA_JANELA_NO_CONTEUDO).toBe('ff-janela-no-conteudo');
     const shell = ler(join(SHELL, 'Shell.tsx'));
     // A partir de 1440 px, na barra; abaixo, no alto do conteúdo, no fluxo (presa, cobriria as barras que as telas prendem).
-    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NA_BARRA\} className="flex min-w-0 items-center empty:hidden max-\[1439px\]:hidden" \/>/);
+    // O lugar na barra usa a MESMA consulta de largura da faixa (min-width 1440 px): nunca os dois juntos em largura
+    // fracionária. E não encolhe abaixo do mínimo do botão: quem cede é a trilha.
+    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NA_BARRA\} className="hidden min-w-\[60px\] items-center empty:hidden has-\[\[data-ponto\]\]:min-w-\[76px\] min-\[1440px\]:flex" \/>/);
     expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NO_CONTEUDO\} className="-mx-4 -mt-6 mb-4 empty:hidden sm:-mx-6 lg:-mx-8 min-\[1440px\]:hidden" \/>/);
-    // Na barra, o botão não encolhe abaixo do próprio conteúdo: 52 px só com o ícone, 68 px com o ponto de alteração.
-    expect(componente).toMatch(/\$\{sujaAoMinimizar \? 'min-w-\[68px\]' : 'min-w-\[52px\]'\}/);
+    // Na barra, o botão não encolhe abaixo do próprio conteúdo com o recuo: 60 px só com o ícone, 76 px com o ponto.
+    expect(componente).toMatch(/\$\{sujaAoMinimizar \? 'min-w-\[76px\]' : 'min-w-\[60px\]'\}/);
+    expect(componente).toMatch(/<span aria-hidden data-ponto className="h-2 w-2 shrink-0 rounded-full bg-atencao" \/>/);
     expect(componente).toMatch(/createPortal\(botaoNaBarra\(false\), lugares\.barra\)\}\{createPortal\(botaoNoConteudo, lugares\.conteudo\)/);
   });
 

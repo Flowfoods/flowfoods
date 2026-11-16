@@ -47,15 +47,18 @@ const CENARIOS: [string, () => LocalDaBusca[]][] = [
 ];
 
 describe('busca ⌘K · os sinônimos só acrescentam', () => {
-  it('em toda consulta (palavras e começos de palavra dos nomes e detalhes), os resultados de antes vêm primeiro, na mesma ordem', () => {
+  it('em toda consulta (palavras, começos de palavra e pares de palavras dos nomes e detalhes), os resultados de antes vêm primeiro, na mesma ordem', () => {
     let consultas = 0;
     for (const [nome, locaisDe] of CENARIOS) {
       const locais = locaisDe();
       const palavras = new Set<string>();
       for (const l of locais) {
-        for (const p of normalizarBusca(`${l.rotulo} ${l.detalhe} ${l.termos ?? ''}`).split(/[^a-z0-9]+/)) {
+        const todas = normalizarBusca(`${l.rotulo} ${l.detalhe} ${l.termos ?? ''}`).split(/[^a-z0-9]+/).filter(Boolean);
+        for (const p of todas) {
           for (let n = 2; n <= p.length; n++) palavras.add(p.slice(0, n));
         }
+        // Consultas de duas palavras seguidas ("rede e", "lojas e marcas" vira "lojas e" e "e marcas").
+        for (let i = 0; i + 1 < todas.length; i++) palavras.add(`${todas[i]} ${todas[i + 1]}`);
       }
       for (const q of palavras) {
         const agora = filtrarLocais(locais, q).map(({ rotulo, href, tipo }) => ({ rotulo, href, tipo }));

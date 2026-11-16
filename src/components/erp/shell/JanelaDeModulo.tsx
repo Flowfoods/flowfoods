@@ -398,7 +398,7 @@ export function JanelaDeModulo({
   // Minimizada: o botão de reabrir na barra do topo (a partir de 1440 px) e na faixa do alto do conteúdo (abaixo disso). Só
   // um aparece; o foco vai para o que está à vista. Sem os dois lugares (fora do shell), um botão fixo no canto.
   const rotuloDeReabrir = `Reabrir ${area.nome}${sujaAoMinimizar ? ', com alteração não salva' : ''}`;
-  const pontoDeAlteracao = sujaAoMinimizar && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-atencao" />;
+  const pontoDeAlteracao = sujaAoMinimizar && <span aria-hidden data-ponto className="h-2 w-2 shrink-0 rounded-full bg-atencao" />;
   const botaoNaBarra = (fixo: boolean) => (
     <button
       ref={reabrirNaBarra}
@@ -406,12 +406,12 @@ export function JanelaDeModulo({
       onClick={() => setMinimizada(false)}
       aria-label={rotuloDeReabrir}
       title={`Reabrir ${area.nome}`}
-      className={`ff-janela-minimizada ff-transicao inline-flex h-11 ${sujaAoMinimizar ? 'min-w-[68px]' : 'min-w-[52px]'} max-w-[240px] items-center gap-2 rounded-nav border border-linha-forte bg-painel pl-1.5 pr-3 text-[13px] font-semibold text-texto hover:bg-forte ${fixo ? 'fixed bottom-3 left-3 z-40 shadow-[var(--ff-sombra)]' : ''}`}
+      className={`ff-janela-minimizada ff-transicao inline-flex h-11 ${sujaAoMinimizar ? 'min-w-[76px]' : 'min-w-[60px]'} max-w-[240px] items-center gap-2 rounded-nav border border-linha-forte bg-painel pl-1.5 pr-3 text-[13px] font-semibold text-texto hover:bg-forte ${fixo ? 'fixed bottom-3 left-3 z-40 shadow-[var(--ff-sombra)]' : ''}`}
     >
       <IconeDoModulo icone={area.icone} cor={area.cor} tamanho={32} variante="cheio" />
       {/* Com pouco lugar na barra (dois seletores e nomes longos), o nome encolhe até sumir e fica o ícone. O mínimo é o do
-          próprio conteúdo, medido no navegador: 52 px (ícone e margens), 68 px com o ponto de alteração; abaixo disso o ícone
-          passaria da borda. O nome completo está no rótulo do botão. */}
+          conteúdo inteiro, com o recuo: 60 px (o nome vazio ainda ocupa um espaçamento), 76 px com o ponto de alteração; com
+          44 px, o ponto passava da borda. O nome completo está no rótulo do botão. */}
       <span className="min-w-0 truncate">{area.nome}</span>
       {pontoDeAlteracao}
     </button>

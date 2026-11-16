@@ -321,9 +321,11 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
               </nav>
               {/* Janela de módulo minimizada (UX-MOD-2): a partir de 1440 px, o botão de reabrir mora aqui, na barra, e não cobre
                   botões nem cards da página. Abaixo disso a barra nem sempre tem lugar: com o menu lateral aberto e os dois
-                  seletores no tamanho máximo (nomes longos), o botão encostava no seletor de parceiro até 1400 px. Vazio, não
+                  seletores no tamanho máximo (nomes longos), o botão encostava no seletor de parceiro até 1400 px. O lugar não
+                  encolhe abaixo do mínimo do botão (60 px; 76 px com o ponto de alteração): quem cede é a trilha. A mesma consulta
+                  de largura da faixa (min-width 1440 px), para os dois nunca aparecerem juntos em largura fracionária. Vazio, não
                   ocupa lugar. */}
-              <div id={ID_DA_JANELA_NA_BARRA} className="flex min-w-0 items-center empty:hidden max-[1439px]:hidden" />
+              <div id={ID_DA_JANELA_NA_BARRA} className="hidden min-w-[60px] items-center empty:hidden has-[[data-ponto]]:min-w-[76px] min-[1440px]:flex" />
             </div>
 
             {/* Desde que a trilha aparece (640 px), os botões não encolhem: quem cede é a trilha (já corta com "…"). Sem isso,
