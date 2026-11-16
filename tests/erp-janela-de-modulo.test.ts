@@ -362,13 +362,13 @@ describe('janela de módulo · regras que o roteiro de navegador exercita', () =
     expect(componente).toMatch(/<Link\s+href=\{a\.href\}\s+replace\s+scroll=\{false\}/);
   });
 
-  it('o botão de reabrir mora na barra do topo e, abaixo de 768 px, no alto do conteúdo; o shell tem os dois lugares', () => {
+  it('o botão de reabrir mora na barra do topo e, abaixo de 1280 px, no alto do conteúdo; o shell tem os dois lugares', () => {
     expect(ID_DA_JANELA_NA_BARRA).toBe('ff-janela-na-barra');
     expect(ID_DA_JANELA_NO_CONTEUDO).toBe('ff-janela-no-conteudo');
     const shell = ler(join(SHELL, 'Shell.tsx'));
-    // A partir de 768 px, na barra; abaixo, no alto do conteúdo, no fluxo (presa, cobriria as barras que as telas prendem).
-    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NA_BARRA\} className="flex shrink-0 items-center empty:hidden max-md:hidden" \/>/);
-    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NO_CONTEUDO\} className="-mx-4 -mt-6 mb-4 empty:hidden sm:-mx-6 md:hidden" \/>/);
+    // A partir de 1280 px, na barra; abaixo, no alto do conteúdo, no fluxo (presa, cobriria as barras que as telas prendem).
+    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NA_BARRA\} className="flex min-w-0 items-center empty:hidden max-xl:hidden" \/>/);
+    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NO_CONTEUDO\} className="-mx-4 -mt-6 mb-4 empty:hidden sm:-mx-6 lg:-mx-8 xl:hidden" \/>/);
     expect(componente).toMatch(/createPortal\(botaoNaBarra\(false\), lugares\.barra\)\}\{createPortal\(botaoNoConteudo, lugares\.conteudo\)/);
   });
 

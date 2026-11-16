@@ -103,7 +103,7 @@ export function fundoDaJanelaNoShell(caminho: string, segmentosDoPainel: readonl
 }
 
 /**
- * Onde o botão de reabrir a janela minimizada aparece, sem cobrir a página: na barra do topo do shell (a partir de 768 px)
+ * Onde o botão de reabrir a janela minimizada aparece, sem cobrir a página: na barra do topo do shell (a partir de 1280 px)
  * ou, abaixo disso, numa faixa no alto do conteúdo, no fluxo da página.
  */
 export const ID_DA_JANELA_NA_BARRA = 'ff-janela-na-barra';

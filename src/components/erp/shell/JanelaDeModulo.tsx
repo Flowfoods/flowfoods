@@ -252,6 +252,15 @@ export function JanelaDeModulo({
       const destino = destinoDoClique(e);
       if (!destino) return;
       const alvo = destino.pathname + destino.search + destino.hash;
+      const daJanela = ehDaJanela(destino.pathname, base);
+      // A tela que a janela já mostra: só reabre (nada sai, nada se descarta), com ou sem alteração.
+      const mesmaTela = daJanela && destino.pathname + destino.search === window.location.pathname + window.location.search;
+      if (mesmaTela) {
+        e.preventDefault();
+        e.stopPropagation();
+        setMinimizada(false);
+        return;
+      }
       if (temRascunho()) {
         e.preventDefault();
         e.stopPropagation();
@@ -259,11 +268,11 @@ export function JanelaDeModulo({
         perguntar({ tipo: 'ir', href: alvo });
         return;
       }
-      if (!ehDaJanela(destino.pathname, base)) return;
+      if (!daJanela) return;
       e.preventDefault();
       e.stopPropagation();
       setMinimizada(false);
-      if (destino.pathname + destino.search !== window.location.pathname + window.location.search) ir(alvo);
+      ir(alvo);
     };
     document.addEventListener('click', interceptar, true);
     return () => document.removeEventListener('click', interceptar, true);
@@ -386,8 +395,8 @@ export function JanelaDeModulo({
   const abaAtual = area.abas.find((a) => a.href === caminho);
   const descricao = pedido ? DESCRICAO_DO_PEDIDO[pedido.tipo] : null;
 
-  // Minimizada: o botão de reabrir na barra do topo (a partir de 640 px) e na faixa abaixo dela (celular). Só um aparece; o
-  // foco vai para o que está à vista. Sem os dois lugares (fora do shell), um botão fixo no canto.
+  // Minimizada: o botão de reabrir na barra do topo (a partir de 1280 px) e na faixa do alto do conteúdo (abaixo disso). Só
+  // um aparece; o foco vai para o que está à vista. Sem os dois lugares (fora do shell), um botão fixo no canto.
   const rotuloDeReabrir = `Reabrir ${area.nome}${sujaAoMinimizar ? ', com alteração não salva' : ''}`;
   const pontoDeAlteracao = sujaAoMinimizar && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-atencao" />;
   const botaoNaBarra = (fixo: boolean) => (
@@ -397,10 +406,12 @@ export function JanelaDeModulo({
       onClick={() => setMinimizada(false)}
       aria-label={rotuloDeReabrir}
       title={`Reabrir ${area.nome}`}
-      className={`ff-janela-minimizada ff-transicao inline-flex h-11 max-w-[240px] shrink-0 items-center gap-2 rounded-nav border border-linha-forte bg-painel pl-1.5 pr-3 text-[13px] font-semibold text-texto hover:bg-forte ${fixo ? 'fixed bottom-3 left-3 z-40 shadow-[var(--ff-sombra)]' : ''}`}
+      className={`ff-janela-minimizada ff-transicao inline-flex h-11 min-w-11 max-w-[240px] items-center gap-2 rounded-nav border border-linha-forte bg-painel pl-1.5 pr-3 text-[13px] font-semibold text-texto hover:bg-forte ${fixo ? 'fixed bottom-3 left-3 z-40 shadow-[var(--ff-sombra)]' : ''}`}
     >
       <IconeDoModulo icone={area.icone} cor={area.cor} tamanho={32} variante="cheio" />
-      <span className="truncate">{area.nome}</span>
+      {/* Com pouco lugar na barra (dois seletores e nomes longos), o nome encolhe até sumir: fica o ícone, com 44 px de alvo (o
+          nome completo está no rótulo do botão). */}
+      <span className="min-w-0 truncate">{area.nome}</span>
       {pontoDeAlteracao}
     </button>
   );
