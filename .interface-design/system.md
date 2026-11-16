@@ -143,7 +143,8 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   situação do parceiro aparece. Alteração não salva (por formulário, na
   hora) pergunta antes de fechar, voltar, trocar de aba, seguir link ou
   abrir a busca, dentro da janela. Minimizar guarda tudo; "Reabrir" fica na
-  barra do topo a partir de 1280 px (44 px no mínimo) e, abaixo disso, numa
+  barra do topo a partir de 1440 px (o nome encolhe e fica o ícone, com o
+  mínimo do próprio conteúdo: 52 px, ou 68 px com o ponto) e, abaixo disso, numa
   faixa no alto do conteúdo, no fluxo (presa, cobriria as barras que as
   telas prendem). A rolagem do fundo trava por CSS (`html:has(...)`), nunca pelo
   estilo do body, que o `Dialogo` guarda e devolve. Usa a classe do diálogo

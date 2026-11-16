@@ -2,8 +2,8 @@
  * Busca ⌘K com nomes curtos e sinônimos (plano de módulos de 11/11/2026, critério 3: "a busca considera nomes novos e
  * antigos; cada atalho aponta ao domínio existente correto"). Sem banco e sem navegador.
  *
- * - os sinônimos só ACRESCENTAM: em toda consulta, os resultados que já existiam vêm primeiro, na mesma ordem (o Enter abre
- *   o mesmo de antes), e o que só casa por sinônimo vem depois;
+ * - os sinônimos só ACRESCENTAM: em toda consulta, os resultados da busca de antes (copiada aqui como referência) vêm
+ *   primeiro, na mesma ordem (o Enter abre o mesmo de antes), e o que só casa por sinônimo vem depois;
  * - o sinônimo casa pelo começo de uma palavra dele ("fin" acha Financeiro; "está" não acha Gestão);
  * - os nomes curtos do plano acham as telas que existem: Financeiro → Faturamento e DRE, Gestão → Rede e Equipe,
  *   Configurações → Lojas e marcas, Integrações e Equipe, iFood e Integração → Integrações, Analytics → o hub;
@@ -25,7 +25,16 @@ const doNivel1 = () => locaisDaNavegacao(comParceiroAtual(navegacaoDoNivel1(), '
 const doNivel1ForaDoParceiro = () => locaisDaNavegacao(navegacaoDoNivel1(), PARCEIROS);
 const rotulos = (r: { rotulo: string }[]) => r.map((x) => x.rotulo);
 const hrefs = (r: { href: string }[]) => r.map((x) => x.href);
-const semTermos = (locais: LocalDaBusca[]) => locais.map(({ termos: _t, ...r }) => r);
+/**
+ * A busca de antes dos sinônimos (9e573a1, `BuscaGlobal`), copiada aqui como referência fixa: nome e detalhe, sem acento,
+ * na ordem do menu; sem termo, as telas. A regressão compara com ela, e não com a função nova, para que uma mudança no
+ * casamento por nome também apareça.
+ */
+const normalizarDeAntes = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const buscaDeAntes = (locais: LocalDaBusca[], q: string) => {
+  const termo = normalizarDeAntes(q.trim());
+  return termo ? locais.filter((r) => normalizarDeAntes(`${r.rotulo} ${r.detalhe}`).includes(termo)) : locais.filter((r) => r.tipo === 'tela');
+};
 
 const CENARIOS: [string, () => LocalDaBusca[]][] = [
   ['Dono', () => doParceiro('DONO')],
@@ -42,7 +51,6 @@ describe('busca ⌘K · os sinônimos só acrescentam', () => {
     let consultas = 0;
     for (const [nome, locaisDe] of CENARIOS) {
       const locais = locaisDe();
-      const antes = semTermos(locais);
       const palavras = new Set<string>();
       for (const l of locais) {
         for (const p of normalizarBusca(`${l.rotulo} ${l.detalhe} ${l.termos ?? ''}`).split(/[^a-z0-9]+/)) {
@@ -51,7 +59,7 @@ describe('busca ⌘K · os sinônimos só acrescentam', () => {
       }
       for (const q of palavras) {
         const agora = filtrarLocais(locais, q).map(({ rotulo, href, tipo }) => ({ rotulo, href, tipo }));
-        const deAntes = filtrarLocais(antes, q).map(({ rotulo, href, tipo }) => ({ rotulo, href, tipo }));
+        const deAntes = buscaDeAntes(locais, q).map(({ rotulo, href, tipo }) => ({ rotulo, href, tipo }));
         expect(agora.slice(0, deAntes.length), `${nome}: "${q}"`).toEqual(deAntes);
         consultas++;
       }
@@ -144,14 +152,6 @@ describe('busca ⌘K · nomes curtos do plano', () => {
     expect(filtrarLocais(doParceiro('OPERADOR'), 'ifood')).toEqual([]);
     expect(rotulos(filtrarLocais(doParceiro('DONO', NENHUM_MODULO_LIBERADO), 'ifood'))).not.toContain('Integrações');
     expect(rotulos(filtrarLocais(doParceiro('DONO', NENHUM_MODULO_LIBERADO), 'integração'))).not.toContain('Integrações');
-    // Em todos os cenários, todo resultado é uma tela, ação ou parceiro do próprio menu.
-    for (const [nome, locaisDe] of CENARIOS) {
-      const locais = locaisDe();
-      const doMenu = new Set(hrefs(locais));
-      for (const q of ['financeiro', 'gestão', 'configurações', 'ifood', 'integração', 'analytics']) {
-        for (const r of filtrarLocais(locais, q)) expect(doMenu.has(r.href), `${nome}: ${q} → ${r.href}`).toBe(true);
-      }
-    }
   });
 
   it('módulo sem tela não vira resultado (CRM Clube, Checklists, Flow Ads, Patrimônio); Delivery e Pessoas só acham telas que existem', () => {

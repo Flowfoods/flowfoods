@@ -319,10 +319,11 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
                   ))}
                 </ol>
               </nav>
-              {/* Janela de módulo minimizada (UX-MOD-2): a partir de 1280 px, o botão de reabrir mora aqui, na barra, e não cobre
-                  botões nem cards da página. Abaixo disso a barra não tem lugar (a 1024 px, com o menu lateral aberto e os dois
-                  seletores, sobram ~20 px). Vazio, não ocupa lugar. */}
-              <div id={ID_DA_JANELA_NA_BARRA} className="flex min-w-0 items-center empty:hidden max-xl:hidden" />
+              {/* Janela de módulo minimizada (UX-MOD-2): a partir de 1440 px, o botão de reabrir mora aqui, na barra, e não cobre
+                  botões nem cards da página. Abaixo disso a barra nem sempre tem lugar: com o menu lateral aberto e os dois
+                  seletores no tamanho máximo (nomes longos), o botão encostava no seletor de parceiro até 1400 px. Vazio, não
+                  ocupa lugar. */}
+              <div id={ID_DA_JANELA_NA_BARRA} className="flex min-w-0 items-center empty:hidden max-[1439px]:hidden" />
             </div>
 
             {/* Desde que a trilha aparece (640 px), os botões não encolhem: quem cede é a trilha (já corta com "…"). Sem isso,
@@ -354,10 +355,10 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           </header>
 
           <main id="conteudo" className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-            {/* Janela minimizada abaixo de 1280 px (a barra do topo não tem lugar): uma faixa no alto do conteúdo, no fluxo da
+            {/* Janela minimizada abaixo de 1440 px (a barra do topo nem sempre tem lugar): uma faixa no alto do conteúdo, no fluxo da
                 página. Não fica presa: presa, cobriria as barras que as telas prendem abaixo da barra do topo (a busca da
                 contagem, por exemplo). Vazia, não ocupa lugar. */}
-            <div id={ID_DA_JANELA_NO_CONTEUDO} className="-mx-4 -mt-6 mb-4 empty:hidden sm:-mx-6 lg:-mx-8 xl:hidden" />
+            <div id={ID_DA_JANELA_NO_CONTEUDO} className="-mx-4 -mt-6 mb-4 empty:hidden sm:-mx-6 lg:-mx-8 min-[1440px]:hidden" />
             <Suspense fallback={null}>
               <VoltarDaNavegacao nav={nav} chaveDoContexto={props.chaveDoContexto} visao={props.visao.modo === 'parceiro' ? props.visao.valor : undefined} />
             </Suspense>
