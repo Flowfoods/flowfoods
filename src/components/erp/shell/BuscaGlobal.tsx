@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { CornerDownLeft, Search } from 'lucide-react';
 import { Dialogo } from '../ui/Dialogo';
+import { filtrarLocais } from '@/lib/erp/busca-local';
 import type { ResultadoDaBusca } from './tipos';
 import { BOTAO_ICONE } from './Popover';
 
@@ -23,10 +24,6 @@ const ROTULO_DO_TIPO: Record<ResultadoDaBusca['tipo'], string> = {
   insumo: 'Insumo',
   ficha: 'Ficha',
 };
-
-function normalizar(s: string) {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
 
 export function BuscaGlobal({
   locais,
@@ -101,10 +98,8 @@ export function BuscaGlobal({
   }, [q]);
 
   const resultados = useMemo(() => {
-    const termo = normalizar(q.trim());
-    const daqui = termo
-      ? locais.filter((r) => normalizar(`${r.rotulo} ${r.detalhe}`).includes(termo))
-      : locais.filter((r) => r.tipo === 'tela');
+    // Nome, detalhe ou nome curto/sinônimo do plano ("Financeiro", "Gestão", "iFood"); sem termo, as telas.
+    const daqui = filtrarLocais(locais, q);
     return [...daqui.slice(0, 12), ...doServidor];
   }, [q, locais, doServidor]);
 

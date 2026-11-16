@@ -150,6 +150,14 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   do kit (entrada, fundo, movimento reduzido). Os testes que varrem rotas
   ignoram só o espaço `@janela` (as páginas dele reexportam rotas que já
   entram na conta ou são rotas vazias).
+- **Busca ⌘K** (decisão 527): acha telas, ações e parceiros do menu de
+  quem busca, sem acento e sem diferença de maiúsculas. Primeiro o que casa
+  pelo nome ou pelo detalhe (área · função), na ordem do menu; depois o que
+  só casa pelos `termos` da área ou da aba, pelo começo de uma palavra:
+  Financeiro e Financeiro e Resultados, Gestão, Configurações e Configuração,
+  iFood e Integração, Analytics. Os termos não aparecem, não mudam o
+  primeiro resultado de antes e nunca criam destino: módulo sem tela não
+  vira resultado.
 - **Barra superior** 64 px, na cor da superfície, borda inferior, sem blur.
 - **Botão** 40 px (44 no celular), padding 16, raio 10, 14 px/600. Um
   primário por tela. Variantes: primario (texto `sobre-acao`), secundario (na

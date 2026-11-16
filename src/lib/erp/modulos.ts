@@ -100,6 +100,12 @@ export interface ItemNav {
    * de "Parceiros Flow") e o que o ⌘K mostra antes do subtítulo.
    */
   area?: string;
+  /**
+   * Nomes curtos e sinônimos, só para a busca ⌘K (plano de módulos de 11/11/2026: o nome curto do launcher e o nome
+   * canônico do módulo, como "Financeiro" para Faturamento e DRE e "iFood" para Integrações). Não aparecem na tela nem
+   * mudam rota, menu ou permissão; a área passa os dela para as suas abas e ações.
+   */
+  termos?: string[];
 }
 
 export interface GrupoNav {
@@ -135,8 +141,8 @@ export interface ModuloNav {
 }
 
 export interface Navegacao {
-  /** Hub: a tela de entrada da área. */
-  inicio: { href: string; titulo: string; subtitulo: string };
+  /** Hub: a tela de entrada da área (`termos`: só para a busca, como em `ItemNav`). */
+  inicio: { href: string; titulo: string; subtitulo: string; termos?: string[] };
   /** "ERP" no /erp; "Barney" no /rodolfo. */
   rotuloDaArea: string;
   modulos: ModuloNav[];
@@ -185,6 +191,8 @@ interface DefinicaoDeArea {
   nome: string;
   subtitulo: string;
   resumo: string;
+  /** Nomes curtos e sinônimos da área, só para a busca (ver `ItemNav.termos`); valem para todas as abas e ações dela. */
+  termos?: string[];
   icone: ChaveIcone;
   cor: string;
   grupos: { rotulo: string; icone: ChaveIcone; telas: Tela[] }[];
@@ -220,6 +228,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       rotulo: 'Equipe',
       icone: 'equipe',
       subtitulo: 'Pessoas, perfis e lojas de cada uma',
+      // Permissões da rede: parte de "Configurações" no plano de módulos (só para a busca).
+      termos: ['Configurações', 'Configuração'],
       permissao: 'acessos.gerir',
     },
     {
@@ -609,6 +619,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       nome: 'Faturamento e DRE',
       subtitulo: 'Venda, despesas e resultado da rede e de cada loja, do dia a dia ao período',
       resumo: 'Venda e resultado',
+      // O nome curto do plano (Financeiro) e o do módulo canônico (Financeiro e Resultados).
+      termos: ['Financeiro', 'Financeiro e Resultados'],
       icone: 'dre',
       cor: COR.dre,
       grupos: [
@@ -703,6 +715,9 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       nome: 'Rede e Equipe',
       subtitulo: 'Lojas, marcas, pessoas, perfis, histórico e acessos',
       resumo: 'Lojas e pessoas',
+      // Gestão (lojas e decisões), nome curto do plano para a área. "Configurações" (integrações, permissões e configuração da
+      // rede) fica só nas abas de Lojas e marcas, Integrações e Equipe.
+      termos: ['Gestão'],
       icone: 'rede',
       cor: COR.rede,
       grupos: [
@@ -715,6 +730,7 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               rotulo: 'Lojas e marcas',
               icone: 'lojas',
               subtitulo: 'Onde a operação acontece',
+              termos: ['Configurações', 'Configuração'],
               permissao: 'lojas.ver',
             },
             {
@@ -722,6 +738,7 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               rotulo: 'Integrações',
               icone: 'canais',
               subtitulo: 'Lojas do iFood ligadas e o que está ativo',
+              termos: ['iFood', 'Integração', 'Configurações', 'Configuração'],
               permissao: 'integracao.ver',
               modulo: 'integracao',
             },
@@ -770,6 +787,12 @@ function liberada(alcance: Alcance, t: Tela) {
   return t.permissao === null || (typeof t.permissao === 'string' ? pode(alcance, t.permissao) : t.permissao.some((p) => pode(alcance, p)));
 }
 
+/** Os termos de busca de uma aba (ou ação): os da área e os dela, sem repetir; sem nenhum, nada. */
+function termosDaAba(area: DefinicaoDeArea, item: ItemNav): { termos?: string[] } {
+  const termos = [...new Set([...(area.termos ?? []), ...(item.termos ?? [])])];
+  return termos.length ? { termos } : {};
+}
+
 /**
  * Áreas do ERP do parceiro para este alcance: as construídas com só as abas e
  * as ações que a pessoa pode (área sem nenhuma aba permitida some, e com ela
@@ -786,7 +809,7 @@ export function modulosDoParceiro(alcance: Alcance, base: string, liberados: Rea
         icone: g.icone,
         itens: g.telas
           .filter((t) => liberada(alcance, t) && (!t.modulo || liberados.has(t.modulo)))
-          .map(({ permissao: _p, tambem: _t, entradaPara: _e, modulo: _m, ...item }) => ({ ...item, area: m.nome })),
+          .map(({ permissao: _p, tambem: _t, entradaPara: _e, modulo: _m, ...item }) => ({ ...item, area: m.nome, ...termosDaAba(m, item) })),
       }))
       .filter((g) => g.itens.length > 0);
     if (grupos.length === 0) continue;
@@ -801,7 +824,7 @@ export function modulosDoParceiro(alcance: Alcance, base: string, liberados: Rea
       cor: m.cor,
       href: entrada?.href ?? grupos[0].itens[0].href,
       grupos,
-      acoes: m.acoes.filter((t) => liberada(alcance, t) && (!t.modulo || liberados.has(t.modulo))).map(({ permissao: _p, tambem: _t, entradaPara: _e, modulo: _m, ...item }) => ({ ...item, area: m.nome })),
+      acoes: m.acoes.filter((t) => liberada(alcance, t) && (!t.modulo || liberados.has(t.modulo))).map(({ permissao: _p, tambem: _t, entradaPara: _e, modulo: _m, ...item }) => ({ ...item, area: m.nome, ...termosDaAba(m, item) })),
     });
   }
   return veCatalogoEmBreve(alcance) ? [...construidos, ...modulosEmBreve()] : construidos;
@@ -835,7 +858,8 @@ export function modulosEmBreve(): ModuloNav[] {
 /** Navegação do /erp (pessoa do parceiro). "Seu acesso" fica no menu do usuário e no hub. */
 export function navegacaoDoParceiro(alcance: Alcance, liberados: ReadonlySet<ModuloComLiberacao>): Navegacao {
   return {
-    inicio: { href: '/erp', titulo: 'Áreas da Rede', subtitulo: 'Tudo o que você usa no ERP' },
+    // A Home analítica mora no hub: "Analytics" é o nome curto do plano para ela.
+    inicio: { href: '/erp', titulo: 'Áreas da Rede', subtitulo: 'Tudo o que você usa no ERP', termos: ['Analytics'] },
     rotuloDaArea: 'ERP',
     modulos: modulosDoParceiro(alcance, '/erp', liberados),
   };

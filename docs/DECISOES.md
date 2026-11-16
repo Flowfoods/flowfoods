@@ -4151,3 +4151,65 @@ Ficha: no 1º commit desta decisão (antes da revisão) o botão saía da tela a
 **Revisão independente:** primeira rodada (8993ff7 e 844e503): reprovado. Bloqueante: a página parava de rolar depois de gaveta → janela → fechar (corrigido no item 6). Importantes: a âncora "Nova pessoa" quebrava Fechar e Voltar (item 3); a tela inteira de Equipe ou Histórico abria a janela por cima de si mesma, com ids repetidos (item 1); um envio tirava a proteção de toda a janela (item 4); Escape duplo podia fechar o diálogo sem estado (item 5). Menores tratados: contagem de passos (pilha), limite do fechamento, `retry` e erro antes do quadro, shell seguindo o endereço da janela, aviso do parceiro fora da janela, busca contornando a pergunta, foco ao fechar, nome do diálogo e Expandir, título antes do h1, CSS do Expandir no celular, abas que não rolavam, botão de reabrir cobrindo botões, `returnValue`, interceptação entre parceiros, testes por texto e pastas `@` largas, e o registro. Segunda rodada (2a1bffc): aprovado, sem bloqueante nem importante; confirmou as 20 correções. Menores tratados em f510beb: a barra do topo entre 640 e ~730 px; a faixa do celular presa cobrindo a busca da contagem (agora no fluxo); a reserva de Fechar sem os filtros da página de trás; o foco ao dispensar a pergunta; o respiro da janela de erro; o menu na mesma tela com a janela minimizada; o teste do corpo da janela. Registrados nos Limites: a memória do Voltar na carga inteira e as entradas criadas pela busca dentro da janela. Terceira rodada (f510beb): aprovado. Menores tratados no commit seguinte: a barra ainda estourava a 1024 px com o menu lateral aberto e dois seletores (o botão de reabrir só vai para a barra a partir de 1280 px, com 44 px no mínimo, medido em 18 combinações de largura e menu); com a janela minimizada e alteração pendente, o link para a mesma tela perguntava sem motivo (agora só reabre); este registro (o resultado do CI não é afirmado antes de existir). O bloco que o `next dev` acrescenta ao `AGENTS.md` fica fora do commit.
 
 **Limites e reversão:** não testado em Safari/iOS, aparelho físico nem leitor de tela real; a validação no iPhone fica com o proprietário, no nível 1, em produção. O voltar do navegador fecha a janela e, com alteração pendente, descarta sem perguntar (o App Router não oferece como impedir). Minimizada com alteração pendente, a busca aberta pelo botão (não pelo atalho) e a troca de visão navegam sem perguntar. Campo de texto controlado pelo React não entra na conferência (o React iguala o valor desenhado ao atual); as três telas usam campos livres e marcações, que entram. A janela não se arrasta. Na janela não aparecem a caixa "Como funciona" nem a ajuda da tela (são da página de trás). Navegação suave para endereço inexistente do parceiro: a tela atual fica e o endereço muda, sem "não encontrada" até recarregar (efeito da estrutura estrita do Next 16 com o `default.tsx`; só um link quebrado leva a isso, e não há nenhum). A 320 px, "Abrir o menu" e o seletor de parceiro se sobrepõem 2 px, com ou sem janela (anterior a esta mudança). Na tela inteira das três telas, ir para outra delas é carga inteira: a memória do Voltar do shell recomeça ("Voltar para Áreas da Rede" em vez de "Voltar para Lojas e marcas"), e numa navegação sem link (a busca) a janela chega a aparecer um instante antes da recarga. Abrir uma das três telas pela busca com a janela aberta cria entrada nova no histórico: o voltar do navegador leva à tela anterior da janela em vez de fechá-la (Fechar continua voltando à página de trás). Reversão: apagar a pasta `@janela`, a `MolduraDaJanela` e os dois lugares do botão de reabrir no shell devolve a navegação de tela inteira (`useCaminhoDaPagina` devolve o próprio endereço sem janela); não há migration nem dado.
+
+### 527. 2026-11-16 · Busca ⌘K com nomes curtos e sinônimos do plano de módulos
+
+**Fonte e recorte:** requisito 5 e critério 3 do plano de módulos (11/11/2026): a busca considera nomes novos e antigos, e cada atalho aponta ao domínio existente correto. Este recorte atende o critério em parte: os módulos sem tela, como CRM Clube, um dos exemplos do critério, ficam para a UX-MOD-4. É a fatia seguinte à janela de módulo (decisão 526), autorizada por Rodolfo em 16/11/2026 ("pode seguir com o plano"). A aplicação da janela a outras áreas (UX-MOD-3) espera a validação no iPhone que o critério da UX-MOD-2 pede; esta fatia não depende dela. Sem rota, tela, permissão, regra, schema, migration, dado ou dependência.
+
+1. **Termos de busca** (`termos` em `ItemNav`, na definição da área e no `inicio` do hub, em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`): nomes curtos e sinônimos que só servem para achar. Eles não aparecem na tela e não mudam rótulo, rota, menu nem permissão. A área passa os seus termos para todas as suas abas e ações. Só entram nomes com tela:
+
+   | Termo | Tela | Origem |
+   |---|---|---|
+   | Financeiro, Financeiro e Resultados | Faturamento e DRE | Nome curto da tabela do plano e nome canônico do módulo |
+   | Gestão | Rede e Equipe | Tabela do plano |
+   | Configurações, Configuração | Lojas e marcas, Integrações e Equipe (no nível 1, também a Central de Integrações) | Tabela do plano: integrações, permissões e configuração da rede, "Integrações e lojas". Não vale para o resto da área. O singular também acha. |
+   | iFood, Integração | Integrações (a aba do parceiro e a Central do nível 1) | Exemplo do requisito 5. "Integração" no singular não achava "Integrações". |
+   | Analytics | O hub, onde fica a Home analítica | Tabela do plano. "Indicadores" ficou fora: não está na tabela e já é nome de aba (Produção › Indicadores). |
+
+   Nomes que já estavam na tela (Cardápio, Fichas técnicas, Insumos, Compras, Estoque, Produção, Etiquetas, Indicadores) acham o mesmo de antes.
+2. **A busca** (`src/lib/erp/busca-local.ts`, puro) monta as telas, as ações e os parceiros a partir do menu de quem busca, como antes. Ignora acento e maiúsculas, e a normalização é a de antes.
+   - **Ordem:** primeiro vem o que casa pelo nome ou pelo detalhe (área · função), como sempre, na ordem do menu. Depois vem o que só casa por um termo. Os sinônimos só acrescentam: o primeiro resultado, que é o do Enter, e os que cabiam nos 12 continuam os de antes.
+   - **Como o termo casa:** pelo começo de uma palavra dele. "fin" acha Financeiro; "está" não acha Gestão.
+   - **Sem termo** digitado, aparecem as telas.
+   - **Permissão:** quem não vê a tela no menu não a acha (Operador sem Faturamento e DRE; parceiro sem Integração liberada).
+   - **Módulos sem tela:** módulo "Em breve" (CRM Clube, Checklists, Flow Ads, Patrimônio) não vira resultado. Nenhum link falso.
+3. **Testes** (`tests/erp-busca-sinonimos.test.ts`, 11 testes):
+   - **Regressão:** em mais de mil consultas (palavras e começos de palavra de nomes, detalhes e termos), os resultados de antes vêm primeiro, na mesma ordem. Cobre 7 cenários: Dono, Gerente, Operador, Dono sem Integração liberada, Gerente de uma loja, nível 1 dentro e fora de um parceiro.
+   - **Primeiro resultado:** o de Indicadores e o de Resultado não mudam.
+   - **Começo de palavra:** o termo casa só pelo começo de uma palavra.
+   - **Nomes curtos:** cada um acha as telas certas, sem acento e sem diferença de maiúsculas, nos cenários.
+   - **Menu e futuros:** todo resultado é do menu de quem busca, e os módulos sem tela não aparecem.
+
+**Validação local (dados sintéticos):**
+- **Testes no commit da primeira rodada (a6a7033):**
+  - Testes de navegação sem banco: 13 arquivos, 459 testes (`npx vitest run` com os arquivos que tocam a navegação).
+  - Testes com banco que tocam a navegação: 5 arquivos, 53 testes (`ERP_DB_TESTE=… npx vitest run --no-file-parallelism`).
+  - Tipos, portão de conteúdo e ai:check limpos. Lint sem erro, com as mesmas 64 advertências de antes.
+- **No navegador**, com a correção da revisão (Chromium, app local, roteiro fora do repositório): 31 conferências sem falha, com nível 1 no parceiro, a dona e o operador.
+  - Financeiro acha só Faturamento e DRE.
+  - Gestão acha Rede e Equipe.
+  - Configurações acha Lojas e marcas e Equipe, mais Integrações só quando ela está no menu, e nunca Histórico nem Seu acesso.
+  - iFood e Integração acham Integrações só quando ela está no menu.
+  - Analytics acha o hub.
+  - "indicadores" segue abrindo Produção › Indicadores, e "resultado" segue abrindo o DRE.
+  - "está" não acha Gestão.
+  - CRM Clube não acha nada.
+  - Enter abre a tela.
+- A correção da revisão também foi verificada pelos testes acima no commit seguinte. O portão completo (o CI do PR e o roteiro local que espelha o job do `deploy.yml`) roda no commit final; o resultado fica no PR e na página de evidências.
+
+**Revisão independente:** primeira rodada (a6a7033): reprovado, sem bloqueante.
+- **Importante:** os termos tiravam o primeiro lugar de nomes que já existiam. "indicadores" passava a abrir o hub, "resultado" a abrir Faturamento, e consultas curtas empurravam resultados antigos para fora dos 12. Corrigido no item 2: o que casa pelo nome vem primeiro.
+- **Menores tratados:**
+  - o termo casava por pedaço do meio da palavra (agora só pelo começo);
+  - "Indicadores" não estava na tabela do plano;
+  - "Configurações" valia para a área inteira;
+  - faltava o singular "Configuração";
+  - o registro não estava preciso (critério parcial, "Pessoas", SHA e comandos);
+  - testes não provavam o que diziam: laço do Operador vazio, primeiro resultado não conferido, Gerente e nível 1 fora do parceiro ausentes;
+  - o comentário de `modulosDoParceiro` estava fora do lugar.
+
+**Limites:**
+- **Módulos "Em breve":** não aparecem na busca, nem como "em breve"; isso é da UX-MOD-4. Os nomes curtos de módulos futuros (CRM, Checklists, Patrimônio, Dispositivos, Flow Ads) não acham nada. "Delivery" acha a Precificação, que fala de delivery no subtítulo. "Pessoas" acha a aba Equipe pelo subtítulo, como já acontecia; não é o módulo futuro Equipe e RH.
+- **Ordem:** dentro de cada grupo (nome e sinônimo) a ordem é a do menu, sem ranqueamento por relevância. Um começo curto que casa com um sinônimo ("fin", "conf") acrescenta telas antes dos insumos do servidor.
+- **Não testado** em Safari/iOS nem com leitor de tela.
+- **Reversão:** apagar os `termos` e voltar a busca a comparar só nome e detalhe; não há migration nem dado.
