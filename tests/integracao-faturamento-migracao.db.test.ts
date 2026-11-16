@@ -11,6 +11,7 @@ import { executarPsqlDeTeste } from './erp-psql-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const MIGRACAO = '20261125000000_erp_integracao_faturamento';
+const MIGRACAO_CANAL_UBER = '20261201000000_erp_faturamento_canal_uber';
 const RAIZ = join(process.cwd(), 'prisma/migrations');
 const temPsql = spawnSync('psql', ['--version']).status === 0;
 const PERFIS = [
@@ -104,7 +105,7 @@ describe.skipIf(!URL_TESTE || !temPsql)('INT-1.7B · migration e protocolo finan
           const [recibo] = await db.$queryRaw<{ id: string }[]>`SELECT id FROM "IntegracaoFaturamentoDia" WHERE "parceiroId"='p1'`;
           expect(recibo.id).toBeTruthy();
           const preparar = `SELECT erp_integracao_faturamento_preparar('p1','l-p1','${DIA}','${posse.id}')`;
-          const concluir = (igual = false) => `SELECT erp_integracao_faturamento_concluir('p1','${recibo.id}','${posse.id}','${HASH}',1,${igual})`;
+          const concluir = (igual = false, versao = 1) => `SELECT erp_integracao_faturamento_concluir('p1','${recibo.id}','${posse.id}','${HASH}',${versao},${igual})`;
           const fonte = `INSERT INTO "IntegracaoFaturamentoFonte"(id,"parceiroId","reciboId",dia,"merchantId","conexaoId","moduloId","snapshotId","lancamentoId","atualizadoEm") VALUES ('f1','p1','${recibo.id}','${DIA}','${MERCHANT}','c1','m1','s1','analytics',now())`;
           // Prova também no fallback dono sem papel: uma escrita normal não cria
           // marker sem prefixo. DDL/desativar triggers pelo owner não é ameaça coberta.
@@ -118,6 +119,9 @@ describe.skipIf(!URL_TESTE || !temPsql)('INT-1.7B · migration e protocolo finan
           exigir(como('p1', `${preparar}; ${lancamento('analytics', 'INTEGRACAO', DIA, true)}; ${fonte}; ${concluir()}`));
           const antesReplay = await db.integracaoFaturamentoDia.findUniqueOrThrow({ where: { id: recibo.id } });
           expect(antesReplay).toMatchObject({ estado: 'APLICADO', hashAplicado: HASH, versaoMapaAplicada: 1, revisaoSolicitada: 1n, revisaoConferida: 1n });
+          exigir(psql(dono, ['-f', join(RAIZ, MIGRACAO_CANAL_UBER, 'migration.sql')]));
+          expect(await conferirMigracao(db)).toEqual([]);
+          expect(await db.integracaoFaturamentoDia.findUniqueOrThrow({ where: { id: recibo.id } })).toEqual(antesReplay);
           expect(await db.faturamentoLancamento.findUniqueOrThrow({ where: { id: 'analytics' } })).toMatchObject({ valorCentavos: 600, pedidos: 3, clientes: null });
           exigir(como('p1', `${preparar}; ${concluir(true)}`));
           expect((await db.integracaoFaturamentoDia.findUniqueOrThrow({ where: { id: recibo.id } })).aplicadoEm).toEqual(antesReplay.aplicadoEm);
@@ -128,10 +132,15 @@ describe.skipIf(!URL_TESTE || !temPsql)('INT-1.7B · migration e protocolo finan
           recusar(`DELETE FROM "IntegracaoFaturamentoFonte" WHERE id='f1'`, perfil.rls ? /permission denied/ : /não pode ser removida/);
           recusar(`${preparar}; UPDATE "IntegracaoFaturamentoFonte" SET "merchantId"='22222222-2222-4222-8222-222222222222' WHERE id='f1'`, /imutáveis/);
           recusar(lancamento('colisao', 'INTEGRACAO', DIA), /Outra integração/);
+          // O worker antigo ainda consegue confirmar um recibo v1, mas não rebaixa um já aplicado em v2.
+          const transicao = exigir(como('p1', `${preparar}; ${concluir(false, 2)}; ${concluir(false, 1)}`));
+          expect(transicao.split('\n').slice(-2)).toEqual(['t', 'f']);
+          const atualizado = await db.integracaoFaturamentoDia.findUniqueOrThrow({ where: { id: recibo.id } });
+          expect(atualizado.versaoMapaAplicada).toBe(2);
           exigir(como('p1', `UPDATE "IntegracaoConexaoModulo" SET estado='ERRO_PERMISSAO',"ultimoErro"='403 sintético da prova de revogação',"ultimoErroEm"=clock_timestamp() WHERE id='m1'`));
           const p = exigir(como('p1', `${preparar}; SELECT erp_integracao_faturamento_pendencia('p1','${recibo.id}','${posse.id}','ACESSO')`));
           expect(p).toContain('"motivo": "ACESSO"');
-          expect(await db.integracaoFaturamentoDia.findUniqueOrThrow({ where: { id: recibo.id } })).toMatchObject({ estado: 'PENDENTE_ACESSO', motivo: 'ACESSO', hashAplicado: HASH, aplicadoEm: antesReplay.aplicadoEm });
+          expect(await db.integracaoFaturamentoDia.findUniqueOrThrow({ where: { id: recibo.id } })).toMatchObject({ estado: 'PENDENTE_ACESSO', motivo: 'ACESSO', hashAplicado: HASH, aplicadoEm: atualizado.aplicadoEm });
           expect(await db.faturamentoLancamento.findUniqueOrThrow({ where: { id: 'analytics' } })).toMatchObject({ valorCentavos: 600, pedidos: 3, clientes: null });
           return recibo.id;
         });

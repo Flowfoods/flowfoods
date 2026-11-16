@@ -48,7 +48,8 @@ export function mapearSnapshotParaFaturamento(s: SnapshotFinanceiro): MapaFatura
   let valor = 0n, pedidos = 0n;
   for (const l of s.linhas) {
     // Exclusões comprovadas, sem inferir o significado de um enum desconhecido.
-    if (l.orderStatus === 'CANCELLED' || l.salesChannel === 'DIGITAL_CATALOG' || l.salesChannel === 'POS') continue;
+    if (l.orderStatus === 'CANCELLED' || l.salesChannel === 'DIGITAL_CATALOG'
+      || l.salesChannel === 'POS' || l.salesChannel === 'EMBEDDED_UBER') continue;
     if (l.orderStatus !== 'CONCLUDED' || l.salesChannel !== 'IFOOD' || l.category !== 'FOOD'
       || (l.deliveredBy !== 'IFOOD_DELIVERY' && l.deliveredBy !== 'MERCHANT_DELIVERY')) {
       return pendente('RECORTE_NAO_MAPEADO');
