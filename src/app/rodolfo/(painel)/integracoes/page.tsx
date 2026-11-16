@@ -13,14 +13,14 @@ import { exigirNivel1, leituraDoParceiro } from '@/lib/erp/contexto';
 import { moduloLiberado } from '@/lib/erp/liberacao';
 import { COR } from '@/lib/erp/modulos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
-import { listarApps } from '@/lib/integracoes/core/apps';
+import { ehAppIfoodDeTeste, listarApps } from '@/lib/integracoes/core/apps';
 import { appAceitaParecer } from '@/lib/integracoes/core/homologacao';
 import { ROTULO_DO_AMBIENTE, ROTULO_DO_MODULO } from '@/lib/integracoes/core/campos';
 import { ultimasLeiturasDeTeste, validadeDosTokens } from '@/lib/integracoes/core/central';
 import { conexoesDoParceiro } from '@/lib/integracoes/core/conexoes';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { Aviso, Contagem, Painel, Ponto, Selo, Vazio } from '@/components/erp/ui/superficies';
-import { FormCadastrarApp } from './forms';
+import { FormCadastrarApp, FormIncluirFinanceiro } from './forms';
 import { diaBr, QUANDO, ROTULO_DA_CATEGORIA, ROTULO_DA_HOMOLOGACAO, ROTULO_DO_PASSO, TOM_DA_HOMOLOGACAO } from './rotulos';
 
 export const dynamic = 'force-dynamic';
@@ -85,6 +85,7 @@ export default async function CentralDeIntegracoesPage() {
                         <dt className="text-suave">Acesso guardado</dt>
                         <dd className="text-texto">{!t ? 'nenhum ainda' : valido ? `vale até ${QUANDO.format(t.expiraEm)}` : `venceu em ${QUANDO.format(t.expiraEm)}; a próxima leitura pede outro`}</dd>
                       </dl>
+                      {ehAppIfoodDeTeste(a) && <FormIncluirFinanceiro appId={a.id} nome={a.nome} cadastrado={a.modulos.includes('FINANCIAL')} />}
                       {appAceitaParecer(a) && <Link href={`/rodolfo/integracoes/apps/${a.id}`} className="inline-block text-sm underline underline-offset-4">Registrar parecer do iFood</Link>}
                     </li>
                   );
