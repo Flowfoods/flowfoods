@@ -16,6 +16,8 @@ export interface ResultadoDaBusca {
   href: string;
   /** Insumo ou ficha desativada aparece marcada (achar ≠ usar). */
   desativado?: boolean;
+  /** Nomes curtos e sinônimos (plano de módulos): só ajudam a achar, não aparecem (`src/lib/erp/busca-local.ts`). */
+  termos?: string;
 }
 
 export interface Notificacao {

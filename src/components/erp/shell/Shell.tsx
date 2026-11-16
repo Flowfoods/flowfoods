@@ -12,7 +12,8 @@ import { usePathname } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Menu } from 'lucide-react';
 import { entradaDoCaminho, caixaDaTela, itemFechado } from '@/lib/erp/ajuda-rota';
-import { abasDaArea, acoesDaNavegacao, itemAtivo, montarTrilha, telasDaNavegacao } from '@/lib/erp/modulos';
+import { abasDaArea, itemAtivo, montarTrilha } from '@/lib/erp/modulos';
+import { locaisDaNavegacao } from '@/lib/erp/busca-local';
 import { comParceiroAtual, slugNoCaminho } from '@/lib/rodolfo/modulos';
 import { raizDoRetorno } from '@/lib/erp/voltar-navegacao';
 import { Dialogo } from '../ui/Dialogo';
@@ -115,31 +116,8 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
     return () => window.removeEventListener('keydown', tecla);
   }, [temAjuda, abrirAjuda]);
 
-  const locais = useMemo<ResultadoDaBusca[]>(() => {
-    const telas: ResultadoDaBusca[] = [
-      { tipo: 'tela', rotulo: nav.inicio.titulo, detalhe: 'Início', href: nav.inicio.href },
-      ...telasDaNavegacao(nav).map((t) => ({
-        tipo: 'tela' as const,
-        rotulo: t.rotulo,
-        detalhe: `${t.modulo} · ${t.subtitulo}`,
-        href: t.href,
-      })),
-      // Ações das áreas que a pessoa vê E pode fazer (o filtro é de `modulosDoParceiro`; aqui só se lista).
-      ...acoesDaNavegacao(nav).map((a) => ({
-        tipo: 'acao' as const,
-        rotulo: a.rotulo,
-        detalhe: `${a.modulo} · ${a.subtitulo}`,
-        href: a.href,
-      })),
-    ];
-    const dosParceiros: ResultadoDaBusca[] = (parceiros ?? []).map((p) => ({
-      tipo: 'parceiro',
-      rotulo: p.nome,
-      detalhe: p.rotuloStatus,
-      href: `/rodolfo/erp/${p.slug}`,
-    }));
-    return [...telas, ...dosParceiros];
-  }, [nav, parceiros]);
+  // Telas, ações e parceiros da busca ⌘K, do menu de quem busca (com os nomes curtos e sinônimos do plano só para achar).
+  const locais = useMemo<ResultadoDaBusca[]>(() => locaisDaNavegacao(nav, parceiros), [nav, parceiros]);
 
   const slug = slugNoCaminho(caminho);
   const { buscarInsumos, buscarInsumosDoParceiro } = props;
