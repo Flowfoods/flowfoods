@@ -7,6 +7,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import type { SessaoErp } from '@/lib/erp/contexto-base';
 import { ehErroDeUnicidade } from '@/lib/erp/tenant';
 import { lerApp, type CampoDoApp, type DadosDoApp } from './campos';
 
@@ -38,6 +39,36 @@ export async function listarApps(): Promise<AppDeIntegracao[]> {
 export async function appPorId(id: string): Promise<AppDeIntegracao | null> {
   if (typeof id !== 'string' || id.length === 0 || id.length > 60) return null;
   return prisma.integracaoApp.findUnique({ where: { id }, select: SELECAO });
+}
+
+const APP_IFOOD_DE_TESTE = { provedor: 'IFOOD', ambiente: 'TEST', categoria: 'TEST' } as const;
+export const EVENTO_FINANCEIRO_INCLUIDO = 'integracao.app-teste-financial-incluido';
+
+export function ehAppIfoodDeTeste(app: Pick<DadosDoApp, 'provedor' | 'ambiente' | 'categoria'>) {
+  return app.provedor === APP_IFOOD_DE_TESTE.provedor && app.ambiente === APP_IFOOD_DE_TESTE.ambiente && app.categoria === APP_IFOOD_DE_TESTE.categoria;
+}
+
+export async function incluirFinanceiroNoAppDeTeste(appId: string, autor: SessaoErp): Promise<{ ok: true; mudou: boolean } | { ok: false; erro: string }> {
+  if (typeof appId !== 'string' || !appId || appId.length > 60 || !autor.userId || !autor.autorNome.trim()) {
+    return { ok: false, erro: 'Não foi possível identificar o app ou o responsável.' };
+  }
+  const alvo = { id: appId, ...APP_IFOOD_DE_TESTE };
+  return prisma.$transaction(async (tx) => {
+    // O mesmo UPDATE confere a ausência e acrescenta ao array atual, inclusive com dois envios simultâneos.
+    const inclusao = await tx.integracaoApp.updateMany({
+      where: { ...alvo, NOT: { modulos: { has: 'FINANCIAL' } } },
+      data: { modulos: { push: 'FINANCIAL' } },
+    });
+    if (inclusao.count === 0) {
+      const jaIncluido = await tx.integracaoApp.findFirst({ where: { ...alvo, modulos: { has: 'FINANCIAL' } }, select: { id: true } });
+      if (jaIncluido) return { ok: true, mudou: false };
+      return { ok: false, erro: 'Escolha um app do iFood com ambiente e categoria de teste.' };
+    }
+    await tx.auditLog.create({
+      data: { userId: autor.userId, evento: EVENTO_FINANCEIRO_INCLUIDO, dados: { appId, modulo: 'FINANCIAL', autorNome: autor.autorNome.trim().slice(0, 120) } },
+    });
+    return { ok: true, mudou: true };
+  });
 }
 
 export type ResultadoDoApp = { ok: true; id: string } | { ok: false; erros: Partial<Record<CampoDoApp | 'geral', string>> };

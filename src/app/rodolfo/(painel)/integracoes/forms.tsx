@@ -24,6 +24,7 @@ import { Confirmacao } from '@/components/erp/telas/equipe/escolhas';
 import type { PedidoReleituraAnalytics } from '@/lib/integracoes/core/situacao-analytics-campos';
 import {
   acaoDesligarConexao,
+  acaoIncluirFinanceiroNoAppDeTeste,
   acaoLigarConexao,
   acaoMarcarHomologacao,
   acaoMudarLiberacao,
@@ -86,6 +87,19 @@ function useConfirmacao() {
     requestAnimationFrame(() => abridor.current?.focus());
   };
   return { aberta, abrir: () => setAberta(true), cancelar, abridor };
+}
+
+export function FormIncluirFinanceiro({ appId, nome, cadastrado }: { appId: string; nome: string; cadastrado: boolean }) {
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoIncluirFinanceiroNoAppDeTeste.bind(null, appId), null);
+  const form = useRef<HTMLFormElement>(null);
+  useFocoDoEnvio(estado, form);
+  if (cadastrado && !estado) return null;
+  return (
+    <FormularioComAcao ref={form} action={enviar} aria-label={`Incluir Financeiro no cadastro de ${nome}`} className="space-y-2">
+      {!cadastrado && <BotaoEnviar variante="secundario" pendente="Incluindo…">Incluir Financeiro no cadastro</BotaoEnviar>}
+      <Resposta estado={estado} />
+    </FormularioComAcao>
+  );
 }
 
 export function FormCadastrarApp() {

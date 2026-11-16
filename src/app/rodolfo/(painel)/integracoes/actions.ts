@@ -17,7 +17,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { exigirNivel1, exigirParceiro } from '@/lib/erp/contexto';
 import { mudarLiberacao } from '@/lib/erp/liberacao';
-import { registrarApp } from '@/lib/integracoes/core/apps';
+import { incluirFinanceiroNoAppDeTeste, registrarApp } from '@/lib/integracoes/core/apps';
 import { registrarParecerApp } from '@/lib/integracoes/core/homologacao';
 import { solicitarReleituraAnalytics } from '@/lib/integracoes/core/releitura-analytics';
 import type { PedidoReleituraAnalytics } from '@/lib/integracoes/core/situacao-analytics-campos';
@@ -85,6 +85,15 @@ export async function acaoRegistrarApp(anterior: EstadoForm, form: FormData): Pr
   await auditar(sessao.userId, 'integracao.app-cadastrado', { appId: r.id, clientId: String(entrada.clientId ?? '').trim(), ambiente: String(entrada.ambiente) });
   revalidar();
   return { ok: true, mensagem: 'App cadastrado. O segredo continua só no cofre do servidor.', vez };
+}
+
+export async function acaoIncluirFinanceiroNoAppDeTeste(appId: string, anterior: EstadoForm): Promise<EstadoForm> {
+  const sessao = await exigirNivel1();
+  const vez = proxima(anterior);
+  const r = await incluirFinanceiroNoAppDeTeste(appId, sessao);
+  if (!r.ok) return recusa(vez, r.erro);
+  revalidar();
+  return { ok: true, mensagem: r.mudou ? 'Financeiro incluído no cadastro deste app.' : 'Financeiro já consta no cadastro deste app.', vez };
 }
 
 export async function acaoMudarLiberacao(slug: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {

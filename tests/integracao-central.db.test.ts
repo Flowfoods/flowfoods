@@ -63,7 +63,7 @@ vi.mock('@/lib/erp/contexto', async () => {
 import { prisma } from '@/lib/db';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
-import { registrarApp } from '@/lib/integracoes/core/apps';
+import { EVENTO_FINANCEIRO_INCLUIDO, incluirFinanceiroNoAppDeTeste, registrarApp } from '@/lib/integracoes/core/apps';
 import { registrarParecerApp, historicoDoParecer, EVENTO_PARECER } from '@/lib/integracoes/core/homologacao';
 import { mudarModulo } from '@/lib/integracoes/core/conexoes';
 import { lerRegistroDaLeitura, marcarParceiroDeHomologacao, MENSAGEM_TROCA_COM_LOJA_LIGADA } from '@/lib/integracoes/core/central';
@@ -417,6 +417,57 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     const app = await db.integracaoApp.findFirstOrThrow({ where: { clientId: `fin-${sufixo}` } });
     expect([app.estadoHomologacao, app.modulos.sort()]).toEqual(['PENDENTE', ['FINANCIAL', 'MERCHANT']]);
     expect(await db.auditLog.count({ where: { userId: atual.userId, evento: 'integracao.app-cadastrado' } })).toBe(1);
+  });
+
+  it('a inclusão de Financeiro no cadastro exige sessão N1 e recusa um app de produção ou inexistente', async () => {
+    const producao = await db.integracaoApp.findUniqueOrThrow({ where: { id: appBi } });
+    const pagina = await html(CentralPage());
+    expect(pagina).not.toContain(`aria-label="Incluir Financeiro no cadastro de ${producao.nome}"`);
+    for (const id of [producao.id, uuid()]) {
+      const resposta = await acoes.acaoIncluirFinanceiroNoAppDeTeste(id, null);
+      expect(resposta).toMatchObject({ ok: false, erros: { geral: expect.stringContaining('teste') } });
+    }
+    atual.semSessao = true;
+    try {
+      await expect(acoes.acaoIncluirFinanceiroNoAppDeTeste(appTeste, null)).rejects.toThrow('SEM_SESSAO_N1');
+    } finally { atual.semSessao = false; }
+    expect(await db.integracaoApp.findUniqueOrThrow({ where: { id: appBi } })).toEqual(producao);
+    expect(await db.auditLog.count({ where: { evento: EVENTO_FINANCEIRO_INCLUIDO, userId: atual.userId } })).toBe(0);
+  });
+
+  it('dois envios incluem Financeiro uma vez só no app escolhido, preservam seus módulos e auditam o operador na mesma transação', async () => {
+    const app = await registrarApp({
+      provedor: 'IFOOD', ambiente: 'TEST', categoria: 'TEST', nome: `Teste financeiro ${sufixo}`,
+      clientId: `financeiro-teste-${sufixo}`, nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET', modulos: ['REVIEW', 'MERCHANT', 'ANALYTICS'],
+    }, 'teste');
+    if (!app.ok) throw new Error(JSON.stringify(app.erros));
+    const ler = (id: string) => db.integracaoApp.findUniqueOrThrow({ where: { id } });
+    const antes = await ler(app.id);
+    const outroTeste = await ler(appTeste);
+    const formulario = (nome: string) => `aria-label="Incluir Financeiro no cadastro de ${nome}"`;
+    expect(await html(CentralPage())).toContain(formulario(antes.nome));
+
+    // Uma falha de auditoria (FK do operador) desfaz o acréscimo.
+    await expect(incluirFinanceiroNoAppDeTeste(app.id, { userId: uuid(), autorNome: 'Teste' })).rejects.toMatchObject({ code: 'P2003' });
+    expect(await ler(app.id)).toEqual(antes);
+
+    const incluir = () => acoes.acaoIncluirFinanceiroNoAppDeTeste(app.id, null);
+    const respostas = await Promise.all([incluir(), incluir()]);
+    const jaIncluido = { ok: true, mensagem: 'Financeiro já consta no cadastro deste app.', vez: 1 };
+    expect(respostas).toEqual(expect.arrayContaining([
+      { ok: true, mensagem: 'Financeiro incluído no cadastro deste app.', vez: 1 }, jaIncluido,
+    ]));
+    const depois = await ler(app.id);
+    expect(depois).toEqual({ ...antes, modulos: [...antes.modulos, 'FINANCIAL'], atualizadoEm: expect.any(Date) });
+    expect(await incluir()).toEqual(jaIncluido);
+    expect(await ler(app.id)).toEqual(depois);
+    expect(await ler(appTeste)).toEqual(outroTeste);
+    const registros = await db.auditLog.findMany({ where: { evento: EVENTO_FINANCEIRO_INCLUIDO, dados: { path: ['appId'], equals: app.id } }, select: { userId: true, dados: true } });
+    expect(registros).toEqual([{ userId: atual.userId, dados: { appId: app.id, modulo: 'FINANCIAL', autorNome: 'Rodolfo (FlowFoods)' } }]);
+    const pagina = await html(CentralPage());
+    expect(pagina).toContain('Avaliações, Loja, Analytics, Financeiro');
+    expect(pagina).not.toContain(formulario(antes.nome));
+    expect(pagina).toContain(formulario(outroTeste.nome));
   });
 
   it('o registro da leitura de teste é conferido campo a campo (JSON de outra versão não quebra a tela)', () => {
