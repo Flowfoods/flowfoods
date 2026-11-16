@@ -25,22 +25,25 @@ export default function ErroAoAbrirAJanela({ retry }: { error: unknown; retry: (
     <dialog
       ref={ref}
       aria-label="Não foi possível abrir esta tela"
-      className="ff-dialogo w-[min(480px,calc(100vw-24px))] p-5"
+      className="ff-dialogo w-[min(480px,calc(100vw-24px))]"
       onCancel={(e) => {
         e.preventDefault();
         router.back();
       }}
     >
-      <Aviso tom="erro" titulo="Não foi possível abrir esta tela agora.">
-        Tente de novo em instantes. A página de trás continua como estava.
-      </Aviso>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={() => retry()} className={classeDeBotao('primario')}>
-          Tentar de novo
-        </button>
-        <button type="button" onClick={() => router.back()} className={classeDeBotao('secundario')}>
-          Fechar
-        </button>
+      {/* O respiro fica num bloco de dentro: a regra do diálogo do kit zera o espaçamento do próprio diálogo. */}
+      <div className="p-5">
+        <Aviso tom="erro" titulo="Não foi possível abrir esta tela agora.">
+          Tente de novo em instantes. A página de trás continua como estava.
+        </Aviso>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={() => retry()} className={classeDeBotao('primario')}>
+            Tentar de novo
+          </button>
+          <button type="button" onClick={() => router.back()} className={classeDeBotao('secundario')}>
+            Fechar
+          </button>
+        </div>
       </div>
     </dialog>
   );

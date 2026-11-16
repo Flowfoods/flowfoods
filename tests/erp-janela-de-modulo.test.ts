@@ -354,17 +354,21 @@ describe('janela de módulo · regras que o roteiro de navegador exercita', () =
 
   it('o conteúdo não depende de estar minimizada (só o diálogo fecha); trocar de tela substitui o endereço', () => {
     expect(componente.match(/\{children\}/g)).toEqual(['{children}']);
-    expect(componente).toMatch(/<ContextoDaCaixa\.Provider value=\{null\}>\{children\}<\/ContextoDaCaixa\.Provider>/);
+    // O corpo da janela é sempre o aviso e a tela, sem condição em volta (o comentário de dentro vira `{}` sem comentários).
+    expect(componente).toMatch(
+      /<div ref=\{corpo\} className="ff-janela-corpo [^"]*">\s*\{aviso && <div className="mb-5">\{aviso\}<\/div>\}\s*(\{\}\s*)?<ContextoDaCaixa\.Provider value=\{null\}>\{children\}<\/ContextoDaCaixa\.Provider>\s*<\/div>/,
+    );
     expect(componente).toMatch(/if \(ehDaJanela\(destino\.pathname, base\)\) router\.replace\(alvo, \{ scroll: false \}\);\s*else router\.push\(alvo\);/);
     expect(componente).toMatch(/<Link\s+href=\{a\.href\}\s+replace\s+scroll=\{false\}/);
   });
 
-  it('o botão de reabrir mora na barra do topo e, no celular, na faixa abaixo dela; o shell tem os dois lugares', () => {
+  it('o botão de reabrir mora na barra do topo e, abaixo de 768 px, no alto do conteúdo; o shell tem os dois lugares', () => {
     expect(ID_DA_JANELA_NA_BARRA).toBe('ff-janela-na-barra');
     expect(ID_DA_JANELA_NO_CONTEUDO).toBe('ff-janela-no-conteudo');
     const shell = ler(join(SHELL, 'Shell.tsx'));
-    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NA_BARRA\} className="flex shrink-0 items-center empty:hidden max-sm:hidden" \/>/);
-    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NO_CONTEUDO\} className="sticky top-16 z-\[25\] -mx-4 -mt-6 mb-4 empty:hidden sm:hidden" \/>/);
+    // A partir de 768 px, na barra; abaixo, no alto do conteúdo, no fluxo (presa, cobriria as barras que as telas prendem).
+    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NA_BARRA\} className="flex shrink-0 items-center empty:hidden max-md:hidden" \/>/);
+    expect(shell).toMatch(/<div id=\{ID_DA_JANELA_NO_CONTEUDO\} className="-mx-4 -mt-6 mb-4 empty:hidden sm:-mx-6 md:hidden" \/>/);
     expect(componente).toMatch(/createPortal\(botaoNaBarra\(false\), lugares\.barra\)\}\{createPortal\(botaoNoConteudo, lugares\.conteudo\)/);
   });
 

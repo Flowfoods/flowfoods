@@ -128,6 +128,10 @@ export function JanelaDeModulo({
   const voltarComFoco = useRef(false);
   const fundoAtual = useRef(fundo);
   fundoAtual.current = fundo;
+  // O endereço completo da página de trás (com os filtros), para Fechar quando o histórico não chega lá.
+  const enderecoDoFundo = useRef<() => string>(() => fundo);
+  enderecoDoFundo.current = moldura?.enderecoDoFundo ?? (() => fundo);
+  const focoAntesDaPergunta = useRef<HTMLElement | null>(null);
   const caminhoAnterior = useRef(caminho);
 
   /** Se algum formulário da janela guarda alteração não salva (avaliado na hora: ver `formularioComRascunho`). */
@@ -214,7 +218,7 @@ export function JanelaDeModulo({
       const f = fechando.current;
       if (!f || !ehDaJanela(window.location.pathname, base)) return;
       if (f.passos >= PASSOS_MAXIMOS_AO_FECHAR) {
-        router.replace(fundoAtual.current, { scroll: false });
+        router.replace(enderecoDoFundo.current(), { scroll: false });
         return;
       }
       f.passos += 1;
@@ -238,22 +242,34 @@ export function JanelaDeModulo({
     return () => window.removeEventListener('beforeunload', avisar);
   }, [temRascunho]);
 
-  // Minimizada com alteração pendente: um link da página de trás desmontaria a janela (ou trocaria a tela dela); antes,
-  // ela volta e pergunta.
+  // Minimizada: um link da página de trás desmontaria a janela (ou trocaria a tela dela). Com alteração pendente, ela volta
+  // e pergunta antes. Sem alteração, um link para uma tela da janela reabre a janela nela, substituindo o endereço (a janela
+  // continua uma entrada só no histórico); para a tela que ela já mostra, só reabre.
   useEffect(() => {
     if (!minimizada) return;
     const interceptar = (e: MouseEvent) => {
       if (e.defaultPrevented || ref.current?.contains(e.target as Node)) return;
       const destino = destinoDoClique(e);
-      if (!destino || !temRascunho()) return;
+      if (!destino) return;
+      const alvo = destino.pathname + destino.search + destino.hash;
+      if (temRascunho()) {
+        e.preventDefault();
+        e.stopPropagation();
+        setMinimizada(false);
+        perguntar({ tipo: 'ir', href: alvo });
+        return;
+      }
+      if (!ehDaJanela(destino.pathname, base)) return;
       e.preventDefault();
       e.stopPropagation();
       setMinimizada(false);
-      setPedido({ tipo: 'ir', href: destino.pathname + destino.search + destino.hash });
+      if (destino.pathname + destino.search !== window.location.pathname + window.location.search) ir(alvo);
     };
     document.addEventListener('click', interceptar, true);
     return () => document.removeEventListener('click', interceptar, true);
-  }, [minimizada, temRascunho]);
+    // `perguntar` e `ir` só usam refs, o estado e o roteador.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minimizada, temRascunho, base]);
 
   // A busca (⌘K, Ctrl K, "/") leva a outra tela sem passar por link: com alteração pendente, a janela pergunta antes.
   useEffect(() => {
@@ -266,7 +282,7 @@ export function JanelaDeModulo({
       e.preventDefault();
       e.stopImmediatePropagation();
       setMinimizada(false);
-      setPedido({ tipo: 'busca', tecla: { key: e.key, code: e.code, metaKey: e.metaKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, bubbles: true, cancelable: true } });
+      perguntar({ tipo: 'busca', tecla: { key: e.key, code: e.code, metaKey: e.metaKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, bubbles: true, cancelable: true } });
     };
     window.addEventListener('keydown', aoTeclar, true);
     return () => window.removeEventListener('keydown', aoTeclar, true);
@@ -281,7 +297,7 @@ export function JanelaDeModulo({
     if (espera.current) window.clearTimeout(espera.current);
     espera.current = window.setTimeout(() => {
       // Já na página de trás (o navegador chegou; só falta desenhar): nada a fazer.
-      if (ehDaJanela(window.location.pathname, base)) router.replace(fundoAtual.current, { scroll: false });
+      if (ehDaJanela(window.location.pathname, base)) router.replace(enderecoDoFundo.current(), { scroll: false });
     }, ESPERA_AO_FECHAR_MS);
   }
 
@@ -312,14 +328,36 @@ export function JanelaDeModulo({
     else if (p.tipo === 'voltar') voltar();
     else if (p.tipo === 'ir') ir(p.href);
     else {
+      // O foco volta aonde estava antes da pergunta: é para lá que a busca o devolve ao fechar.
+      const alvo = focoAntesDaPergunta.current;
+      focoAntesDaPergunta.current = null;
+      (alvo && alvo.isConnected && ref.current?.contains(alvo) ? alvo : titulo.current)?.focus();
       liberarAtalho.current = true;
       window.dispatchEvent(new KeyboardEvent('keydown', p.tecla));
       liberarAtalho.current = false;
     }
   }
 
+  /** Mostra a pergunta e guarda onde estava o foco (o campo, o botão ou o link), para devolver se a pessoa continuar. */
+  function perguntar(p: Pedido) {
+    const ativo = document.activeElement;
+    focoAntesDaPergunta.current = ativo instanceof HTMLElement && ref.current?.contains(ativo) ? ativo : null;
+    setPedido(p);
+  }
+
+  /** "Continuar editando" (ou Escape na pergunta): a pergunta sai e o foco volta aonde estava; se sumiu, ao nome da janela. */
+  function dispensar() {
+    setPedido(null);
+    const alvo = focoAntesDaPergunta.current;
+    focoAntesDaPergunta.current = null;
+    requestAnimationFrame(() => {
+      const ok = alvo && alvo.isConnected && ref.current?.contains(alvo);
+      (ok ? alvo : titulo.current)?.focus();
+    });
+  }
+
   function pedir(p: Pedido) {
-    if (temRascunho()) setPedido(p);
+    if (temRascunho()) perguntar(p);
     else concluir(p);
   }
 
@@ -394,7 +432,7 @@ export function JanelaDeModulo({
         className="ff-dialogo ff-janela"
         onCancel={(e) => {
           e.preventDefault();
-          if (pedido) setPedido(null);
+          if (pedido) dispensar();
           else pedir({ tipo: 'fechar' });
         }}
         onClose={(e) => {
@@ -423,7 +461,7 @@ export function JanelaDeModulo({
           if (temRascunho()) {
             e.preventDefault();
             e.stopPropagation();
-            setPedido({ tipo: 'ir', href: alvo });
+            perguntar({ tipo: 'ir', href: alvo });
           } else if (ehDaJanela(destino.pathname, base)) {
             e.preventDefault();
             e.stopPropagation();
@@ -507,7 +545,7 @@ export function JanelaDeModulo({
                 <strong className="font-semibold">Há alteração não salva nesta janela.</strong> {descricao.texto}
               </p>
               <div className="flex flex-wrap gap-2">
-                <button ref={continuar} type="button" className={classeDeBotao('secundario')} onClick={() => setPedido(null)}>
+                <button ref={continuar} type="button" className={classeDeBotao('secundario')} onClick={dispensar}>
                   Continuar editando
                 </button>
                 <button type="button" className={classeDeBotao('perigo')} onClick={() => concluir(pedido)}>

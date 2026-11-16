@@ -13,15 +13,17 @@
  * Também diz à janela qual é a página de trás: Fechar volta o histórico até ela e, se o histórico não chegar lá, vai para ela.
  */
 
-import { usePathname, useSelectedLayoutSegments } from 'next/navigation';
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import { caminhoDoFundo, destinoViraTelaInteira, telaAbertaNaJanela, telaDaJanela } from '@/lib/erp/janela';
+import { usePathname, useSearchParams, useSelectedLayoutSegments } from 'next/navigation';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { caminhoDe, caminhoDoFundo, destinoViraTelaInteira, telaAbertaNaJanela, telaDaJanela } from '@/lib/erp/janela';
 
 interface Moldura {
   /** `/rodolfo/erp/<slug>`. */
   base: string;
   /** O caminho da página de trás. */
   fundo: string;
+  /** O endereço da página de trás com a busca (filtros) de antes da janela abrir; sem ele, o caminho. */
+  enderecoDoFundo: () => string;
 }
 
 const ContextoDaMoldura = createContext<Moldura | null>(null);
@@ -77,8 +79,18 @@ export function MolduraDaJanela({ base, children }: { base: string; children: Re
     if (vira && telaDaJanela(window.location.pathname)?.tela === tela) window.location.replace(window.location.href);
   }, [vira, tela]);
 
+  // O último endereço completo fora da janela: Fechar usa quando o histórico não chega à página de trás (os filtros ficam).
+  const busca = useSearchParams()?.toString() ?? '';
+  const foraDaJanela = useRef<string | null>(null);
+  useEffect(() => {
+    if (tela === null) foraDaJanela.current = busca ? `${caminho}?${busca}` : caminho;
+  }, [tela, caminho, busca]);
   const fundoDaPagina = caminhoDoFundo(base, fundo);
-  const valor = useMemo(() => ({ base, fundo: fundoDaPagina }), [base, fundoDaPagina]);
+  const enderecoDoFundo = useCallback(() => {
+    const ultimo = foraDaJanela.current;
+    return ultimo && caminhoDe(ultimo) === fundoDaPagina ? ultimo : fundoDaPagina;
+  }, [fundoDaPagina]);
+  const valor = useMemo(() => ({ base, fundo: fundoDaPagina, enderecoDoFundo }), [base, fundoDaPagina, enderecoDoFundo]);
   if (vira) return null;
   return <ContextoDaMoldura.Provider value={valor}>{children}</ContextoDaMoldura.Provider>;
 }

@@ -341,9 +341,10 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
                   ))}
                 </ol>
               </nav>
-              {/* Janela de módulo minimizada (UX-MOD-2): o botão de reabrir mora aqui, na barra, e não cobre botões nem cards da
-                  página. Vazio, não ocupa lugar. */}
-              <div id={ID_DA_JANELA_NA_BARRA} className="flex shrink-0 items-center empty:hidden max-sm:hidden" />
+              {/* Janela de módulo minimizada (UX-MOD-2): a partir de 768 px, o botão de reabrir mora aqui, na barra, e não cobre
+                  botões nem cards da página (abaixo disso, a barra não tem lugar com o seletor de parceiro). Vazio, não ocupa
+                  lugar. */}
+              <div id={ID_DA_JANELA_NA_BARRA} className="flex shrink-0 items-center empty:hidden max-md:hidden" />
             </div>
 
             {/* Desde que a trilha aparece (640 px), os botões não encolhem: quem cede é a trilha (já corta com "…"). Sem isso,
@@ -375,9 +376,10 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           </header>
 
           <main id="conteudo" className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-            {/* Janela minimizada no celular (abaixo de 640 px a barra do topo não tem lugar): uma faixa presa logo abaixo da
-                barra, no fluxo da página, que não cobre botões. Vazia, não ocupa lugar. */}
-            <div id={ID_DA_JANELA_NO_CONTEUDO} className="sticky top-16 z-[25] -mx-4 -mt-6 mb-4 empty:hidden sm:hidden" />
+            {/* Janela minimizada abaixo de 768 px (a barra do topo não tem lugar): uma faixa no alto do conteúdo, no fluxo da
+                página. Não fica presa: presa, cobriria as barras que as telas prendem abaixo da barra do topo (a busca da
+                contagem, por exemplo). Vazia, não ocupa lugar. */}
+            <div id={ID_DA_JANELA_NO_CONTEUDO} className="-mx-4 -mt-6 mb-4 empty:hidden sm:-mx-6 md:hidden" />
             <Suspense fallback={null}>
               <VoltarDaNavegacao nav={nav} chaveDoContexto={props.chaveDoContexto} visao={props.visao.modo === 'parceiro' ? props.visao.valor : undefined} />
             </Suspense>
