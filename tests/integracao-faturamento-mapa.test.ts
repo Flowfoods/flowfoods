@@ -14,7 +14,7 @@ const falta = (motivo: string) => ({ estado: 'pendente', motivo });
 describe('INT-1.7B · mapper financeiro de snapshots persistidos', () => {
   it('soma as duas logísticas FOOD documentadas sem inferir clientes ou descontar taxas', () => {
     expect(mapear(snapshot([linha({}), linha({ chaveGrupo: 'c'.repeat(64), deliveredBy: 'MERCHANT_DELIVERY', pedidos: 2n, gmvWithoutDelivery: 400n })])))
-      .toEqual({ estado: 'apto', valorCentavos: 2399, pedidos: 5, clientes: null, versaoMapa: 1 });
+      .toEqual({ estado: 'apto', valorCentavos: 2399, pedidos: 5, clientes: null, versaoMapa: 2 });
   });
   it.each(['', 'merchant', 'AD7BDF06-B1BB-4D2C-A5CB-D270ABDFCD43', ' ad7bdf06-b1bb-4d2c-a5cb-d270abdfcd43'])('recusa merchant não canônico: %j', merchantId => {
     expect(mapear({ ...snapshot(), merchantId })).toEqual(falta('IDENTIDADE'));
@@ -29,11 +29,12 @@ describe('INT-1.7B · mapper financeiro de snapshots persistidos', () => {
   it('exclui cancelados e outros canais conhecidos mesmo com dimensões/valor ausentes', () => {
     expect(mapear(snapshot([linha({ orderStatus: 'CANCELLED', category: null, gmvWithoutDelivery: null }),
       linha({ chaveGrupo: 'c'.repeat(64), salesChannel: 'POS', gmvWithoutDelivery: null }),
-      linha({ chaveGrupo: 'd'.repeat(64), salesChannel: 'DIGITAL_CATALOG', deliveredBy: null, gmvWithoutDelivery: null })])))
-      .toEqual({ estado: 'apto', valorCentavos: 0, pedidos: 0, clientes: null, versaoMapa: 1 });
+      linha({ chaveGrupo: 'd'.repeat(64), salesChannel: 'DIGITAL_CATALOG', deliveredBy: null, gmvWithoutDelivery: null }),
+      linha({ chaveGrupo: 'e'.repeat(64), salesChannel: 'EMBEDDED_UBER', gmvWithoutDelivery: null })])))
+      .toEqual({ estado: 'apto', valorCentavos: 0, pedidos: 0, clientes: null, versaoMapa: 2 });
   });
   it('vazio oficial é zero e não é fonte ausente', () => {
-    expect(mapear(snapshot([]))).toEqual({ estado: 'apto', valorCentavos: 0, pedidos: 0, clientes: null, versaoMapa: 1 });
+    expect(mapear(snapshot([]))).toEqual({ estado: 'apto', valorCentavos: 0, pedidos: 0, clientes: null, versaoMapa: 2 });
     expect(mapear({ ...snapshot([]), vazioOficial: false })).toEqual(falta('SNAPSHOT_INCOMPLETO'));
   });
   it.each([{ numeroGrupos: 2 }, { pedidos: 4n }, { vazioOficial: true }])('exige cobertura integral (caso %#)', delta => expect(mapear({ ...snapshot(), ...delta })).toEqual(falta('SNAPSHOT_INCOMPLETO')));

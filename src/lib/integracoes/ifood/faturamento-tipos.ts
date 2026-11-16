@@ -1,5 +1,5 @@
 /** Contratos da INT-1.7B. Nenhum payload HTTP ou número do formulário autoriza aplicação. */
-export const VERSAO_MAPA_FATURAMENTO_ANALYTICS = 1;
+export const VERSAO_MAPA_FATURAMENTO_ANALYTICS = 2;
 export const FONTE_FATURAMENTO_ANALYTICS = 'ifood-analytics';
 
 export const MOTIVOS_PENDENCIA_FINANCEIRA = [

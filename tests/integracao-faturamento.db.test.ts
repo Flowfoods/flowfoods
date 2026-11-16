@@ -64,7 +64,22 @@ describe.skipIf(!URL_TESTE)('INT-1.7B · aplicação financeira atômica e repla
     expect(l).toMatchObject({ origem: 'INTEGRACAO', canal: 'IFOOD', valorCentavos: 1999, pedidos: 3, clientes: null, chaveIdempotencia: `ifood-analytics:dia:${m.merchantId}:${DIA_FINANCEIRO}`, origemRef: `ifood-analytics:${f.snapshotId}` });
     expect(f).toMatchObject({ conexaoId: m.conexaoId, moduloId: m.moduloId, merchantId: m.merchantId, lancamentoId: l.id });
     expect(await eventos(m)).toHaveLength(1);
-    expect(await recibo(m)).toMatchObject({ estado: 'APLICADO', versaoMapaAplicada: 1, revisaoConferida: 1n });
+    expect(await recibo(m)).toMatchObject({ estado: 'APLICADO', versaoMapaAplicada: 2, revisaoConferida: 1n });
+  });
+  it('preserva o canal da Uber no Analytics e aplica só as vendas iFood uma vez', async () => {
+    const m = await massa();
+    await publicarFinanceiro(m, lider.posse, [
+      bucketFinanceiro(32, 2),
+      bucketFinanceiro(11, 1, { salesChannel: 'EMBEDDED_UBER', deliveredBy: 'MERCHANT_DELIVERY' }),
+    ]);
+    expect(await m.cliente.kpiIfoodDia.count({ where: { salesChannel: 'EMBEDDED_UBER', pedidos: 1n } })).toBe(1);
+    expect(await aplicar(m)).toMatchObject({ estado: 'aplicado' });
+    expect(await linhas(m)).toMatchObject([{ valorCentavos: 3200, pedidos: 2 }]);
+    const historico = await eventos(m);
+    expect(historico).toHaveLength(1);
+    expect(await aplicar(m)).toMatchObject({ estado: 'igual' });
+    expect(await linhas(m)).toHaveLength(1);
+    expect(await eventos(m)).toEqual(historico);
   });
   it('replay e sem-mudança confirmam o destino sem duplicar linha/histórico/aplicadoEm', async () => {
     const m = await massa(); await publicarFinanceiro(m, lider.posse); await aplicar(m);
