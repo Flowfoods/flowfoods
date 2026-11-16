@@ -2,6 +2,8 @@
 -- CREATE OR REPLACE preserva as permissões das funções existentes durante a atualização do worker.
 BEGIN;
 
+DO $$ BEGIN EXECUTE format('SET LOCAL search_path = %I, pg_temp', current_schema()); END $$;
+
 CREATE OR REPLACE FUNCTION erp_integracao_faturamento_validar(p_parceiro text,p_recibo text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path FROM CURRENT AS $$
 DECLARE r "IntegracaoFaturamentoDia"%ROWTYPE; f record; n bigint; total_valor numeric; total_pedidos numeric; valor numeric; pedidos numeric;

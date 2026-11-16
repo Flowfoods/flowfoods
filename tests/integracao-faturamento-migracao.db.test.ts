@@ -120,6 +120,7 @@ describe.skipIf(!URL_TESTE || !temPsql)('INT-1.7B · migration e protocolo finan
           const antesReplay = await db.integracaoFaturamentoDia.findUniqueOrThrow({ where: { id: recibo.id } });
           expect(antesReplay).toMatchObject({ estado: 'APLICADO', hashAplicado: HASH, versaoMapaAplicada: 1, revisaoSolicitada: 1n, revisaoConferida: 1n });
           exigir(psql(dono, ['-f', join(RAIZ, MIGRACAO_CANAL_UBER, 'migration.sql')]));
+          expect(await conferirMigracao(db)).toEqual([]);
           expect(await db.integracaoFaturamentoDia.findUniqueOrThrow({ where: { id: recibo.id } })).toEqual(antesReplay);
           expect(await db.faturamentoLancamento.findUniqueOrThrow({ where: { id: 'analytics' } })).toMatchObject({ valorCentavos: 600, pedidos: 3, clientes: null });
           exigir(como('p1', `${preparar}; ${concluir(true)}`));

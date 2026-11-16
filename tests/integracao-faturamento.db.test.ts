@@ -73,6 +73,22 @@ describe.skipIf(!URL_TESTE)('INT-1.7B · aplicação financeira atômica e repla
       bucketFinanceiro(11, 1, { salesChannel: 'EMBEDDED_UBER', deliveredBy: 'MERCHANT_DELIVERY' }),
     ]);
     expect(await m.cliente.kpiIfoodDia.count({ where: { salesChannel: 'EMBEDDED_UBER', pedidos: 1n } })).toBe(1);
+    // Com o mesmo snapshot e o valor correto da parte iFood, o contrato SQL v1 ainda rejeita o canal.
+    const r = await recibo(m);
+    const s = await m.cliente.integracaoSnapshot.findFirstOrThrow({ where: { situacao: 'PUBLICADO' } });
+    await expect(m.cliente.transacao(async tx => {
+      await tx.sql`SELECT erp_integracao_faturamento_preparar(${tx.parceiroId},${m.lojaId},${DIA_FINANCEIRO}::date,${lider.posse.id})`;
+      const l = await tx.faturamentoLancamento.create({ data: {
+        parceiroId: tx.parceiroId, lojaId: m.lojaId, data, canal: 'IFOOD', origem: 'INTEGRACAO', valorCentavos: 3200,
+        pedidos: 2, clientes: null, origemRef: `ifood-analytics:${s.id}`, chaveIdempotencia: `ifood-analytics:dia:${m.merchantId}:${DIA_FINANCEIRO}`,
+      } });
+      await tx.integracaoFaturamentoFonte.create({ data: {
+        parceiroId: tx.parceiroId, reciboId: r.id, dia: data, merchantId: m.merchantId,
+        conexaoId: m.conexaoId, moduloId: m.moduloId, snapshotId: s.id, lancamentoId: l.id,
+      } });
+      await tx.sql`SELECT erp_integracao_faturamento_concluir(${tx.parceiroId},${r.id},${lider.posse.id},${'a'.repeat(64)},1,false)`;
+    })).rejects.toThrow(/Recorte financeiro não mapeado/);
+    expect(await linhas(m)).toEqual([]);
     expect(await aplicar(m)).toMatchObject({ estado: 'aplicado' });
     expect(await linhas(m)).toMatchObject([{ valorCentavos: 3200, pedidos: 2 }]);
     const historico = await eventos(m);
