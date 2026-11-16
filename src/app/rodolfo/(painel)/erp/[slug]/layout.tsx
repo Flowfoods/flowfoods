@@ -5,12 +5,13 @@
  * desconhecido é 404); a URL só escolhe, o portão isola.
  *
  * `janela` (UX-MOD-2, piloto de 15/11/2026): o espaço da janela de módulo. Navegar dentro do parceiro para Lojas e marcas,
- * Equipe ou Histórico abre a tela numa janela por cima desta página (`@janela`); em qualquer outro caso fica vazio.
+ * Equipe ou Histórico abre a tela numa janela por cima desta página (`@janela`); em qualquer outro caso fica vazio. A
+ * moldura decide quando a janela não abre (a página de trás já é uma dessas telas, ou o destino é de outro parceiro).
  */
 
 import { exigirParceiro } from '@/lib/erp/contexto';
-import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
-import { Aviso } from '@/components/erp/ui/superficies';
+import { AvisoDoParceiro } from '@/components/erp/shell/aviso-do-parceiro';
+import { MolduraDaJanela } from '@/components/erp/shell/MolduraDaJanela';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,22 +30,15 @@ export default async function ParceiroLayout(
   } = props;
 
   const { parceiro, bloqueio } = await exigirParceiro(params.slug);
-  const status = STATUS_DO_PARCEIRO[parceiro.status];
 
   // A janela fica FORA da pilha `space-y-6`: a margem entre irmãos a deslocaria (o diálogo é posicionado pela tela).
   return (
     <>
     <div className="space-y-6">
-      {bloqueio && (
-        <Aviso tom={parceiro.status === 'SUSPENSO' ? 'erro' : 'alerta'} titulo={`${status.rotulo}.`}>
-          {parceiro.status === 'SUSPENSO'
-            ? 'Insumos, fichas técnicas, lojas e marcas ficam bloqueados até reativar. O nome do parceiro ainda pode ser corrigido em Cadastro do parceiro.'
-            : 'Insumos, fichas técnicas, lojas e marcas abrem quando o parceiro for ativado em Cadastro do parceiro.'}
-        </Aviso>
-      )}
+      <AvisoDoParceiro status={parceiro.status} bloqueio={bloqueio} />
       {children}
     </div>
-    {janela}
+    <MolduraDaJanela base={`/rodolfo/erp/${parceiro.slug}`}>{janela}</MolduraDaJanela>
     </>
   );
 }

@@ -29,12 +29,14 @@ import { Notificacoes } from './Notificacoes';
 import { BOTAO_ICONE, Popover } from './Popover';
 import { SeletorVisao } from './SeletorVisao';
 import { VoltarDaNavegacao } from './VoltarDaNavegacao';
+import { useCaminhoDaPagina } from './caminho-da-pagina';
+import { ID_DA_JANELA_NA_BARRA, ID_DA_JANELA_NO_CONTEUDO } from '@/lib/erp/janela';
 import type { PropsDoShell, ResultadoDaBusca } from './tipos';
 import { ProvedorDaTrilha, useTrilhaExtra, type ItemDaTrilha } from './trilha';
 import { ProvedorDaConsulta } from './contexto-da-consulta';
 
 export function Shell(p: { props: PropsDoShell; children: ReactNode }) {
-  const caminho = usePathname() ?? '';
+  const caminho = useCaminhoDaPagina();
   const contexto = [
     p.props.chaveDoContexto ?? '',
     raizDoRetorno(caminho) ?? '',
@@ -50,7 +52,9 @@ export function Shell(p: { props: PropsDoShell; children: ReactNode }) {
 }
 
 function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }) {
-  const caminho = usePathname();
+  // A página que o shell descreve (com a janela de módulo aberta, a de trás) e o endereço de fato (que fecha a gaveta).
+  const caminho = useCaminhoDaPagina();
+  const endereco = usePathname();
   const [recolhido, setRecolhido] = useState(props.menuRecolhido);
   const [gaveta, setGaveta] = useState(false);
   const botaoMenu = useRef<HTMLButtonElement>(null);
@@ -72,11 +76,11 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
     hrefAtivo: ativo?.item.href ?? (caminho === nav.inicio.href ? nav.inicio.href : null),
   };
 
-  // Trocar de tela fecha a gaveta.
+  // Trocar de tela fecha a gaveta (inclusive ao abrir a janela de módulo, que muda o endereço e não a página de trás).
   useEffect(() => {
     setGaveta(false);
     setAjudaAberta(false);
-  }, [caminho]);
+  }, [endereco]);
 
   // Ajuda (0.6): a entrada da tela vem da rota; a caixa, da preferência (a mesma conta no servidor e aqui).
   const ajuda = props.ajuda;
@@ -337,6 +341,9 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
                   ))}
                 </ol>
               </nav>
+              {/* Janela de módulo minimizada (UX-MOD-2): o botão de reabrir mora aqui, na barra, e não cobre botões nem cards da
+                  página. Vazio, não ocupa lugar. */}
+              <div id={ID_DA_JANELA_NA_BARRA} className="flex shrink-0 items-center empty:hidden max-sm:hidden" />
             </div>
 
             {/* Desde que a trilha aparece (640 px), os botões não encolhem: quem cede é a trilha (já corta com "…"). Sem isso,
@@ -368,6 +375,9 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           </header>
 
           <main id="conteudo" className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+            {/* Janela minimizada no celular (abaixo de 640 px a barra do topo não tem lugar): uma faixa presa logo abaixo da
+                barra, no fluxo da página, que não cobre botões. Vazia, não ocupa lugar. */}
+            <div id={ID_DA_JANELA_NO_CONTEUDO} className="sticky top-16 z-[25] -mx-4 -mt-6 mb-4 empty:hidden sm:hidden" />
             <Suspense fallback={null}>
               <VoltarDaNavegacao nav={nav} chaveDoContexto={props.chaveDoContexto} visao={props.visao.modo === 'parceiro' ? props.visao.valor : undefined} />
             </Suspense>

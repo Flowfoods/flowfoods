@@ -21,7 +21,7 @@ import { Painel, Selo } from '@/components/erp/ui/superficies';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { COR } from '@/lib/erp/modulos';
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/erp', useRouter: () => ({ refresh: () => {}, push: () => {} }) }));
+vi.mock('next/navigation', () => ({ useSelectedLayoutSegments: () => [], usePathname: () => '/erp', useRouter: () => ({ refresh: () => {}, push: () => {} }) }));
 
 const css = readFileSync('src/components/erp/tokens.css', 'utf8');
 const globais = readFileSync('src/app/globals.css', 'utf8');

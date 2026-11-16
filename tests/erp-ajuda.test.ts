@@ -35,6 +35,8 @@ import { PageHeader } from '@/components/erp/ui/cabecalho';
 
 let caminhoAtual = '/erp';
 vi.mock('next/navigation', () => ({
+  // O shell lê os segmentos da rota (página de trás da janela de módulo, decisão 526).
+  useSelectedLayoutSegments: () => [],
   usePathname: () => caminhoAtual,
   useRouter: () => ({ push: () => {}, refresh: () => {} }),
 }));
@@ -53,13 +55,14 @@ const GERENTE = resolverAlcance(vinculo({ perfilBase: 'GERENTE' }));
 const OPERADOR = resolverAlcance(vinculo({ perfilBase: 'OPERADOR' }));
 
 // ---------------------------------------------------------------- as rotas do disco
-// Pasta `@nome` é um espaço paralelo do layout (a janela de módulo, decisão 526): não cria endereço. As telas que a janela
-// mostra são as próprias rotas, que já têm entrada; o teste da janela prova que ela só intercepta rotas que existem.
+// O espaço `@janela` (a janela de módulo, decisão 526) fica fora: as páginas dele são as interceptações (reexportam as
+// próprias rotas, que já têm entrada) e as rotas vazias que fecham a janela; o teste da janela prova as duas coisas. Só
+// esse espaço sai da conta: um espaço paralelo novo entra no inventário até ser tratado.
 function paginas(dir: string): string[] {
   let out: string[] = [];
   for (const n of readdirSync(dir)) {
     const p = join(dir, n);
-    if (statSync(p).isDirectory() && n.startsWith('@')) continue;
+    if (statSync(p).isDirectory() && n === '@janela') continue;
     if (statSync(p).isDirectory()) out = out.concat(paginas(p));
     else if (/^page\.[jt]sx?$/.test(n)) out.push(p);
   }

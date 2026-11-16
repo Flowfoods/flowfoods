@@ -375,14 +375,24 @@ html:has(.ff-app[data-tema='escuro']) {
   width: calc(100vw - 16px);
   height: calc(100dvh - 16px);
 }
+/* No celular, a tela toda, com ou sem Expandir (ligado no celular deitado e girado para em pé, não sobra faixa). */
 @media (max-width: 699px) {
-  .ff-app dialog.ff-janela {
+  .ff-app dialog.ff-janela,
+  .ff-app dialog.ff-janela[data-cheia='true'] {
     margin: 0;
     width: 100vw;
     height: 100dvh;
     border: 0;
     border-radius: 0;
   }
+}
+/*
+ * A página de trás não rola com a janela aberta. Regra de CSS, e não o estilo do body: o `Dialogo` do kit guarda e devolve
+ * o estilo do body, e a janela abre e fecha junto com a gaveta e a ajuda (os dois disputariam o valor guardado). Minimizada,
+ * a janela fica fechada e o fundo volta a rolar.
+ */
+html:has(.ff-app dialog.ff-janela[open]) {
+  overflow: hidden;
 }
 /* Dentro da janela o título da tela fica menor: a janela já diz a área no cabeçalho dela. */
 .ff-app .ff-janela-corpo h1 {

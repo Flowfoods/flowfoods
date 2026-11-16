@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
+  // O shell lê os segmentos da rota (página de trás da janela de módulo, decisão 526).
+  useSelectedLayoutSegments: () => [],
   usePathname: () => '/erp/dre',
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: () => {}, refresh: () => {} }),
