@@ -12,6 +12,7 @@ import {
 } from '@/lib/erp/voltar-navegacao';
 import { Voltar } from '../telas/cadastro/partes';
 import { useContextoDaConsulta } from './contexto-da-consulta';
+import { useCaminhoDaPagina } from './caminho-da-pagina';
 
 const useAntesDaPintura = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -26,8 +27,18 @@ export function VoltarDaNavegacao({
   chaveDoContexto?: string;
   visao?: string | null;
 }) {
-  const caminho = usePathname() ?? '';
-  const busca = useSearchParams()?.toString() ?? '';
+  // Com a janela de módulo aberta, o Voltar do shell continua o da página de trás (caminho e busca de antes da janela): ele
+  // não muda e não guarda a janela como visita.
+  const caminhoDoEndereco = usePathname() ?? '';
+  const buscaDoEndereco = useSearchParams()?.toString() ?? '';
+  const caminho = useCaminhoDaPagina();
+  const naJanela = caminho !== caminhoDoEndereco;
+  // O último endereço fora da janela (guardado no próprio desenho, o padrão do React para lembrar o desenho anterior).
+  const [foraDaJanela, guardarForaDaJanela] = useState({ caminho: caminhoDoEndereco, busca: buscaDoEndereco });
+  if (!naJanela && (foraDaJanela.caminho !== caminhoDoEndereco || foraDaJanela.busca !== buscaDoEndereco)) {
+    guardarForaDaJanela({ caminho: caminhoDoEndereco, busca: buscaDoEndereco });
+  }
+  const busca = naJanela ? (foraDaJanela.caminho === caminho ? foraDaJanela.busca : '') : buscaDoEndereco;
   const atual = caminho + (busca ? '?' + busca : '');
   const consulta = useContextoDaConsulta();
   const contexto = consulta.chave || [chaveDoContexto ?? '', raizDoRetorno(caminho) ?? '', visao ?? ''].join(':');

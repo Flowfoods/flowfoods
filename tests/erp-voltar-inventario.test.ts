@@ -18,9 +18,13 @@ const ARVORES = [
   { pasta: join(RAIZ, 'src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]'), prefixo: '/rodolfo/erp/alfa' },
 ];
 
+// O espaço `@janela` (a janela de módulo, decisão 526) fica fora: o retorno da janela são os botões Voltar e Fechar dela
+// (roteiro de navegador e teste da janela); a tela que ela mostra é a própria rota, inventariada aqui. Só esse espaço sai
+// da conta: um espaço paralelo novo entra no inventário até ser tratado.
 const paginas = (pasta: string): string[] =>
   readdirSync(pasta).flatMap((n) => {
     const p = join(pasta, n);
+    if (statSync(p).isDirectory() && n === '@janela') return [];
     return statSync(p).isDirectory() ? paginas(p) : n === 'page.tsx' ? [p] : [];
   });
 

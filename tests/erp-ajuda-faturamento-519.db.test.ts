@@ -14,6 +14,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const atual = vi.hoisted(() => ({ ctx: null as null | (() => unknown), visao: { tipo: 'rede' } as { tipo: string; lojaId?: string; nome?: string }, caminho: '/erp' }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('next/navigation', () => ({
+  // O shell lê os segmentos da rota (página de trás da janela de módulo, decisão 526).
+  useSelectedLayoutSegments: () => [],
   redirect: (url: string) => {
     throw Object.assign(new Error(`REDIRECT ${url}`), { url });
   },

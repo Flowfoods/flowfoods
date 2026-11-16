@@ -16,6 +16,8 @@ import { TelaDeDespesas } from '@/components/erp/telas/dre/despesas';
 
 const rota = vi.hoisted(() => ({ caminho: '/erp/fichas', busca: '' }));
 vi.mock('next/navigation', () => ({
+  // O shell lê os segmentos da rota (página de trás da janela de módulo, decisão 526).
+  useSelectedLayoutSegments: () => [],
   usePathname: () => rota.caminho,
   useSearchParams: () => new URLSearchParams(rota.busca),
 }));

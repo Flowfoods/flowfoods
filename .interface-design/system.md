@@ -127,6 +127,29 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   veem módulo futuro até o público delas ser definido. Fora de um parceiro o
   seletor do nível 1 não lista futuros. Na gaveta do celular o painel fica na
   largura dela.
+- **Janela de módulo** (piloto, decisão 526; só nível 1, área Rede e Equipe):
+  a tela abre num diálogo nativo por cima da página, que não sai do lugar
+  (rota interceptada: o link direto e a recarga mostram a tela inteira; da
+  tela inteira de uma das telas da janela, as outras abrem como tela
+  inteira). Cabeçalho com ícone de cor cheia, nome da janela (não é título;
+  o h1 é o da tela), contexto do topo e os botões Voltar, Minimizar,
+  Expandir (`aria-pressed`, nome fixo) e Fechar (44 px); abas da área, as
+  mesmas do menu, num trilho que rola. A janela é uma entrada no histórico:
+  abas e links para telas dela substituem o endereço; Voltar anda pela
+  pilha da janela; Fechar e o voltar do navegador voltam à página de trás.
+  Até 1040 px × 88 % da altura; Expandir ocupa a tela; no celular é a tela
+  toda. O shell (trilha, menu, ajuda, Voltar) continua descrevendo a página
+  de trás; a caixa "Como funciona" não aparece na janela; o aviso de
+  situação do parceiro aparece. Alteração não salva (por formulário, na
+  hora) pergunta antes de fechar, voltar, trocar de aba, seguir link ou
+  abrir a busca, dentro da janela. Minimizar guarda tudo; "Reabrir" fica na
+  barra do topo a partir de 1280 px (44 px no mínimo) e, abaixo disso, numa
+  faixa no alto do conteúdo, no fluxo (presa, cobriria as barras que as
+  telas prendem). A rolagem do fundo trava por CSS (`html:has(...)`), nunca pelo
+  estilo do body, que o `Dialogo` guarda e devolve. Usa a classe do diálogo
+  do kit (entrada, fundo, movimento reduzido). Os testes que varrem rotas
+  ignoram só o espaço `@janela` (as páginas dele reexportam rotas que já
+  entram na conta ou são rotas vazias).
 - **Barra superior** 64 px, na cor da superfície, borda inferior, sem blur.
 - **Botão** 40 px (44 no celular), padding 16, raio 10, 14 px/600. Um
   primário por tela. Variantes: primario (texto `sobre-acao`), secundario (na

@@ -20,6 +20,8 @@ import { CamposDaEmbalagem, EMBALAGEM_VAZIA, TEXTO_DO_CUSTO_INICIAL } from '@/co
 
 let caminhoAtual = '/erp/insumos/novo';
 vi.mock('next/navigation', () => ({
+  // O shell lê os segmentos da rota (página de trás da janela de módulo, decisão 526).
+  useSelectedLayoutSegments: () => [],
   usePathname: () => caminhoAtual,
   useRouter: () => ({ push: () => {}, refresh: () => {} }),
 }));
