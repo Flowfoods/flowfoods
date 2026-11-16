@@ -4154,29 +4154,62 @@ Ficha: no 1º commit desta decisão (antes da revisão) o botão saía da tela a
 
 ### 527. 2026-11-16 · Busca ⌘K com nomes curtos e sinônimos do plano de módulos
 
-**Fonte e recorte:** requisito 5 e critério 3 do plano de módulos (11/11/2026): a busca considera nomes novos e antigos, e cada atalho aponta ao domínio existente correto. Fatia seguinte à janela de módulo (decisão 526), autorizada por Rodolfo em 16/11/2026 ("pode seguir com o plano"). A aplicação da janela a outras áreas (UX-MOD-3) espera a validação no iPhone que o critério da UX-MOD-2 pede; esta fatia não depende dela. Sem rota, tela, permissão, regra, schema, migration, dado ou dependência.
+**Fonte e recorte:** requisito 5 e critério 3 do plano de módulos (11/11/2026): a busca considera nomes novos e antigos, e cada atalho aponta ao domínio existente correto. Este recorte atende o critério em parte: os módulos sem tela, como CRM Clube, um dos exemplos do critério, ficam para a UX-MOD-4. É a fatia seguinte à janela de módulo (decisão 526), autorizada por Rodolfo em 16/11/2026 ("pode seguir com o plano"). A aplicação da janela a outras áreas (UX-MOD-3) espera a validação no iPhone que o critério da UX-MOD-2 pede; esta fatia não depende dela. Sem rota, tela, permissão, regra, schema, migration, dado ou dependência.
 
-1. **Termos de busca** (`termos` em `ItemNav` e na definição da área, `src/lib/erp/modulos.ts`): nomes curtos e sinônimos que só ajudam a achar. Eles não aparecem na tela e não mudam rótulo, rota, menu nem permissão. A área passa os dela para todas as suas abas e ações. Da tabela de nomes curtos do launcher, só o que tem tela:
-   - **Financeiro** e **Financeiro e Resultados**: Faturamento e DRE.
-   - **Gestão** e **Configurações**: Rede e Equipe.
-   - **iFood** e **Integração**: Integrações, a aba do parceiro e a Central do nível 1. A Central também responde a Configurações. "Integração" no singular não achava "Integrações".
-   - **Analytics** e **Indicadores**: o hub, onde mora a Home analítica.
+1. **Termos de busca** (`termos` em `ItemNav`, na definição da área e no `inicio` do hub, em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`): nomes curtos e sinônimos que só servem para achar. Eles não aparecem na tela e não mudam rótulo, rota, menu nem permissão. A área passa os seus termos para todas as suas abas e ações. Só entram nomes com tela:
 
-   Nomes que já estavam na tela (Cardápio, Fichas técnicas, Insumos, Compras, Estoque, Produção, Etiquetas) continuam achando como antes.
-2. **A busca** (`src/lib/erp/busca-local.ts`, puro) monta as telas, as ações e os parceiros a partir do menu de quem busca, como antes. O termo procurado é comparado sem acento e sem diferença de maiúsculas, no nome, no detalhe e nos termos. A ordem é a do menu, e sem termo aparecem as telas. Quem não vê a tela no menu não a acha pela busca: um Operador sem DRE, ou um parceiro sem Integração liberada. Módulo sem tela ("Em breve", como CRM Clube, Checklists, Flow Ads e Patrimônio) não vira resultado: nenhum link falso.
-3. **Testes:** `tests/erp-busca-sinonimos.test.ts` cobre:
-   - cada nome curto no parceiro (Dono) e no nível 1 dentro de um parceiro;
-   - os nomes canônicos;
-   - que o termo não muda rótulo, destino nem ordem;
-   - o Operador e o parceiro sem liberação;
-   - os módulos sem tela.
+   | Termo | Tela | Origem |
+   |---|---|---|
+   | Financeiro, Financeiro e Resultados | Faturamento e DRE | Nome curto da tabela do plano e nome canônico do módulo |
+   | Gestão | Rede e Equipe | Tabela do plano |
+   | Configurações, Configuração | Lojas e marcas, Integrações e Equipe (no nível 1, também a Central de Integrações) | Tabela do plano: integrações, permissões e configuração da rede, "Integrações e lojas". Não vale para o resto da área. O singular também acha. |
+   | iFood, Integração | Integrações (a aba do parceiro e a Central do nível 1) | Exemplo do requisito 5. "Integração" no singular não achava "Integrações". |
+   | Analytics | O hub, onde fica a Home analítica | Tabela do plano. "Indicadores" ficou fora: não está na tabela e já é nome de aba (Produção › Indicadores). |
 
-**Validação local (dados sintéticos):** no navegador (Chromium, app local, roteiro fora do repositório), 24 conferências sem falha, no nível 1 dentro do parceiro, na dona e no operador:
-- Financeiro acha só Faturamento e DRE, com DRE entre os resultados.
-- Gestão acha Rede e Equipe.
-- Configurações, iFood e Integração acham Integrações só quando ela está no menu: o nível 1 vê; a dona do parceiro de teste, sem a liberação, não.
-- Analytics acha o hub.
-- CRM Clube não acha nada.
-- Enter abre a primeira tela de Financeiro.
+   Nomes que já estavam na tela (Cardápio, Fichas técnicas, Insumos, Compras, Estoque, Produção, Etiquetas, Indicadores) acham o mesmo de antes.
+2. **A busca** (`src/lib/erp/busca-local.ts`, puro) monta as telas, as ações e os parceiros a partir do menu de quem busca, como antes. Ignora acento e maiúsculas, e a normalização é a de antes.
+   - **Ordem:** primeiro vem o que casa pelo nome ou pelo detalhe (área · função), como sempre, na ordem do menu. Depois vem o que só casa por um termo. Os sinônimos só acrescentam: o primeiro resultado, que é o do Enter, e os que cabiam nos 12 continuam os de antes.
+   - **Como o termo casa:** pelo começo de uma palavra dele. "fin" acha Financeiro; "está" não acha Gestão.
+   - **Sem termo** digitado, aparecem as telas.
+   - **Permissão:** quem não vê a tela no menu não a acha (Operador sem Faturamento e DRE; parceiro sem Integração liberada).
+   - **Módulos sem tela:** módulo "Em breve" (CRM Clube, Checklists, Flow Ads, Patrimônio) não vira resultado. Nenhum link falso.
+3. **Testes** (`tests/erp-busca-sinonimos.test.ts`, 11 testes):
+   - **Regressão:** em mais de mil consultas (palavras e começos de palavra de nomes, detalhes e termos), os resultados de antes vêm primeiro, na mesma ordem. Cobre 7 cenários: Dono, Gerente, Operador, Dono sem Integração liberada, Gerente de uma loja, nível 1 dentro e fora de um parceiro.
+   - **Primeiro resultado:** o de Indicadores e o de Resultado não mudam.
+   - **Começo de palavra:** o termo casa só pelo começo de uma palavra.
+   - **Nomes curtos:** cada um acha as telas certas, sem acento e sem diferença de maiúsculas, nos cenários.
+   - **Menu e futuros:** todo resultado é do menu de quem busca, e os módulos sem tela não aparecem.
 
-**Limites:** os módulos do catálogo "Em breve" não aparecem na busca, nem como "em breve": isso é da UX-MOD-4 (mostrar futuros conforme acesso e estado real). Os nomes curtos dos módulos futuros (CRM, Delivery, Pessoas, Checklists, Patrimônio, Dispositivos, Flow Ads) não acham nada, porque não há tela. "Delivery" acha a Precificação, que fala de delivery no subtítulo. A ordem continua a do menu, sem ranqueamento por relevância. Não testado em Safari/iOS nem leitor de tela. Reversão: apagar os `termos` e voltar a busca a comparar só nome e detalhe; não há migration nem dado.
+**Validação local (dados sintéticos):**
+- **Testes no commit da primeira rodada (a6a7033):**
+  - Testes de navegação sem banco: 13 arquivos, 459 testes (`npx vitest run` com os arquivos que tocam a navegação).
+  - Testes com banco que tocam a navegação: 5 arquivos, 53 testes (`ERP_DB_TESTE=… npx vitest run --no-file-parallelism`).
+  - Tipos, portão de conteúdo e ai:check limpos. Lint sem erro, com as mesmas 64 advertências de antes.
+- **No navegador**, com a correção da revisão (Chromium, app local, roteiro fora do repositório): 31 conferências sem falha, com nível 1 no parceiro, a dona e o operador.
+  - Financeiro acha só Faturamento e DRE.
+  - Gestão acha Rede e Equipe.
+  - Configurações acha Lojas e marcas e Equipe, mais Integrações só quando ela está no menu, e nunca Histórico nem Seu acesso.
+  - iFood e Integração acham Integrações só quando ela está no menu.
+  - Analytics acha o hub.
+  - "indicadores" segue abrindo Produção › Indicadores, e "resultado" segue abrindo o DRE.
+  - "está" não acha Gestão.
+  - CRM Clube não acha nada.
+  - Enter abre a tela.
+- A correção da revisão também foi verificada pelos testes acima no commit seguinte. O portão completo (o CI do PR e o roteiro local que espelha o job do `deploy.yml`) roda no commit final; o resultado fica no PR e na página de evidências.
+
+**Revisão independente:** primeira rodada (a6a7033): reprovado, sem bloqueante.
+- **Importante:** os termos tiravam o primeiro lugar de nomes que já existiam. "indicadores" passava a abrir o hub, "resultado" a abrir Faturamento, e consultas curtas empurravam resultados antigos para fora dos 12. Corrigido no item 2: o que casa pelo nome vem primeiro.
+- **Menores tratados:**
+  - o termo casava por pedaço do meio da palavra (agora só pelo começo);
+  - "Indicadores" não estava na tabela do plano;
+  - "Configurações" valia para a área inteira;
+  - faltava o singular "Configuração";
+  - o registro não estava preciso (critério parcial, "Pessoas", SHA e comandos);
+  - testes não provavam o que diziam: laço do Operador vazio, primeiro resultado não conferido, Gerente e nível 1 fora do parceiro ausentes;
+  - o comentário de `modulosDoParceiro` estava fora do lugar.
+
+**Limites:**
+- **Módulos "Em breve":** não aparecem na busca, nem como "em breve"; isso é da UX-MOD-4. Os nomes curtos de módulos futuros (CRM, Checklists, Patrimônio, Dispositivos, Flow Ads) não acham nada. "Delivery" acha a Precificação, que fala de delivery no subtítulo. "Pessoas" acha a aba Equipe pelo subtítulo, como já acontecia; não é o módulo futuro Equipe e RH.
+- **Ordem:** dentro de cada grupo (nome e sinônimo) a ordem é a do menu, sem ranqueamento por relevância. Um começo curto que casa com um sinônimo ("fin", "conf") acrescenta telas antes dos insumos do servidor.
+- **Não testado** em Safari/iOS nem com leitor de tela.
+- **Reversão:** apagar os `termos` e voltar a busca a comparar só nome e detalhe; não há migration nem dado.

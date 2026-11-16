@@ -3,9 +3,10 @@
  * parceiros. Puro, testável.
  *
  * Os nomes curtos e sinônimos (`termos` das áreas e abas, plano de módulos de 11/11/2026: "Financeiro" para Faturamento e
- * DRE, "Gestão" e "Configurações" para Rede e Equipe, "iFood" e "Integração" para Integrações, "Analytics" para o hub) só
- * ajudam a ACHAR: não aparecem na lista nem criam destino. Os resultados saem do menu da pessoa, então quem não vê a tela
- * no menu não a acha pela busca, e módulo sem tela ("Em breve") não vira resultado.
+ * DRE, "Gestão" para Rede e Equipe, "Configurações" para Lojas e marcas, Integrações e Equipe, "iFood" e "Integração" para
+ * Integrações, "Analytics" para o hub) só ajudam a ACHAR: não aparecem na lista nem criam destino, e vêm depois do que já
+ * casava pelo nome. Os resultados saem do menu da pessoa, então quem não vê a tela no menu não a acha pela busca, e módulo
+ * sem tela ("Em breve") não vira resultado.
  */
 
 import { acoesDaNavegacao, telasDaNavegacao, type Navegacao } from './modulos';
@@ -58,9 +59,26 @@ export function locaisDaNavegacao(
   return [...telas, ...dosParceiros];
 }
 
-/** O que responde ao termo (no nome, no detalhe ou num nome curto/sinônimo), na ordem do menu; sem termo, só as telas. */
+/**
+ * Se o termo procurado é o começo de um nome curto/sinônimo, ou de uma palavra dele ("fin" acha Financeiro; "está" não
+ * acha Gestão, nem "cad" acha um nome que só contém essas letras no meio).
+ */
+function casaComTermos(termos: string, termo: string): boolean {
+  const nomes = ` ${normalizarBusca(termos).replace(/\s*·\s*/g, ' ').replace(/\s+/g, ' ')}`;
+  return nomes.includes(` ${termo}`);
+}
+
+/**
+ * O que responde ao termo, sem termo, só as telas. Primeiro o que casa pelo nome ou pelo detalhe (área · função), como sempre
+ * foi, na ordem do menu; DEPOIS o que só casa por um nome curto/sinônimo. Assim os sinônimos só acrescentam: o primeiro
+ * resultado (o do Enter) e os que cabiam na lista continuam os de antes ("indicadores" segue abrindo Produção › Indicadores,
+ * "resultado" segue abrindo o DRE).
+ */
 export function filtrarLocais<T extends { tipo: string; rotulo: string; detalhe: string; termos?: string }>(locais: readonly T[], q: string): T[] {
-  const termo = normalizarBusca(q.trim());
+  const termo = normalizarBusca(q.trim()).replace(/\s+/g, ' ');
   if (!termo) return locais.filter((r) => r.tipo === 'tela');
-  return locais.filter((r) => normalizarBusca(`${r.rotulo} ${r.detalhe} ${r.termos ?? ''}`).includes(termo));
+  const pelaTela = (r: T) => normalizarBusca(`${r.rotulo} ${r.detalhe}`).includes(termo);
+  const direto = locais.filter(pelaTela);
+  const soPeloTermo = locais.filter((r) => !pelaTela(r) && !!r.termos && casaComTermos(r.termos, termo));
+  return [...direto, ...soPeloTermo];
 }

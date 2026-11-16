@@ -121,7 +121,7 @@ export function modulosDoNivel1(): ModuloNav[] {
               subtitulo: 'Pedidos do site: ativar ou recusar',
             },
             // INT-1.8 (decisão 490): a Central de Integrações, só do nível 1.
-            { href: '/rodolfo/integracoes', rotulo: 'Integrações', icone: 'canais', subtitulo: 'Apps do iFood, lojas ligadas e liberação', termos: ['iFood', 'Integração', 'Configurações'] },
+            { href: '/rodolfo/integracoes', rotulo: 'Integrações', icone: 'canais', subtitulo: 'Apps do iFood, lojas ligadas e liberação', termos: ['iFood', 'Integração', 'Configurações', 'Configuração'] },
           ],
         },
       ],
@@ -169,7 +169,7 @@ export function comParceiroAtual(
     rotulo: parceiro.nome,
     icone: 'rede',
     // O hub do parceiro tem a Home analítica: "Analytics" é o nome curto do plano para ela.
-    itens: [{ href: base, rotulo: 'Áreas da Rede', icone: 'inicio', subtitulo: `Hub de ${parceiro.nome}`, termos: ['Analytics', 'Indicadores'] }],
+    itens: [{ href: base, rotulo: 'Áreas da Rede', icone: 'inicio', subtitulo: `Hub de ${parceiro.nome}`, termos: ['Analytics'] }],
   };
   const grupos: GrupoNav[] = areas.map((a) => ({ rotulo: a.nome, icone: a.icone, itens: a.grupos.flatMap((g) => g.itens) }));
   const acoes = areas.flatMap((a) => a.acoes);
