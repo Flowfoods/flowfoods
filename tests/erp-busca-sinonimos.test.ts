@@ -77,6 +77,16 @@ describe('busca ⌘K · os sinônimos só acrescentam', () => {
     expect(filtrarLocais(doParceiro('DONO'), 'cad')[0].href).not.toBe('/erp');
   });
 
+  it('espaços repetidos contam como um só, na consulta e no texto: um parceiro gravado com espaço duplo continua achado', () => {
+    const comEspacoDuplo = [{ slug: 'bar-do-ze', nome: 'Bar  do Zé', rotuloStatus: 'Ativo' }];
+    const locais = locaisDaNavegacao(navegacaoDoNivel1(), comEspacoDuplo);
+    for (const q of ['bar do', 'bar  do', 'BAR   DO ZE']) expect(rotulos(filtrarLocais(locais, q)), q).toEqual(['Bar  do Zé']);
+    // Na consulta: com espaços repetidos, acha o mesmo que com um espaço só.
+    const doDono = doParceiro('DONO');
+    expect(filtrarLocais(doDono, 'lojas   e marcas')).toEqual(filtrarLocais(doDono, 'lojas e marcas'));
+    expect(rotulos(filtrarLocais(doDono, 'lojas   e marcas'))).toContain('Lojas e marcas');
+  });
+
   it('o sinônimo casa pelo começo de uma palavra dele, não por pedaço do meio', () => {
     // "fin" é o começo de Financeiro: acha Faturamento e DRE; "está" e "tão" são pedaços de Gestão: não acham por ela.
     expect(filtrarLocais(doParceiro('DONO'), 'fin').some((r) => r.detalhe.startsWith('Faturamento e DRE'))).toBe(true);

@@ -4154,9 +4154,16 @@ Ficha: no 1º commit desta decisão (antes da revisão) o botão saía da tela a
 
 **Ajuste seguinte (16/11/2026, depois do merge):** a revisão final de f372d3b apontou que, com os dois seletores no tamanho máximo, o botão de reabrir na barra ainda podia passar da borda. A correção foi revisada por um novo revisor independente.
 - **Primeira rodada (6efc30c): reprovada, sem bloqueante.** Achados:
-  - **Importante:** a partir de 1440 px, com trilha longa e barra de rolagem visível, o lugar na barra encolhia abaixo do mínimo do botão, e o botão cobria o seletor de parceiro (28 de 192 casos numa réplica fiel do topo).
+  - **Importante:** a partir de 1440 px, com trilha média ou longa, com ou sem barra de rolagem, o lugar na barra encolhia abaixo do mínimo do botão, e o botão cobria o seletor de parceiro (28 de 192 casos numa réplica fiel do topo, até 37,7 px com todos os nomes no limite).
   - **Menores:** em largura fracionária, entre 1439 e 1440 px, a barra e a faixa apareciam juntas. O mínimo real, contando o espaçamento do nome vazio, é 60 e 76 px, e não 52 e 68. O registro ainda citava 1280 e 44 px.
-- **Correção:** o lugar na barra tem o mesmo mínimo do botão: 60 px, ou 76 px com o ponto, por `has-[[data-ponto]]`. A barra e a faixa usam a mesma consulta, `min-width: 1440px`. O texto foi corrigido.
+- **Correção (129b381):** o lugar na barra tem o mesmo mínimo do botão: 60 px, ou 76 px com o ponto, por `has-[[data-ponto]]`, e quem cede é a trilha. A barra e a faixa usam a mesma consulta, `min-width: 1440px`. O texto foi corrigido.
+- **Segunda rodada (129b381): aprovada.** O revisor mediu a réplica do topo, com as classes exatas, em 1.664 casos: de 1280 a 1920 px, menu aberto e recolhido, com e sem rolagem de 15 px, quatro trilhas, quatro conjuntos de nomes, com e sem o ponto. A partir de 1440 px, os 1.152 casos ficaram só na barra, sem cobrir o seletor e com folga mínima de 8 px. Abaixo disso, os 512 casos ficaram só na faixa. Em largura fracionária (escala de 1,25 e 1,1), aparece só a faixa. Observação fora do escopo, anterior a esta mudança: a 1280 px, com o menu aberto e todos os nomes no limite, inclusive o da pessoa, a página estoura 7 px (22 px com rolagem), com ou sem janela.
+- **Validação de 129b381** (Chromium, app local, dados sintéticos, roteiros fora do repositório):
+  - **Pior caso:** nomes no limite nos dois seletores, trilha longa e barra de rolagem de 15 px, trocados só na página, com e sem o ponto, de 1280 a 1920 px: 32 de 32 sem sobreposição, com ícone e ponto dentro do botão e sem estouro.
+  - **Barra do topo:** de 768 a 1920 px, com o menu aberto e recolhido: 26 de 26.
+  - **Roteiros completos:** janela, 121 de 121; busca, 31 de 31.
+  - **Portão completo local** (PostgreSQL 16.15, Node 22.23.4, roteiro que espelha o job do `deploy.yml`, árvore limpa no início e no fim): testes com banco em 357 arquivos e 6.173 testes, nenhum pulado. Lint, tipos, portão de conteúdo, build e fontes também passaram.
+  - **Portão descartado:** o portão anterior (6efc30c) teve uma falha num teste de tempo da integração iFood, área que esta mudança não toca. O teste passou em 3 de 3 execuções isoladas e no CI. Ficou sugerida uma tarefa separada para estabilizá-lo.
 
 ### 527. 2026-11-16 · Busca ⌘K com nomes curtos e sinônimos do plano de módulos
 
@@ -4179,12 +4186,13 @@ Ficha: no 1º commit desta decisão (antes da revisão) o botão saía da tela a
    - **Sem termo** digitado, aparecem as telas.
    - **Permissão:** quem não vê a tela no menu não a acha (Operador sem Faturamento e DRE; parceiro sem Integração liberada).
    - **Módulos sem tela:** módulo "Em breve" (CRM Clube, Checklists, Flow Ads, Patrimônio) não vira resultado. Nenhum link falso.
-3. **Testes** (`tests/erp-busca-sinonimos.test.ts`, 11 testes):
-   - **Regressão:** em mais de mil consultas (palavras e começos de palavra de nomes, detalhes e termos), os resultados de antes vêm primeiro, na mesma ordem. Cobre 7 cenários: Dono, Gerente, Operador, Dono sem Integração liberada, Gerente de uma loja, nível 1 dentro e fora de um parceiro.
+3. **Testes** (`tests/erp-busca-sinonimos.test.ts`, 12 testes depois do ajuste seguinte):
+   - **Regressão:** em mais de mil consultas (palavras, começos de palavra e pares de palavras de nomes, detalhes e termos), os resultados de antes vêm primeiro, na mesma ordem. A comparação é com uma cópia fixa da busca de antes, guardada no teste, e não com a função nova. Cobre 7 cenários: Dono, Gerente, Operador, Dono sem Integração liberada, Gerente de uma loja, nível 1 dentro e fora de um parceiro.
    - **Primeiro resultado:** o de Indicadores e o de Resultado não mudam.
    - **Começo de palavra:** o termo casa só pelo começo de uma palavra.
    - **Nomes curtos:** cada um acha as telas certas, sem acento e sem diferença de maiúsculas, nos cenários.
-   - **Menu e futuros:** todo resultado é do menu de quem busca, e os módulos sem tela não aparecem.
+   - **Permissão e futuros:** o Operador e o parceiro sem Integração liberada não acham o que não veem; os módulos sem tela não aparecem.
+   - **Espaços repetidos:** um parceiro gravado com espaço duplo é achado com um ou mais espaços, e uma consulta com espaços repetidos acha o mesmo que com um só.
 
 **Validação local (dados sintéticos):**
 - **Testes no commit da primeira rodada (a6a7033):**
@@ -4219,3 +4227,14 @@ Ficha: no 1º commit desta decisão (antes da revisão) o botão saía da tela a
 - **Ordem:** dentro de cada grupo (nome e sinônimo) a ordem é a do menu, sem ranqueamento por relevância. Um começo curto que casa com um sinônimo ("fin", "conf") acrescenta telas antes dos insumos do servidor.
 - **Não testado** em Safari/iOS nem com leitor de tela.
 - **Reversão:** apagar os `termos` e voltar a busca a comparar só nome e detalhe; não há migration nem dado.
+
+**Ajuste seguinte (16/11/2026, depois do merge, no mesmo PR do ajuste da 526):** foram tratadas as três observações opcionais da segunda rodada.
+- A regressão passou a comparar com uma cópia fixa da busca de antes.
+- Saiu o laço que não podia falhar, porque a função só filtra a lista que recebe.
+- O texto passou a citar a junção de espaços.
+
+A revisão independente dessa mudança fez duas rodadas:
+- **Primeira rodada (6efc30c):** pediu que os espaços repetidos contassem também no texto. Antes, um parceiro gravado com espaço duplo ("Bar  do Zé") deixava de ser achado. Pediu também pares de palavras na regressão. Os dois entraram em 129b381.
+- **Segunda rodada (129b381):** aprovada. Mutantes que invertem nome e detalhe falham com os pares de palavras.
+
+Os testes de espaços repetidos entraram no commit seguinte. Um mutante que tira a junção de espaços do texto faz o teste novo falhar.
