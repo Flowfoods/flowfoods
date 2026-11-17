@@ -48,6 +48,15 @@ export function ehAppIfoodDeTeste(app: Pick<DadosDoApp, 'provedor' | 'ambiente' 
   return app.provedor === APP_IFOOD_DE_TESTE.provedor && app.ambiente === APP_IFOOD_DE_TESTE.ambiente && app.categoria === APP_IFOOD_DE_TESTE.categoria;
 }
 
+/** A apuração de referência usa o cadastro global do app, inclusive quando nenhuma loja está conectada. */
+export async function appDeReferenciaFinancial(id: string) {
+  if (typeof id !== 'string' || !id || id.length > 60) return null;
+  return prisma.integracaoApp.findFirst({
+    where: { id, ...APP_IFOOD_DE_TESTE, modulos: { has: 'FINANCIAL' } },
+    select: { id: true, nome: true, clientId: true },
+  });
+}
+
 export async function incluirFinanceiroNoAppDeTeste(appId: string, autor: SessaoErp): Promise<{ ok: true; mudou: boolean } | { ok: false; erro: string }> {
   if (typeof appId !== 'string' || !appId || appId.length > 60 || !autor.userId || !autor.autorNome.trim()) {
     return { ok: false, erro: 'Não foi possível identificar o app ou o responsável.' };

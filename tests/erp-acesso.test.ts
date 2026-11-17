@@ -5,6 +5,7 @@
  * no middleware.
  */
 import bcrypt from 'bcryptjs';
+import { encode } from 'next-auth/jwt';
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 import {
@@ -218,8 +219,9 @@ describe('ERP 0.3 · sessões separadas (middleware) e portal travado', () => {
     expect(['/api/auth/signin', '/rodolfo/login']).toContain(destino(r));
   });
 
-  it('sessão expirada no envio Financial volta por GET ao login ou devolve 401 ao cliente JSON', async () => {
-    const path = 'http://localhost:3100/rodolfo/integracoes/rede-sintetica/financial/fontes';
+  it.each(['rede-sintetica/financial/fontes', 'apps/app-sintetico/financial/conferir'])(
+    'sessão expirada em %s volta por GET ao login ou devolve 401 ao cliente JSON', async rota => {
+    const path = 'http://localhost:3100/rodolfo/integracoes/' + rota;
     const enviar = async (accept: string) => (await middleware(new NextRequest(path, {
       method: 'POST', headers: { accept }, body: 'arquivo sintético',
     }), evento)) as Response;
@@ -231,6 +233,10 @@ describe('ERP 0.3 · sessões separadas (middleware) e portal travado', () => {
     expect(json.headers.get('location')).toBeNull();
     expect(json.headers.get('x-middleware-next')).toBeNull();
     expect(await json.json()).toMatchObject({ mensagem: expect.any(String) });
+    const token = await encode({ secret: process.env.NEXTAUTH_SECRET!, token: { sub: 'admin-sintetico' } });
+    const valido = await middleware(new NextRequest(path, { method: 'POST',
+      headers: { authorization: 'Bearer ' + token }, body: 'arquivo sintético' }), evento);
+    expect(valido?.status ?? 200).toBe(200);
   });
 
   it('/erp sem o cookie próprio volta para /entrar — o cookie do next-auth (/rodolfo) não serve', async () => {

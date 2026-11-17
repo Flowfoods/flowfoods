@@ -84,10 +84,11 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
   // mesmo objeto, só que decidimos NÓS quando ele entra.
   const acesso = await (comSessao as unknown as (r: NextRequest, e: NextFetchEvent) => Promise<Response | undefined>)(req, event);
   // O redirecionamento padrão 307 reenviaria os arquivos ao login se a sessão vencesse com o formulário aberto.
-  if (req.method === 'POST' && /^\/rodolfo\/integracoes\/[^/]+\/financial\/fontes\/?$/.test(pathname) && acesso?.status === 307) {
+  const envioDeFontes = /^\/rodolfo\/integracoes\/(?:[^/]+\/financial\/fontes|apps\/[^/]+\/financial\/conferir)\/?$/.test(pathname);
+  if (req.method === 'POST' && envioDeFontes && acesso?.status === 307) {
     const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
     if (formularioFinancialPedeHtml(req.headers)) return NextResponse.redirect(new URL('/rodolfo/login', req.url), { status: 303, headers });
-    return NextResponse.json({ mensagem: 'Entre na central FlowFoods para registrar fontes.' }, { status: 401, headers });
+    return NextResponse.json({ mensagem: 'Entre na central FlowFoods para apresentar as fontes.' }, { status: 401, headers });
   }
   return acesso;
 }

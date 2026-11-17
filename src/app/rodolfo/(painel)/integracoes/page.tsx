@@ -86,6 +86,8 @@ export default async function CentralDeIntegracoesPage() {
                         <dd className="text-texto">{!t ? 'nenhum ainda' : valido ? `vale até ${QUANDO.format(t.expiraEm)}` : `venceu em ${QUANDO.format(t.expiraEm)}; a próxima leitura pede outro`}</dd>
                       </dl>
                       {ehAppIfoodDeTeste(a) && <FormIncluirFinanceiro appId={a.id} nome={a.nome} cadastrado={a.modulos.includes('FINANCIAL')} />}
+                      {ehAppIfoodDeTeste(a) && a.modulos.includes('FINANCIAL') && <Link prefetch={false} href={`/rodolfo/integracoes/apps/${a.id}/financial`}
+                        className="inline-flex min-h-11 items-center text-sm underline underline-offset-4">Conferir apuração Financial de homologação</Link>}
                       {appAceitaParecer(a) && <Link href={`/rodolfo/integracoes/apps/${a.id}`} className="inline-block text-sm underline underline-offset-4">Registrar parecer do iFood</Link>}
                     </li>
                   );
