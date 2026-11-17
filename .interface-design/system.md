@@ -380,6 +380,8 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   no vermelho, e #292B27 no amarelo e no laranja (≥ 4,5:1, o menor é o verde com 4,93:1). Sem dados, Não ofertado e Faixas
   não configuradas continuam no `Selo` neutro. Filtros: amostra redonda de 10 px ao lado do nome; caixa e botão neutros.
   Impressão: a palavra em preto. Tokens `--ff-cmv-*`/`--ff-sobre-cmv-*` só em Fichas (teste-guarda); `--ff-farol-*` não muda.
+  Exceção escopada à regra do farol 2.4 ("cor só no texto e no glifo"): aqui a cor fica no selo do indicador, sempre com a
+  palavra; nunca em card, linha, cabeçalho ou botão.
 - **Orçamento de compra (2.5)**: bloco com o número grande em Gelasio ("ainda cabe no período" em suave, "passou do
   orçamento" em `erro` com a palavra), a conta por extenso em 13 px tabular ("Meta do CMV 30,0 % × R$ 41.000,00 de receita
   prevista = R$ 12.300,00 de teto − R$ 10.000,00 já comprados = R$ 2.300,00") e o ritmo com o `Farol` da 2.4 abaixo de um

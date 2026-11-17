@@ -4262,27 +4262,54 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
    O selo leva o próprio contraste e não depende do tema nem da superfície.
 3. **Medidas em CIELAB:**
    - croma de 52 ou mais em todas; o verde `ok` de antes tinha 26;
-   - distância de 41 ou mais entre qualquer par; antes, três faixas tinham distância zero;
+   - distância ΔE76 de 41 ou mais entre qualquer par; em ΔE2000, a menor é 29,6, entre amarelo e laranja. Antes, três faixas tinham distância zero;
    - matiz do vermelho em 33°, do laranja em 55° e do amarelo em 88°.
 4. **Onde aparece:**
    - no detalhe da ficha por canal e na projeção das embalagens (`FarolDeCmv`);
    - na prévia dos intervalos das faixas do canal (`IntervalosDoFarol`);
    - na lista (`CmvCompacto`);
-   - nos filtros, com uma amostra redonda ao lado do nome, nas opções e nos botões das faixas escolhidas. Caixa e botão continuam neutros. Os estados sem faixa ficam só com o contorno.
+   - nos filtros, com uma amostra redonda ao lado do nome, nas opções e nos botões das faixas escolhidas. Caixa e botão continuam neutros. Os estados sem faixa ficam só com o contorno. O selo e a amostra saem do mesmo mapa (`CLASSES_DA_COR`).
 5. **Tokens só de Fichas:** `--ff-cmv-*` e `--ff-sobre-cmv-*` ficam num bloco próprio de `tokens.css`, fora dos temas, com as classes no Tailwind.
    - O farol do DRE (`--ff-farol-*`, decisão 177) não muda.
    - O `Selo` genérico não muda: só a forma dele passou para a constante `FORMA_DO_SELO`.
-   - Um teste-guarda confere que essas cores só aparecem em `fichas/farol.tsx` e em `tokens.css`.
+   - Um teste-guarda confere que essas cores só aparecem em `fichas/farol.tsx` e em `tokens.css`. Ele pega o nome da cor e também a classe montada pelo prefixo.
    - Na impressão do navegador, o selo vira a palavra em preto sobre branco. O papel da ficha (`modo="impressao"`) já mostrava só a palavra.
+6. **Relação com regras anteriores:**
+   - É uma exceção escopada à regra da decisão 177 ("cor só no texto e no glifo; nunca fundo ou borda"), que continua valendo para o farol do DRE.
+   - Aqui a cor fica no selo do indicador, sempre com a palavra. Nunca em card, linha, cabeçalho ou botão.
+   - Substitui a apresentação anterior das faixas: os tons genéricos `ok`, `alerta` e `erro`, desde o PR #37 (07/11/2026), que só exigiam o texto, sem cor própria por faixa.
 
-**Verificação até aqui:**
-- testes focados: 86 passam;
-- testes sem banco de Fichas, Home de CMV, DRE e farol: 591 passam, e os 280 de banco ficam para o portão completo;
-- app local com dados sintéticos: 46 de 46 conferências, nos temas claro e escuro, no desktop (1440 px) e no celular (390 px). Elas cobrem lista, filtros, detalhe, faixas do canal e impressão.
+**Verificação:**
+- **Portão completo local em eb7f145:**
+  - Ambiente: PostgreSQL 16.15, Node 22.23.4 e um roteiro que espelha o job do `deploy.yml`. A árvore estava limpa no início e no fim.
+  - Testes com banco: 357 arquivos e 6.183 testes, nenhum pulado.
+  - ai-check, ai-test, lint, tipos, portão de conteúdo, build e fontes também passaram.
+- **CI:** verde em eb7f145.
+- **Testes focados:** 87 passam depois da correção da revisão.
+- **App local com dados sintéticos:** 46 de 46 conferências, nos temas claro e escuro, no desktop (1440 px) e no celular (390 px). Elas cobrem lista, filtros, detalhe, faixas do canal e impressão.
+- **Portão de conteúdo:** só varre `src/`. As linhas novas destes documentos foram conferidas à mão.
+
+**Revisão independente:** novo revisor, subagente só de leitura.
+- **Primeira rodada (eb7f145): aprovada, sem bloqueante.**
+  - O revisor mediu de novo cores e contraste e passou o axe-core em 16 combinações, sem violação.
+  - Rodou 20 mutantes: 15 morreram, inclusive voltar uma faixa ao `ok`, pôr a cor no botão e tirar a sobrescrita da impressão.
+  - **Achado importante:** a amostra dos filtros vinha de um segundo mapa, e trocar duas cores só nele passava nos testes.
+  - **Achados menores:** a guarda dos filtros só olhava a tag de abertura do botão; o fundo do neutro não estava fixado; a guarda de uso não via classe montada pelo prefixo; e o registro misturava métricas.
+- **Correção no commit seguinte:** um mapa só para selo e amostra, com teste que liga a amostra ao selo em cada faixa; a contagem de todas as cores nos filtros; o fundo do neutro fixado; e a guarda pelo prefixo. Os mutantes sobreviventes agora morrem.
+- **Confirmação:** a confirmação desse commit fica no PR e na página de evidências.
 
 **Limites:**
 - Não testado em Safari/iOS nem com leitor de tela.
-- Na simulação de deuteranopia, verde e vermelho ficam próximos (distância 8,4). A palavra continua no selo.
-- A associação de cores segue a ordem do farol do sistema. Outra preferência de Rodolfo muda só `APRESENTACAO_DA_FAIXA`.
+- **Daltonismo, simulado em ΔE2000.** A palavra continua no selo. Os pares mais próximos:
+  - na deuteranopia, verde e vermelho (8,4) e amarelo e laranja (10,7);
+  - na protanopia, verde e laranja (11,0).
+- **Decisões do dono, sem bloqueio:**
+  - O vermelho do Crítico (#B3001B) fica a 6,5 em ΔE2000 do vermelho da marca e do botão principal (#BC382E). O selo é bem menor que o botão, mas pode lembrá-lo.
+  - O Confortável em amarelo pode ser lido como alerta.
+  - Contra a superfície, os selos se destacam de forma diferente em cada tema. No escuro: Crítico 2,15:1 e Muito favorável 2,30:1. No claro: amarelo 1,67:1 e laranja 2,78:1. A palavra mantém de 4,93:1 a 8,50:1 sobre o próprio fundo.
+  - A associação de cores segue a ordem do farol do sistema. Outra preferência muda só `APRESENTACAO_DA_FAIXA`.
+- **Impressão:** o selo colorido perde a borda, que fica branca, e o neutro mantém a sua. Continua legível e monocromático.
+- **Filtros aplicados:** os botões do resumo ("Faixa: Loja · Confortável") mostram só o texto.
+- **Fora do escopo, anterior a esta mudança:** a 320 px, a lista estoura 1 px por causa do botão "Nova ficha", e a edição estoura 11 px por causa de "Escolher foto" e "Principal".
 
 **Reversão:** voltar `APRESENTACAO_DA_FAIXA` aos tons `ok`, `alerta` e `erro` e apagar os tokens `cmv-*`. Não há migration nem dado.

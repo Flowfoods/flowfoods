@@ -216,7 +216,9 @@ describe('farol do CMV de Fichas (17/11/2026): cinco cores próprias, cheias e s
   it('só Fichas usa essas cores: o farol do DRE e o resto do ERP continuam como estão', () => {
     const arquivos = (dir: string): string[] =>
       readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? arquivos(`${dir}/${d.name}`) : /\.(tsx?|css)$/.test(d.name) ? [`${dir}/${d.name}`] : []));
-    const usos = arquivos('src').filter((p) => /cmv-(?:azul|verde|amarelo|laranja|vermelho)/.test(readFileSync(p, 'utf8'))).sort();
+    // O nome da cor por extenso, ou uma classe montada pelo prefixo (`bg-cmv-${cor}`), fora de Fichas e dos tokens: nada.
+    const uso = /cmv-(?:azul|verde|amarelo|laranja|vermelho)|\b(?:bg|border|text|ring|fill|stroke|from|via|to|outline|shadow|decoration|divide|accent|caret)(?:-[trblxyse])?-(?:sobre-)?cmv-/;
+    const usos = arquivos('src').filter((p) => uso.test(readFileSync(p, 'utf8'))).sort();
     expect(usos).toEqual(['src/components/erp/telas/fichas/farol.tsx', 'src/components/erp/tokens.css']);
   });
 });
