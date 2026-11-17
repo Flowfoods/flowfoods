@@ -4277,7 +4277,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 6. **Relação com regras anteriores:**
    - É uma exceção escopada à regra da decisão 177 ("cor só no texto e no glifo; nunca fundo ou borda"), que continua valendo para o farol do DRE.
    - Aqui a cor fica no selo do indicador, sempre com a palavra. Nunca em card, linha, cabeçalho ou botão.
-   - Substitui a apresentação anterior das faixas: os tons genéricos `ok`, `alerta` e `erro`, desde o PR #37 (07/11/2026), que só exigiam o texto, sem cor própria por faixa.
+   - Substitui a apresentação anterior das faixas: os tons genéricos `ok`, `alerta` e `erro`, que só exigiam o texto, sem cor própria por faixa. Eles vieram com as cinco faixas no PR #34 (e8c17e2, 06/11/2026), e o PR #37 acrescentou o teste "sem exigir cor exclusiva".
 
 **Verificação:**
 - **Portão completo local em eb7f145:**
@@ -4294,9 +4294,9 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
   - O revisor mediu de novo cores e contraste e passou o axe-core em 16 combinações, sem violação.
   - Rodou 20 mutantes: 15 morreram, inclusive voltar uma faixa ao `ok`, pôr a cor no botão e tirar a sobrescrita da impressão.
   - **Achado importante:** a amostra dos filtros vinha de um segundo mapa, e trocar duas cores só nele passava nos testes.
-  - **Achados menores:** a guarda dos filtros só olhava a tag de abertura do botão; o fundo do neutro não estava fixado; a guarda de uso não via classe montada pelo prefixo; e o registro misturava métricas.
+  - **Achados menores:** a guarda dos filtros só olhava a tag de abertura do botão; o fundo do neutro não estava fixado; a guarda de uso não via classe montada pelo prefixo; e o registro misturava métricas. Os demais (contraste contra a superfície, vermelho da marca, borda na impressão, resumo dos filtros, relação com a 177 e verificação desatualizada) estão nos itens 6, "Verificação" e "Limites".
 - **Correção no commit seguinte:** um mapa só para selo e amostra, com teste que liga a amostra ao selo em cada faixa; a contagem de todas as cores nos filtros; o fundo do neutro fixado; e a guarda pelo prefixo. Os mutantes sobreviventes agora morrem.
-- **Confirmação:** a confirmação desse commit fica no PR e na página de evidências.
+- **Confirmação (1a3ebbc): aprovada.** O revisor rodou 18 mutantes numa cópia isolada e todos morreram: os 5 que sobreviviam e 9 novos contra o mapa único. Os 3 ajustes de redação que ele sugeriu entraram no commit seguinte. A confirmação desse commit fica no PR e na página de evidências.
 
 **Limites:**
 - Não testado em Safari/iOS nem com leitor de tela.
@@ -4312,4 +4312,4 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - **Filtros aplicados:** os botões do resumo ("Faixa: Loja · Confortável") mostram só o texto.
 - **Fora do escopo, anterior a esta mudança:** a 320 px, a lista estoura 1 px por causa do botão "Nova ficha", e a edição estoura 11 px por causa de "Escolher foto" e "Principal".
 
-**Reversão:** voltar `APRESENTACAO_DA_FAIXA` aos tons `ok`, `alerta` e `erro` e apagar os tokens `cmv-*`. Não há migration nem dado.
+**Reversão:** reverter os commits desta decisão (ou o merge do PR). Só voltar os tons em `APRESENTACAO_DA_FAIXA` não compila, porque o selo e a amostra dependem da cor. Não há migration nem dado.
