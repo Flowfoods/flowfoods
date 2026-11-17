@@ -374,6 +374,12 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   régua vazia e o motivo escrito. Tokens `--ff-farol-*` (claro #2F5D8A #166534 #6F6300 #B04400 #C41522; escuro
   #8DB4DC #5DBB84 #E2C55A #F0913A #F5424D), contraste ≥ 4,5:1 sobre painel, fundo e linha de resultado.
   Painel no topo do DRE no kit Bento da Kairu: estrutura modular, sem a paleta tonal do kit.
+- **Farol do CMV de Fichas (decisão 528)**: outra escala, a das cinco faixas configuráveis por canal. Selo cheio, uma cor
+  por faixa, a mesma nos dois temas: Muito favorável azul #1D4ED8, Favorável verde #15803D, Confortável amarelo
+  dourado #F2C200, Atenção laranja #F97316, Crítico vermelho #B3001B. O texto do selo é creme #FFFDF8 no azul, no verde e
+  no vermelho, e #292B27 no amarelo e no laranja (≥ 4,5:1, o menor é o verde com 4,93:1). Sem dados, Não ofertado e Faixas
+  não configuradas continuam no `Selo` neutro. Filtros: amostra redonda de 10 px ao lado do nome; caixa e botão neutros.
+  Impressão: a palavra em preto. Tokens `--ff-cmv-*`/`--ff-sobre-cmv-*` só em Fichas (teste-guarda); `--ff-farol-*` não muda.
 - **Orçamento de compra (2.5)**: bloco com o número grande em Gelasio ("ainda cabe no período" em suave, "passou do
   orçamento" em `erro` com a palavra), a conta por extenso em 13 px tabular ("Meta do CMV 30,0 % × R$ 41.000,00 de receita
   prevista = R$ 12.300,00 de teto − R$ 10.000,00 já comprados = R$ 2.300,00") e o ritmo com o `Farol` da 2.4 abaixo de um

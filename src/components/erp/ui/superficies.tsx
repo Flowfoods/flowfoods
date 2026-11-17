@@ -117,6 +117,9 @@ const TONS: Record<Tom, string> = {
  */
 const FUNDO_CHEIO: Record<Tom, string> = { ok: 'bg-ok-fundo border-ok', alerta: 'bg-atencao-fundo border-atencao', erro: 'bg-destaque border-erro', neutro: 'bg-forte' };
 
+/** A forma de todo selo (tamanho, borda, raio e tipo); a cor vem de quem usa. O farol do CMV de Fichas usa a mesma. */
+export const FORMA_DO_SELO = 'inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-[7px] border px-2 py-0.5 text-[12px] font-semibold';
+
 /**
  * Selo de situação: sempre com texto. Borda e texto na cor, sobre a superfície
  * (opaca: o contraste da palavra não depende de onde o selo está pousado).
@@ -125,13 +128,7 @@ const FUNDO_CHEIO: Record<Tom, string> = { ok: 'bg-ok-fundo border-ok', alerta: 
  */
 export function Selo({ tom = 'neutro', cheio = false, children }: { tom?: Tom; cheio?: boolean; children: ReactNode }) {
   const fundo = cheio ? FUNDO_CHEIO[tom] : 'bg-painel';
-  return (
-    <span
-      className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-[7px] border px-2 py-0.5 text-[12px] font-semibold ${TONS[tom]} ${fundo}`}
-    >
-      {children}
-    </span>
-  );
+  return <span className={`${FORMA_DO_SELO} ${TONS[tom]} ${fundo}`}>{children}</span>;
 }
 
 /** Ponto de situação do parceiro (sempre ao lado da palavra). */

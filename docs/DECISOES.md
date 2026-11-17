@@ -4239,3 +4239,50 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - **Primeira rodada (6efc30c):** apontou que, com a junção só na consulta, um parceiro gravado com espaço duplo ("Bar  do Zé") deixava de ser achado, e pediu uma ressalva no texto. A correção escolhida foi mais forte: os espaços repetidos passaram a contar como um só também no texto. Pediu também pares de palavras na regressão. Os dois entraram em 129b381.
 - **Segunda rodada (129b381):** aprovada. Mutantes que invertem nome e detalhe falham com os pares de palavras.
 - **Confirmação (0a588fe, só teste e registro):** aprovada. O teste de espaços repetidos, que entrou nesse commit, falha quando o texto, a consulta ou os dois deixam de juntar os espaços. Os três ajustes de texto que ela sugeriu entraram no commit seguinte.
+
+### 528. 2026-11-17 · Farol do CMV de Fichas: uma cor própria e cheia por faixa
+
+**Fonte e recorte:** pedido de Rodolfo em 16/11/2026. Na lista, "Muito favorável", "Favorável" e "Confortável" usavam o mesmo verde. Cada faixa passa a ter uma cor própria e inconfundível, entre vermelho, laranja, azul, amarelo e verde, em tons mais profundos e saturados, com vermelho, laranja e amarelo bem separados. É uma fatia visual, executada enquanto a janela de módulo (decisão 526) espera a validação no iPhone, autorizada por Rodolfo em 17/11/2026 ("continue o plano"). Sem limite, meta, fórmula, preço, filtro, permissão, schema, migration, dado ou dependência.
+
+1. **Faixa e cor:** segue a ordem do farol do sistema (decisão 177), do melhor ao pior:
+   - Muito favorável: azul;
+   - Favorável: verde;
+   - Confortável: amarelo;
+   - Atenção: laranja;
+   - Crítico: vermelho.
+
+   Rótulos, ordem, intervalos e a classificação (`classificarFarolDeCmv`) não mudam: a cor sai só de `APRESENTACAO_DA_FAIXA`. Sem dados, Não ofertado e Faixas não configuradas continuam no `Selo` neutro.
+2. **Selo cheio, igual nos dois temas:** fundo e borda na cor da faixa, com o texto do par:
+   - azul #1D4ED8, texto creme #FFFDF8 (6,59:1);
+   - verde #15803D, texto creme (4,93:1);
+   - amarelo dourado #F2C200, texto #292B27 (8,50:1);
+   - laranja #F97316, texto #292B27 (5,10:1);
+   - vermelho #B3001B, texto creme (7,04:1).
+
+   O selo leva o próprio contraste e não depende do tema nem da superfície.
+3. **Medidas em CIELAB:**
+   - croma de 52 ou mais em todas; o verde `ok` de antes tinha 26;
+   - distância de 41 ou mais entre qualquer par; antes, três faixas tinham distância zero;
+   - matiz do vermelho em 33°, do laranja em 55° e do amarelo em 88°.
+4. **Onde aparece:**
+   - no detalhe da ficha por canal e na projeção das embalagens (`FarolDeCmv`);
+   - na prévia dos intervalos das faixas do canal (`IntervalosDoFarol`);
+   - na lista (`CmvCompacto`);
+   - nos filtros, com uma amostra redonda ao lado do nome, nas opções e nos botões das faixas escolhidas. Caixa e botão continuam neutros. Os estados sem faixa ficam só com o contorno.
+5. **Tokens só de Fichas:** `--ff-cmv-*` e `--ff-sobre-cmv-*` ficam num bloco próprio de `tokens.css`, fora dos temas, com as classes no Tailwind.
+   - O farol do DRE (`--ff-farol-*`, decisão 177) não muda.
+   - O `Selo` genérico não muda: só a forma dele passou para a constante `FORMA_DO_SELO`.
+   - Um teste-guarda confere que essas cores só aparecem em `fichas/farol.tsx` e em `tokens.css`.
+   - Na impressão do navegador, o selo vira a palavra em preto sobre branco. O papel da ficha (`modo="impressao"`) já mostrava só a palavra.
+
+**Verificação até aqui:**
+- testes focados: 86 passam;
+- testes sem banco de Fichas, Home de CMV, DRE e farol: 591 passam, e os 280 de banco ficam para o portão completo;
+- app local com dados sintéticos: 46 de 46 conferências, nos temas claro e escuro, no desktop (1440 px) e no celular (390 px). Elas cobrem lista, filtros, detalhe, faixas do canal e impressão.
+
+**Limites:**
+- Não testado em Safari/iOS nem com leitor de tela.
+- Na simulação de deuteranopia, verde e vermelho ficam próximos (distância 8,4). A palavra continua no selo.
+- A associação de cores segue a ordem do farol do sistema. Outra preferência de Rodolfo muda só `APRESENTACAO_DA_FAIXA`.
+
+**Reversão:** voltar `APRESENTACAO_DA_FAIXA` aos tons `ok`, `alerta` e `erro` e apagar os tokens `cmv-*`. Não há migration nem dado.

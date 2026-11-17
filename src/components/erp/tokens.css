@@ -37,6 +37,26 @@
   --ff-curva-entrada: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/*
+ * Farol do CMV de Fichas (17/11/2026): cada faixa tem uma cor própria e cheia, a
+ * mesma nos dois temas, porque o selo leva o próprio contraste (texto ≥ 4,5:1 sobre
+ * a cor dele). Azul, verde, amarelo, laranja e vermelho, do mais favorável ao crítico.
+ * Variantes só de Fichas (teste-guarda): o farol do DRE (`--ff-farol-*`) não muda.
+ * `sobre-cmv-*` é o texto do selo. Na impressão, viram texto preto sobre branco.
+ */
+.ff-app {
+  --ff-cmv-azul: 29 78 216;
+  --ff-sobre-cmv-azul: 255 253 248;
+  --ff-cmv-verde: 21 128 61;
+  --ff-sobre-cmv-verde: 255 253 248;
+  --ff-cmv-amarelo: 242 194 0;
+  --ff-sobre-cmv-amarelo: 41 43 39;
+  --ff-cmv-laranja: 249 115 22;
+  --ff-sobre-cmv-laranja: 41 43 39;
+  --ff-cmv-vermelho: 179 0 27;
+  --ff-sobre-cmv-vermelho: 255 253 248;
+}
+
 /* Claro: o padrão, e o que vale em "sistema" quando o aparelho está claro. */
 .ff-app,
 .ff-app[data-tema='claro'] {
@@ -603,6 +623,17 @@ html:has(.ff-app dialog.ff-janela[open]) {
     --ff-destaque: 255 255 255;
     --ff-ok-fundo: 255 255 255;
     --ff-atencao-fundo: 255 255 255;
+    /* Farol do CMV de Fichas: o papel não imprime o fundo, então o selo vira a palavra em preto. */
+    --ff-cmv-azul: 255 255 255;
+    --ff-sobre-cmv-azul: 0 0 0;
+    --ff-cmv-verde: 255 255 255;
+    --ff-sobre-cmv-verde: 0 0 0;
+    --ff-cmv-amarelo: 255 255 255;
+    --ff-sobre-cmv-amarelo: 0 0 0;
+    --ff-cmv-laranja: 255 255 255;
+    --ff-sobre-cmv-laranja: 0 0 0;
+    --ff-cmv-vermelho: 255 255 255;
+    --ff-sobre-cmv-vermelho: 0 0 0;
     color-scheme: light;
     background: #fff;
     color: #000;
