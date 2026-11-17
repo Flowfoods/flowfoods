@@ -44,16 +44,34 @@ export function ResumoDeErros({
   );
 }
 
-/** Erro geral, com "Recarregar" quando foi conflito de versão. */
+/**
+ * Recarrega a página sem a pergunta de sair: só quando o que foi digitado já está guardado no rascunho da aba (a tela volta
+ * preenchida). Sem rascunho, recarregar passa pela pergunta de sempre.
+ */
+export function recarregarSemPerguntar(): void {
+  // Sem religar por tempo: o pedido de descarregar pode chegar depois de um `setTimeout(0)`. A página vai embora de qualquer
+  // jeito, e o valor do módulo volta ao inicial no carregamento novo.
+  dispensaDoUnload = true;
+  window.location.reload();
+}
+
+/** Erro geral, com "Recarregar" quando foi conflito de versão ou o ERP foi atualizado com a tela aberta. */
 export function ErroGeral({ estado, recarregar }: { estado: EstadoCadastro; recarregar: string }) {
   if (!estado?.erros.geral) return null;
   return (
     <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
       <p className="text-erro">{estado.erros.geral}</p>
-      {estado.conflito && (
-        <a href={recarregar} className={classeDeBotao('secundario')}>
-          Recarregar
-        </a>
+      {estado.versaoNova ? (
+        // A ação desta tela não existe no servidor novo: precisa carregar a página de novo (o JavaScript novo), não navegar.
+        <button type="button" className={classeDeBotao('secundario')} onClick={() => (estado.rascunhoGuardado ? recarregarSemPerguntar() : window.location.reload())}>
+          Recarregar a página
+        </button>
+      ) : (
+        estado.conflito && (
+          <a href={recarregar} className={classeDeBotao('secundario')}>
+            Recarregar
+          </a>
+        )
       )}
     </div>
   );

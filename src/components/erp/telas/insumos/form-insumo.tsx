@@ -11,14 +11,14 @@ import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
  */
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState, useActionState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useActionState } from 'react';
 
 import { AJUDA_DO_TIPO, MARCA_MAXIMA, TIPOS, TIPOS_DO_FORM, type TipoInsumo } from '@/lib/erp/insumo-campos';
 import { rotuloDaVolta } from '@/lib/erp/volta';
 import { CHAVE_DO_SISTEMA } from '@/lib/erp/categoria-campos';
 import { nomeDaChave, sugerirCategoria } from '@/lib/erp/categoria-sugestao';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
-import { CONSERVACOES, type Conservacao, type Validades } from '@/lib/erp/validade';
+import { CONSERVACOES, entradaDoFormulario, lerValidades, type Conservacao, type Validades } from '@/lib/erp/validade';
 import { UNIDADES, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
@@ -31,6 +31,7 @@ import { CamposDaEmbalagem, EMBALAGEM_VAZIA, type ValoresDaEmbalagem } from './c
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import { SalvandoAnunciado, useAcaoSegura } from '../cadastro/anuncio';
+import { guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
 
 export interface ValoresDoInsumo extends ValoresDaEmbalagem {
   nome: string;
@@ -80,7 +81,64 @@ function idDaSugestao(categorias: readonly OpcaoDeCategoria[], chave: string): s
   return (categorias.find((c) => c.chave === chave && c.ativa) ?? categorias.find((c) => c.chave === CHAVE_DO_SISTEMA))?.id ?? '';
 }
 
-export function FormInsumo({
+/**
+ * INS-SALVAR-CONFIRMACAO: o que estava no formulário enviado → valores para abrir o cadastro de novo, depois de recarregar.
+ * Só texto e escolhas da própria lista voltam (o servidor confere tudo ao salvar). Os prazos de uso passam pelo mesmo leitor do
+ * servidor: um prazo que ele recusaria não volta, e o campo fica para conferir.
+ */
+export function valoresDoFormulario(form: FormData): ValoresDoInsumo {
+  const txt = (k: string) => {
+    const v = form.get(k);
+    return typeof v === 'string' ? v : '';
+  };
+  const tipo = txt('tipo');
+  const unidade = txt('unidade');
+  const conservacao = txt('conservacao');
+  const prazos = lerValidades(entradaDoFormulario((k) => form.get(k) ?? undefined), 'insumo');
+  return {
+    nome: txt('nome').slice(0, 80),
+    tipo: tipo === 'PRE_PREPARO' || (TIPOS_DO_FORM as readonly string[]).includes(tipo) ? (tipo as TipoInsumo) : INSUMO_NOVO.tipo,
+    unidade: Object.hasOwn(UNIDADES, unidade) ? (unidade as Unidade) : '',
+    categoriaId: txt('categoriaId'),
+    conservacao: Object.hasOwn(CONSERVACOES, conservacao) ? (conservacao as Conservacao) : '',
+    marcaReferencia: txt('marcaReferencia').slice(0, MARCA_MAXIMA),
+    validades: prazos.ok ? prazos.validades : null,
+    conteudo: txt('conteudo'),
+    escala: txt('escala') === 'menor' ? 'menor' : 'base',
+    preco: txt('preco'),
+    semPreco: ['on', 'sim', 'true', '1'].includes(txt('semPreco')),
+    frete: txt('frete'),
+  };
+}
+
+type PropsDoFormInsumo = Omit<Parameters<typeof FormInsumoBase>[0], 'recuperado' | 'aoDescartarRecuperado' | 'chaveDoRascunho'>;
+
+/**
+ * O formulário do insumo. No cadastro novo, se o ERP foi atualizado com a tela aberta (o envio não foi processado), o que
+ * estava digitado fica no rascunho da aba e volta aqui depois de recarregar, com o aviso e a opção de descartar. O rascunho só é
+ * lido depois do primeiro desenho: quando chega (ou se descarta), o formulário nasce de novo com os valores certos.
+ */
+export function FormInsumo(props: PropsDoFormInsumo) {
+  const r = useRascunhoDaTela<ValoresDoInsumo>();
+  const [descartou, setDescartou] = useState(false);
+  const novo = props.modo === 'criar';
+  const recuperado = novo && !descartou && r.valores ? r.valores : null;
+  return (
+    <FormInsumoBase
+      key={r.valores === undefined ? 'carregando' : descartou ? 'descartado' : 'pronto'}
+      {...props}
+      inicial={recuperado ?? props.inicial}
+      recuperado={!!recuperado}
+      chaveDoRascunho={novo ? r.chave : ''}
+      aoDescartarRecuperado={() => {
+        r.descartar();
+        setDescartou(true);
+      }}
+    />
+  );
+}
+
+function FormInsumoBase({
   acao,
   modo,
   base,
@@ -98,6 +156,9 @@ export function FormInsumo({
   aConfirmar = false,
   de = '',
   origemLista = false,
+  recuperado = false,
+  aoDescartarRecuperado,
+  chaveDoRascunho = '',
 }: {
   acao: AcaoDeCadastro;
   modo: 'criar' | 'editar';
@@ -128,9 +189,15 @@ export function FormInsumo({
   de?: string;
   /** L.1: veio da caneta da lista: salvar volta para a LISTA, não para o detalhe. */
   origemLista?: boolean;
+  /** INS-SALVAR-CONFIRMACAO: os valores vieram do rascunho guardado antes de recarregar. */
+  recuperado?: boolean;
+  aoDescartarRecuperado?: () => void;
+  /** Cadastro novo: onde guardar o que foi digitado se o ERP foi atualizado com a tela aberta ('' = não guarda). */
+  chaveDoRascunho?: string;
 }) {
   const inicial: ValoresDoInsumo = inicialDado ?? { ...INSUMO_NOVO, ...valoresLembrados(lembrado), nome: (nomeSugerido ?? '').slice(0, 80) };
-  const acaoSegura = useAcaoSegura(acao);
+  const aoVersaoNova = useCallback((form: FormData) => !!chaveDoRascunho && guardarRascunho(chaveDoRascunho, valoresDoFormulario(form)), [chaveDoRascunho]);
+  const acaoSegura = useAcaoSegura(acao, { aoVersaoNova });
   const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acaoSegura, null);
   const [nome, setNome] = useState(inicial.nome);
   const [unidade, setUnidade] = useState<Unidade | ''>(inicial.unidade);
@@ -194,6 +261,16 @@ export function FormInsumo({
       {origemLista && <input type="hidden" name="origem" value="lista" />}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULO_DO_CAMPO[c] ?? (c.startsWith('validade-') ? `Prazo de uso após abertura em ${CONSERVACOES[c.slice(9) as Conservacao]?.toLowerCase() ?? c}` : c)} />
       <ErroGeral estado={estado} recarregar={aqui} />
+      {recuperado && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-linha-forte px-4 py-3 text-sm">
+          <p className="text-texto">
+            Recuperamos o que você tinha digitado antes de recarregar. Nada foi salvo ainda: confira e salve.
+          </p>
+          <button type="button" onClick={aoDescartarRecuperado} className="ff-transicao min-h-11 rounded-[7px] px-3 text-[13px] font-medium text-suave underline underline-offset-4 hover:text-texto sm:min-h-9 [@media(pointer:coarse)]:min-h-11">
+            Descartar e começar de novo
+          </button>
+        </div>
+      )}
       <SalvandoAnunciado />
 
       <fieldset disabled={!!bloqueio} className="min-w-0 space-y-4">

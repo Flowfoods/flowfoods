@@ -8,6 +8,13 @@ export type EstadoCadastro = {
   erros: Partial<Record<string, string>>;
   /** Alguém gravou depois que esta tela leu: recarregar, não insistir. */
   conflito?: boolean;
+  /**
+   * INS-SALVAR-CONFIRMACAO: o ERP foi atualizado com esta tela aberta. A ação dela não existe no servidor novo, então NADA
+   * foi salvo, e salvar de novo falha igual: só recarregar resolve.
+   */
+  versaoNova?: boolean;
+  /** Com `versaoNova`: o que foi digitado ficou guardado no rascunho da aba e volta preenchido depois de recarregar. */
+  rascunhoGuardado?: boolean;
   /** Nome repetido de um cadastro desativado: link para reativar. */
   desativadoId?: string;
   /** I.1a: nome repetido de um cadastro ativo (ou escrito de outro jeito): link para abrir o que já existe. */
