@@ -4297,7 +4297,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
   - **Achados menores:** a guarda dos filtros só olhava a tag de abertura do botão; o fundo do neutro não estava fixado; a guarda de uso não via classe montada pelo prefixo; e o registro misturava métricas. Os demais (contraste contra a superfície, vermelho da marca, borda na impressão, resumo dos filtros, relação com a 177 e verificação desatualizada) estão nos itens 6, "Verificação" e "Limites".
 - **Correção no commit seguinte:** um mapa só para selo e amostra, com teste que liga a amostra ao selo em cada faixa; a contagem de todas as cores nos filtros; o fundo do neutro fixado; e a guarda pelo prefixo. Os mutantes sobreviventes agora morrem.
 - **Confirmação (1a3ebbc): aprovada.** O revisor rodou 18 mutantes numa cópia isolada e todos morreram: os 5 que sobreviviam, 9 novos (6 contra o mapa único e o neutro, 3 contra a guarda pelo prefixo) e 4 que já morriam. Os 3 ajustes de redação que ele sugeriu entraram no commit seguinte.
-- **Confirmação do texto (7e59454):** dois ajustes de fidelidade, a origem do teste antigo e a conta dos mutantes. O texto sugerido pelo revisor entrou exatamente como veio, no commit seguinte, que ele deu por aprovado sem nova rodada.
+- **Confirmação do texto (7e59454):** dois ajustes de fidelidade: a origem do teste antigo, um erro que veio da sugestão anterior do próprio revisor, e a conta dos mutantes. O texto sugerido entrou exatamente como veio no commit seguinte, junto com esta linha. A checagem final fica no PR e na página de evidências.
 
 **Limites:**
 - Não testado em Safari/iOS nem com leitor de tela.
