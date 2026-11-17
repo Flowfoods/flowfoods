@@ -58,13 +58,18 @@ export const FRASE_SEM_CONEXAO =
   'Não deu para confirmar se o envio chegou (a conexão pode ter caído). O que você digitou continua aqui. Toque em salvar de novo: se já tiver sido salvo, o sistema reconhece e não cria outro.';
 
 /**
- * INS-SALVAR-CONFIRMACAO (17/11/2026): o ERP foi atualizado com a tela aberta. Aqui o resultado NÃO é incerto: o servidor
- * novo não conhece a ação desta tela e não rodou nada. Salvar de novo falharia igual; só recarregar resolve.
+ * INS-SALVAR-CONFIRMACAO (17/11/2026): o ERP foi atualizado com a tela aberta. O resultado DESTE envio é certo: o servidor
+ * novo não conhece a ação desta tela e não rodou nada. Salvar de novo falharia igual; só recarregar resolve. A frase fala só
+ * deste envio (vale também para excluir): um envio anterior que ficou sem confirmação pode ter sido salvo.
  */
 export const FRASE_VERSAO_NOVA =
-  'O ERP foi atualizado enquanto esta tela estava aberta, e este envio não foi processado: nada foi salvo. Para salvar, recarregue a página e preencha de novo.';
+  'O ERP foi atualizado enquanto esta tela estava aberta, e este envio não foi processado. Recarregue a página e tente de novo.';
 export const FRASE_VERSAO_NOVA_COM_RASCUNHO =
-  'O ERP foi atualizado enquanto esta tela estava aberta, e este envio não foi processado: nada foi salvo. Recarregue a página: o que você digitou volta preenchido para você conferir e salvar.';
+  'O ERP foi atualizado enquanto esta tela estava aberta, e este envio não foi processado. Recarregue a página: o que você digitou volta preenchido para você conferir e salvar.';
+/** Um envio anterior desta tela ficou sem confirmação: sem o rascunho (que leva a chave do envio), só dá para pedir que confira. */
+export const FRASE_ENVIO_ANTERIOR_INCERTO = 'Um envio anterior desta tela pode ter chegado: confira antes de repetir.';
+/** Com o rascunho, a chave do envio volta junto: o servidor reconhece o reenvio (a proteção de sempre) e não cria outro. */
+export const FRASE_ENVIO_ANTERIOR_RECONHECIDO = 'Um envio anterior pode ter sido salvo: ao salvar, o sistema reconhece e não cria outro.';
 
 /** O redirecionamento do Next é uma exceção de controle: nunca vira mensagem de erro. */
 function ehRedirecionamento(e: unknown): boolean {
@@ -82,10 +87,13 @@ export function ehVersaoNova(e: unknown): boolean {
 
 /**
  * A action do formulário com a rede protegida: falha de conexão volta como erro geral, com o formulário intacto.
- * `aoVersaoNova`: o formulário guarda o que foi digitado (devolve se conseguiu) antes de pedir para recarregar.
+ * `aoVersaoNova`: o formulário guarda o que foi digitado (devolve se conseguiu) antes de pedir para recarregar; `incerto` diz se
+ * algum envio anterior DESTA tela ficou sem confirmação (aí ele pode ter sido salvo, e o rascunho precisa levar a chave do envio).
  */
-export function useAcaoSegura(acao: AcaoDeCadastro, opcoes?: { aoVersaoNova?: (form: FormData) => boolean }): AcaoDeCadastro {
+export function useAcaoSegura(acao: AcaoDeCadastro, opcoes?: { aoVersaoNova?: (form: FormData, contexto: { incerto: boolean }) => boolean }): AcaoDeCadastro {
   const aoVersaoNova = opcoes?.aoVersaoNova;
+  // Vale para a vida desta tela: depois de um envio sem confirmação, nada aqui afirma que ele não foi salvo.
+  const algumIncerto = useRef(false);
   return useCallback(
     async (anterior: EstadoCadastro, form: FormData) => {
       try {
@@ -94,21 +102,20 @@ export function useAcaoSegura(acao: AcaoDeCadastro, opcoes?: { aoVersaoNova?: (f
         if (ehRedirecionamento(e)) throw e;
         const vez = (anterior?.vez ?? 0) + 1;
         if (ehVersaoNova(e)) {
+          const incerto = algumIncerto.current;
           let rascunhoGuardado = false;
           try {
-            rascunhoGuardado = aoVersaoNova?.(form) === true;
+            rascunhoGuardado = aoVersaoNova?.(form, { incerto }) === true;
           } catch {
-            // Guardar é conforto: se falhar, a frase manda preencher de novo.
+            // Guardar é conforto: se falhar, a frase manda tentar de novo depois de recarregar.
           }
-          return {
-            ok: false,
-            erros: { geral: rascunhoGuardado ? FRASE_VERSAO_NOVA_COM_RASCUNHO : FRASE_VERSAO_NOVA },
-            versaoNova: true,
-            rascunhoGuardado,
-            vez,
-          } satisfies NonNullable<EstadoCadastro>;
+          const frase = rascunhoGuardado
+            ? `${FRASE_VERSAO_NOVA_COM_RASCUNHO}${incerto ? ` ${FRASE_ENVIO_ANTERIOR_RECONHECIDO}` : ''}`
+            : `${FRASE_VERSAO_NOVA}${incerto ? ` ${FRASE_ENVIO_ANTERIOR_INCERTO}` : ''}`;
+          return { ok: false, erros: { geral: frase }, versaoNova: true, rascunhoGuardado, ...(incerto ? { incerto } : {}), vez } satisfies NonNullable<EstadoCadastro>;
         }
-        return { ok: false, erros: { geral: FRASE_SEM_CONEXAO }, vez } satisfies NonNullable<EstadoCadastro>;
+        algumIncerto.current = true;
+        return { ok: false, erros: { geral: FRASE_SEM_CONEXAO }, incerto: true, vez } satisfies NonNullable<EstadoCadastro>;
       }
     },
     [acao, aoVersaoNova],

@@ -18,7 +18,7 @@ import { rotuloDaVolta } from '@/lib/erp/volta';
 import { CHAVE_DO_SISTEMA } from '@/lib/erp/categoria-campos';
 import { nomeDaChave, sugerirCategoria } from '@/lib/erp/categoria-sugestao';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
-import { CONSERVACOES, entradaDoFormulario, lerValidades, type Conservacao, type Validades } from '@/lib/erp/validade';
+import { CONSERVACOES, entradaDoFormulario, lerValidades, ORDEM_DAS_CONSERVACOES, type Conservacao, type Validades } from '@/lib/erp/validade';
 import { UNIDADES, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
@@ -31,7 +31,7 @@ import { CamposDaEmbalagem, EMBALAGEM_VAZIA, type ValoresDaEmbalagem } from './c
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import { SalvandoAnunciado, useAcaoSegura } from '../cadastro/anuncio';
-import { guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
+import { descartarRascunho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
 
 export interface ValoresDoInsumo extends ValoresDaEmbalagem {
   nome: string;
@@ -111,25 +111,65 @@ export function valoresDoFormulario(form: FormData): ValoresDoInsumo {
   };
 }
 
-type PropsDoFormInsumo = Omit<Parameters<typeof FormInsumoBase>[0], 'recuperado' | 'aoDescartarRecuperado' | 'chaveDoRascunho'>;
+/**
+ * O que fica no rascunho da aba quando o ERP muda de versão com o Novo insumo aberto: os valores, a CHAVE DO ENVIO (o reenvio
+ * depois de recarregar é o mesmo envio para o servidor, que o reconhece e não cria outro) e se algum envio anterior desta tela
+ * ficou sem confirmação (aí ele pode ter sido salvo).
+ */
+export interface RascunhoDoInsumo {
+  valores: ValoresDoInsumo;
+  envio: string;
+  incerto: boolean;
+  /** Havia prazo de uso marcado que o leitor do servidor recusaria: ele não volta, e o aviso pede para conferir. */
+  prazoNaoVoltou: boolean;
+}
+
+export function rascunhoDoEnvio(form: FormData, incerto: boolean): RascunhoDoInsumo {
+  const valores = valoresDoFormulario(form);
+  const envio = form.get('envio');
+  const marcouPrazo = ORDEM_DAS_CONSERVACOES.some((c) => ['on', 'sim', 'true', '1'].includes(String(form.get(`aceita_${c}`) ?? '')));
+  return { valores, envio: typeof envio === 'string' ? envio : '', incerto, prazoNaoVoltou: marcouPrazo && valores.validades === null };
+}
+
+/** O que veio do armazenamento só vale se tiver a forma de um rascunho do insumo (outra versão do ERP pode ter guardado outra coisa). */
+function ehRascunhoDoInsumo(v: unknown): v is RascunhoDoInsumo {
+  const r = v as Partial<RascunhoDoInsumo> | null;
+  return !!r && typeof r === 'object' && !!r.valores && typeof r.valores === 'object' && typeof r.valores.nome === 'string' && typeof r.envio === 'string' && typeof r.incerto === 'boolean';
+}
+
+/** O formulário só nasce de novo quando há o que recuperar ou quando a pessoa descarta: abrir sem rascunho não remonta nada. */
+export const chaveDaMontagem = (recuperado: boolean, descartou: boolean) => (descartou ? 'descartado' : recuperado ? 'recuperado' : 'base');
+
+/** O aviso do formulário recuperado: não promete "nada salvo" quando um envio anterior pode ter chegado. */
+export function textoDoRecuperado(r: Pick<RascunhoDoInsumo, 'incerto' | 'prazoNaoVoltou'>): string {
+  return [
+    'Recuperamos o que você tinha digitado antes de recarregar.',
+    r.incerto ? 'Um envio anterior pode ter sido salvo: ao salvar, o sistema reconhece e não cria outro.' : 'O envio anterior não foi processado: confira e salve.',
+    r.prazoNaoVoltou ? 'O prazo de uso após abertura que estava escrito não voltou: confira.' : '',
+  ].filter(Boolean).join(' ');
+}
+
+type PropsDoFormInsumo = Omit<Parameters<typeof FormInsumoBase>[0], 'recuperado' | 'aoDescartarRecuperado' | 'chaveDoRascunho' | 'focarNoNome'>;
 
 /**
  * O formulário do insumo. No cadastro novo, se o ERP foi atualizado com a tela aberta (o envio não foi processado), o que
- * estava digitado fica no rascunho da aba e volta aqui depois de recarregar, com o aviso e a opção de descartar. O rascunho só é
- * lido depois do primeiro desenho: quando chega (ou se descarta), o formulário nasce de novo com os valores certos.
+ * estava digitado fica no rascunho da aba e volta aqui depois de recarregar, com a mesma chave do envio, o aviso e a opção de
+ * descartar. O rascunho só é lido depois do primeiro desenho: quando chega (ou se descarta), o formulário nasce de novo.
  */
 export function FormInsumo(props: PropsDoFormInsumo) {
-  const r = useRascunhoDaTela<ValoresDoInsumo>();
+  const r = useRascunhoDaTela<RascunhoDoInsumo>();
   const [descartou, setDescartou] = useState(false);
   const novo = props.modo === 'criar';
-  const recuperado = novo && !descartou && r.valores ? r.valores : null;
+  const recuperado = novo && !descartou && ehRascunhoDoInsumo(r.valores) ? r.valores : null;
   return (
     <FormInsumoBase
-      key={r.valores === undefined ? 'carregando' : descartou ? 'descartado' : 'pronto'}
+      key={chaveDaMontagem(!!recuperado, descartou)}
       {...props}
-      inicial={recuperado ?? props.inicial}
-      recuperado={!!recuperado}
+      inicial={recuperado?.valores ?? props.inicial}
+      envio={recuperado?.envio || props.envio}
+      recuperado={recuperado ? { incerto: recuperado.incerto, prazoNaoVoltou: recuperado.prazoNaoVoltou } : null}
       chaveDoRascunho={novo ? r.chave : ''}
+      focarNoNome={descartou}
       aoDescartarRecuperado={() => {
         r.descartar();
         setDescartou(true);
@@ -156,9 +196,10 @@ function FormInsumoBase({
   aConfirmar = false,
   de = '',
   origemLista = false,
-  recuperado = false,
+  recuperado = null,
   aoDescartarRecuperado,
   chaveDoRascunho = '',
+  focarNoNome = false,
 }: {
   acao: AcaoDeCadastro;
   modo: 'criar' | 'editar';
@@ -189,16 +230,28 @@ function FormInsumoBase({
   de?: string;
   /** L.1: veio da caneta da lista: salvar volta para a LISTA, não para o detalhe. */
   origemLista?: boolean;
-  /** INS-SALVAR-CONFIRMACAO: os valores vieram do rascunho guardado antes de recarregar. */
-  recuperado?: boolean;
+  /** INS-SALVAR-CONFIRMACAO: os valores vieram do rascunho guardado antes de recarregar (e o que o aviso precisa dizer). */
+  recuperado?: Pick<RascunhoDoInsumo, 'incerto' | 'prazoNaoVoltou'> | null;
   aoDescartarRecuperado?: () => void;
   /** Cadastro novo: onde guardar o que foi digitado se o ERP foi atualizado com a tela aberta ('' = não guarda). */
   chaveDoRascunho?: string;
+  /** Acabou de descartar o recuperado: o foco volta para o nome (não fica perdido na página). */
+  focarNoNome?: boolean;
 }) {
   const inicial: ValoresDoInsumo = inicialDado ?? { ...INSUMO_NOVO, ...valoresLembrados(lembrado), nome: (nomeSugerido ?? '').slice(0, 80) };
-  const aoVersaoNova = useCallback((form: FormData) => !!chaveDoRascunho && guardarRascunho(chaveDoRascunho, valoresDoFormulario(form)), [chaveDoRascunho]);
+  // Guarda no envio que encontrou o ERP atualizado (com a chave do envio e se algum anterior ficou incerto).
+  const aoVersaoNova = useCallback(
+    (form: FormData, { incerto }: { incerto: boolean }) => !!chaveDoRascunho && guardarRascunho(chaveDoRascunho, rascunhoDoEnvio(form, incerto)),
+    [chaveDoRascunho],
+  );
   const acaoSegura = useAcaoSegura(acao, { aoVersaoNova });
   const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acaoSegura, null);
+  // Guarda de novo no toque em "Recarregar a página": o que está na tela agora, inclusive o que mudou depois do aviso.
+  const incertoAteAqui = !!estado?.incerto;
+  const guardarAntesDeRecarregar = useCallback(
+    (form: FormData) => !!chaveDoRascunho && guardarRascunho(chaveDoRascunho, rascunhoDoEnvio(form, incertoAteAqui)),
+    [chaveDoRascunho, incertoAteAqui],
+  );
   const [nome, setNome] = useState(inicial.nome);
   const [unidade, setUnidade] = useState<Unidade | ''>(inicial.unidade);
   const [tipo, setTipo] = useState<TipoInsumo>(inicial.tipo);
@@ -207,6 +260,23 @@ function FormInsumoBase({
   const saida = useAvisoDeSaida(estado);
   const erros = estado?.erros ?? {};
   const idBase = 'insumo';
+  // O formulário recuperado é trabalho não salvo: sair ou recarregar de novo pergunta antes (uma vez, na montagem).
+  const marcouRecuperado = useRef(false);
+  useEffect(() => {
+    if (!recuperado || marcouRecuperado.current) return;
+    marcouRecuperado.current = true;
+    saida.aoMudar();
+  });
+  // O aviso do recuperado nasce no HTML; a região viva só recebe o texto depois de montar, para o leitor de tela anunciar.
+  const textoRecuperado = recuperado ? textoDoRecuperado(recuperado) : '';
+  const anuncioRecuperado = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (anuncioRecuperado.current) anuncioRecuperado.current.textContent = textoRecuperado;
+  }, [textoRecuperado]);
+  // Descartou o recuperado: o foco volta para o nome.
+  useEffect(() => {
+    if (focarNoNome) document.getElementById(`${idBase}-nome`)?.focus();
+  }, [focarNoNome]);
   // Prioridade nº 1 (23/10): a explicação vai para o botão de ajuda do campo; sem o ponto, o texto antigo fica.
   const temPonto = { tipo: useTemPonto('tipo'), marca: useTemPonto('marca'), unidade: useTemPonto('unidade') };
   const prePreparo = inicial.tipo === 'PRE_PREPARO';
@@ -253,22 +323,32 @@ function FormInsumoBase({
   })();
 
   return (
-    <FormularioComAcao action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao
+      action={enviar}
+      onChange={saida.aoMudar}
+      onSubmit={() => {
+        saida.aoEnviar();
+        // Um envio novo substitui o rascunho de antes: se ele também encontrar o ERP atualizado, guarda de novo; se gravar, nada
+        // volta numa próxima abertura dizendo que não foi salvo.
+        if (chaveDoRascunho) descartarRascunho(chaveDoRascunho);
+      }}
+      noValidate
+      className="space-y-4"
+    >
       {versao && <input type="hidden" name="versao" value={versao} />}
       {modo === 'criar' && chaveDeEnvio && <input type="hidden" name="envio" value={chaveDeEnvio} />}
       {modo === 'criar' && volta && <input type="hidden" name="volta" value={volta} />}
       {de && <input type="hidden" name="de" value={de} />}
       {origemLista && <input type="hidden" name="origem" value="lista" />}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULO_DO_CAMPO[c] ?? (c.startsWith('validade-') ? `Prazo de uso após abertura em ${CONSERVACOES[c.slice(9) as Conservacao]?.toLowerCase() ?? c}` : c)} />
-      <ErroGeral estado={estado} recarregar={aqui} />
+      <ErroGeral estado={estado} recarregar={aqui} aoGuardarAntesDeRecarregar={chaveDoRascunho ? guardarAntesDeRecarregar : undefined} />
       {recuperado && (
-        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-linha-forte px-4 py-3 text-sm">
-          <p className="text-texto">
-            Recuperamos o que você tinha digitado antes de recarregar. Nada foi salvo ainda: confira e salve.
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-linha-forte px-4 py-3 text-sm">
+          <p className="text-texto">{textoRecuperado}</p>
           <button type="button" onClick={aoDescartarRecuperado} className="ff-transicao min-h-11 rounded-[7px] px-3 text-[13px] font-medium text-suave underline underline-offset-4 hover:text-texto sm:min-h-9 [@media(pointer:coarse)]:min-h-11">
             Descartar e começar de novo
           </button>
+          <p ref={anuncioRecuperado} role="status" aria-live="polite" className="sr-only" />
         </div>
       )}
       <SalvandoAnunciado />

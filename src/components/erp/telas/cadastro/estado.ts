@@ -15,6 +15,8 @@ export type EstadoCadastro = {
   versaoNova?: boolean;
   /** Com `versaoNova`: o que foi digitado ficou guardado no rascunho da aba e volta preenchido depois de recarregar. */
   rascunhoGuardado?: boolean;
+  /** Algum envio desta tela ficou sem confirmação (rede ou servidor): ele pode ter sido salvo, então nenhuma frase diz "nada". */
+  incerto?: boolean;
   /** Nome repetido de um cadastro desativado: link para reativar. */
   desativadoId?: string;
   /** I.1a: nome repetido de um cadastro ativo (ou escrito de outro jeito): link para abrir o que já existe. */

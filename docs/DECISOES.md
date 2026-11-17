@@ -4314,3 +4314,84 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - **Fora do escopo, anterior a esta mudança:** a 320 px, a lista estoura 1 px por causa do botão "Nova ficha", e a edição estoura 11 px por causa de "Escolher foto" e "Principal".
 
 **Reversão:** reverter os commits desta decisão (ou o merge do PR). Só voltar os tons em `APRESENTACAO_DA_FAIXA` não compila, porque o selo e a amostra dependem da cor. Não há migration nem dado.
+
+### 529. 2026-11-17 · Formulário aberto durante um deploy: o resultado certo deste envio, recarregar e recuperar o Novo insumo
+
+**Fonte e recorte:** incidente INS-SALVAR-CONFIRMACAO, do relato de Rodolfo em 16/11/2026. Ao salvar um Novo insumo em Rede Completa, a tela mostrou "Não deu para confirmar se o envio chegou (a conexão pode ter caído)…". É prioridade alta do plano, autorizada por Rodolfo em 17/11/2026 ("continue com o plano"). Sem regra, permissão, schema, migration, dado, dependência ou infraestrutura.
+
+1. **Causa reproduzida, não comprovada no incidente:**
+   - O build de produção não leva a pasta `.next` do build anterior (`.dockerignore`). Por isso, o Next 16 gera uma chave nova em cada build, e ela também é o sal dos identificadores das ações do servidor.
+   - Assim, todo deploy troca o identificador de todas as ações. Num teste local, as 269 ações mudaram entre dois builds com chaves diferentes; com a mesma chave, nenhuma mudou.
+   - Um formulário aberto antes de um deploy chama uma ação que o servidor novo não conhece. O servidor responde 409 com `x-nextjs-action-not-found` sem executar nada, e o cliente recebe `UnrecognizedActionError`.
+2. **Antes:** `useAcaoSegura` tratava qualquer exceção como resultado incerto ("a conexão pode ter caído… toque em salvar de novo").
+   - Nesse caso, salvar de novo falhava igual, e recarregar apagava o que foi digitado.
+   - Reprodução no app local, em build de produção, com dois builds e banco sintético: deu a mesma tela do relato, e nada foi gravado.
+3. **Agora, a ação segura** (`cadastro/anuncio.tsx`):
+   - Reconhece o erro (`ehVersaoNova`) pelo nome que o Next dá; um teste com a classe real confere.
+   - A frase fala só **deste** envio: "este envio não foi processado. Recarregue a página…". Por isso ela serve também para excluir.
+   - Na vida da tela, lembra se algum envio anterior ficou sem confirmação. Se ficou, a frase não diz "nada": com o rascunho, diz que o sistema reconhece o reenvio; sem ele, pede que a pessoa confira antes de repetir.
+   - Falha de rede ou do servidor continua incerta, com a frase de sempre.
+4. **"Recarregar a página"** (`cadastro/erros.tsx`):
+   - Recarrega em vez de navegar.
+   - No toque, o formulário guarda o que está na tela naquele momento, inclusive o que mudou depois do aviso, e o prazo do rascunho é renovado. Só então recarrega sem a pergunta de sair. Sem guardar, a pergunta continua.
+   - Se a recarga for interrompida, a pergunta volta em 1,5 s.
+   - O alerta vai para o meio da tela e o foco para o botão.
+5. **Novo insumo** (`insumos/form-insumo.tsx`):
+   - **O rascunho da aba:** guarda os valores, a **chave do envio**, a incerteza e se algum prazo não voltou. O escopo é a pessoa e o parceiro, vindos do servidor.
+   - **Recuperação:** o formulário volta com a mesma chave. Assim, o servidor reconhece o reenvio ("criado-repetido"), a proteção de sempre, sem uma segunda deduplicação.
+   - **Aviso:**
+     - É anunciado ao leitor de tela.
+     - Não promete "nada salvo" quando um envio anterior pode ter chegado.
+     - Pede para conferir o prazo que não voltou.
+   - **"Descartar e começar de novo":** leva o foco ao nome.
+   - **Proteção:** o formulário recuperado conta como alteração, então sair pergunta. Cada envio novo descarta o rascunho anterior. O formulário só remonta quando há o que recuperar.
+6. **O que não muda:**
+   - a proteção do reenvio (chave por pessoa e hash dos campos);
+   - o conflito de versão lida;
+   - editar insumo, que mostra a frase sem rascunho e pergunta ao recarregar;
+   - os outros formulários, que passam a dizer a verdade e oferecer recarregar, mas sem recuperar.
+
+**Verificação:**
+- **Portão completo local em d64d0ec:** ambiente com PostgreSQL 16.15, Node 22.23.4 e o roteiro que espelha o `deploy.yml`, com a árvore limpa. Testes com banco: 361 arquivos e 6.240 testes, nenhum pulado. Lint, tipos, build e fontes também passaram.
+- **CI:** verde em d64d0ec.
+- **Commit da correção da revisão:** o portão completo fica no PR e na página de evidências.
+- **Testes:** 123 passam, entre eles os novos de integração da fiação. Os mutantes:
+  - 6 que a revisão achou;
+  - 8 novos, entre eles chave nova no lugar da antiga, incerteza ignorada, frase "nada foi salvo" de volta e remontagem em toda abertura.
+  - Os 14 morrem.
+- **Navegador:** os cenários do revisor, com a resposta real do servidor de outro deploy injetada (409 e `x-nextjs-action-not-found`), deram 20 de 20 no desktop claro, no celular escuro e no celular claro. Os cenários:
+  - versão nova;
+  - rede;
+  - envio incerto que gravou seguido de versão nova, com reenvio reconhecido e um registro só;
+  - edição depois do aviso;
+  - rascunho vencido;
+  - novo F5;
+  - envio que passa depois do aviso;
+  - editar.
+- **Dois builds de produção, com a primeira versão da correção:** 14 de 14.
+
+**Revisão independente:** novo revisor, subagente só de leitura.
+- **Primeira rodada (d64d0ec): reprovada.**
+  - **Bloqueante:** se um envio anterior ficou incerto e já tinha gravado, a versão nova dizia "nada foi salvo". Além disso, a recuperação trocava a chave do envio, e só o nome único evitava o duplicado.
+  - **Importantes:**
+    - recarregava sem pergunta mesmo com edição depois do aviso ou com o rascunho vencido;
+    - os testes não provavam a integração: seis mutantes viviam.
+  - **Menores:**
+    - remontagem em toda abertura;
+    - recuperado desprotegido e aviso não anunciado;
+    - rascunho que só saía ao ser lido;
+    - frase de "salvar" no excluir;
+    - alerta fora da tela;
+    - prazo inválido que sumia sem aviso;
+    - pergunta desligada se a recarga fosse interrompida.
+- **Correção no commit seguinte:** todos tratados, como descrito nos itens 3 a 5.
+- **Confirmação:** fica no PR e na página de evidências.
+
+**Limites:**
+- **Causa do incidente real:** falta procurar "Failed to find Server Action" nos registros de produção no horário do relato e conferir o catálogo. As duas coisas dependem de leitura autorizada de Rodolfo.
+- **Evitar a troca a cada deploy:** fixar a chave das ações no build (`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`). Isso é segredo e infraestrutura, então fica como decisão de Rodolfo.
+- A recuperação vale só para o Novo insumo.
+- O formulário recuperado é lido uma vez: um segundo F5, se a pessoa confirmar a saída, volta vazio.
+- Não testado em Safari/iOS nem com leitor de tela real.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
