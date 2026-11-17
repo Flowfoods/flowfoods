@@ -4277,7 +4277,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 6. **Relação com regras anteriores:**
    - É uma exceção escopada à regra da decisão 177 ("cor só no texto e no glifo; nunca fundo ou borda"), que continua valendo para o farol do DRE.
    - Aqui a cor fica no selo do indicador, sempre com a palavra. Nunca em card, linha, cabeçalho ou botão.
-   - Substitui a apresentação anterior das faixas: os tons genéricos `ok`, `alerta` e `erro`, que só exigiam o texto, sem cor própria por faixa. Eles vieram com as cinco faixas no PR #34 (e8c17e2, 06/11/2026), e o PR #37 acrescentou o teste "sem exigir cor exclusiva".
+   - Substitui a apresentação anterior das faixas: os tons genéricos `ok`, `alerta` e `erro`, que só exigiam o texto, sem cor própria por faixa. Eles vieram com as cinco faixas, já com o teste 'sem exigir cor exclusiva', no PR #34 (e8c17e2, 06/11/2026).
 
 **Verificação:**
 - **Portão completo local em eb7f145:**
@@ -4296,7 +4296,8 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
   - **Achado importante:** a amostra dos filtros vinha de um segundo mapa, e trocar duas cores só nele passava nos testes.
   - **Achados menores:** a guarda dos filtros só olhava a tag de abertura do botão; o fundo do neutro não estava fixado; a guarda de uso não via classe montada pelo prefixo; e o registro misturava métricas. Os demais (contraste contra a superfície, vermelho da marca, borda na impressão, resumo dos filtros, relação com a 177 e verificação desatualizada) estão nos itens 6, "Verificação" e "Limites".
 - **Correção no commit seguinte:** um mapa só para selo e amostra, com teste que liga a amostra ao selo em cada faixa; a contagem de todas as cores nos filtros; o fundo do neutro fixado; e a guarda pelo prefixo. Os mutantes sobreviventes agora morrem.
-- **Confirmação (1a3ebbc): aprovada.** O revisor rodou 18 mutantes numa cópia isolada e todos morreram: os 5 que sobreviviam e 9 novos contra o mapa único. Os 3 ajustes de redação que ele sugeriu entraram no commit seguinte. A confirmação desse commit fica no PR e na página de evidências.
+- **Confirmação (1a3ebbc): aprovada.** O revisor rodou 18 mutantes numa cópia isolada e todos morreram: os 5 que sobreviviam, 9 novos (6 contra o mapa único e o neutro, 3 contra a guarda pelo prefixo) e 4 que já morriam. Os 3 ajustes de redação que ele sugeriu entraram no commit seguinte.
+- **Confirmação do texto (7e59454):** dois ajustes de fidelidade, a origem do teste antigo e a conta dos mutantes. O texto sugerido pelo revisor entrou exatamente como veio, no commit seguinte, que ele deu por aprovado sem nova rodada.
 
 **Limites:**
 - Não testado em Safari/iOS nem com leitor de tela.
