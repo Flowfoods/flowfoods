@@ -4239,3 +4239,78 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - **Primeira rodada (6efc30c):** apontou que, com a junção só na consulta, um parceiro gravado com espaço duplo ("Bar  do Zé") deixava de ser achado, e pediu uma ressalva no texto. A correção escolhida foi mais forte: os espaços repetidos passaram a contar como um só também no texto. Pediu também pares de palavras na regressão. Os dois entraram em 129b381.
 - **Segunda rodada (129b381):** aprovada. Mutantes que invertem nome e detalhe falham com os pares de palavras.
 - **Confirmação (0a588fe, só teste e registro):** aprovada. O teste de espaços repetidos, que entrou nesse commit, falha quando o texto, a consulta ou os dois deixam de juntar os espaços. Os três ajustes de texto que ela sugeriu entraram no commit seguinte.
+
+### 528. 2026-11-17 · Farol do CMV de Fichas: uma cor própria e cheia por faixa
+
+**Fonte e recorte:** pedido de Rodolfo em 16/11/2026. Na lista, "Muito favorável", "Favorável" e "Confortável" usavam o mesmo verde. Cada faixa passa a ter uma cor própria e inconfundível, entre vermelho, laranja, azul, amarelo e verde, em tons mais profundos e saturados, com vermelho, laranja e amarelo bem separados. É uma fatia visual, executada enquanto a janela de módulo (decisão 526) espera a validação no iPhone, autorizada por Rodolfo em 17/11/2026 ("continue o plano"). Sem limite, meta, fórmula, preço, filtro, permissão, schema, migration, dado ou dependência.
+
+1. **Faixa e cor:** segue a ordem do farol do sistema (decisão 177), do melhor ao pior:
+   - Muito favorável: azul;
+   - Favorável: verde;
+   - Confortável: amarelo;
+   - Atenção: laranja;
+   - Crítico: vermelho.
+
+   Rótulos, ordem, intervalos e a classificação (`classificarFarolDeCmv`) não mudam: a cor sai só de `APRESENTACAO_DA_FAIXA`. Sem dados, Não ofertado e Faixas não configuradas continuam no `Selo` neutro.
+2. **Selo cheio, igual nos dois temas:** fundo e borda na cor da faixa, com o texto do par:
+   - azul #1D4ED8, texto creme #FFFDF8 (6,59:1);
+   - verde #15803D, texto creme (4,93:1);
+   - amarelo dourado #F2C200, texto #292B27 (8,50:1);
+   - laranja #F97316, texto #292B27 (5,10:1);
+   - vermelho #B3001B, texto creme (7,04:1).
+
+   O selo leva o próprio contraste e não depende do tema nem da superfície.
+3. **Medidas em CIELAB:**
+   - croma de 52 ou mais em todas; o verde `ok` de antes tinha 26;
+   - distância ΔE76 de 41 ou mais entre qualquer par; em ΔE2000, a menor é 29,6, entre amarelo e laranja. Antes, três faixas tinham distância zero;
+   - matiz do vermelho em 33°, do laranja em 55° e do amarelo em 88°.
+4. **Onde aparece:**
+   - no detalhe da ficha por canal e na projeção das embalagens (`FarolDeCmv`);
+   - na prévia dos intervalos das faixas do canal (`IntervalosDoFarol`);
+   - na lista (`CmvCompacto`);
+   - nos filtros, com uma amostra redonda ao lado do nome, nas opções e nos botões das faixas escolhidas. Caixa e botão continuam neutros. Os estados sem faixa ficam só com o contorno. O selo e a amostra saem do mesmo mapa (`CLASSES_DA_COR`).
+5. **Tokens só de Fichas:** `--ff-cmv-*` e `--ff-sobre-cmv-*` ficam num bloco próprio de `tokens.css`, fora dos temas, com as classes no Tailwind.
+   - O farol do DRE (`--ff-farol-*`, decisão 177) não muda.
+   - O `Selo` genérico não muda: só a forma dele passou para a constante `FORMA_DO_SELO`.
+   - Um teste-guarda confere que essas cores só aparecem em `fichas/farol.tsx` e em `tokens.css`. Ele pega o nome da cor e também a classe montada pelo prefixo.
+   - Na impressão do navegador, o selo vira a palavra em preto sobre branco. O papel da ficha (`modo="impressao"`) já mostrava só a palavra.
+6. **Relação com regras anteriores:**
+   - É uma exceção escopada à regra da decisão 177 ("cor só no texto e no glifo; nunca fundo ou borda"), que continua valendo para o farol do DRE.
+   - Aqui a cor fica no selo do indicador, sempre com a palavra. Nunca em card, linha, cabeçalho ou botão.
+   - Substitui a apresentação anterior das faixas: os tons genéricos `ok`, `alerta` e `erro`, que só exigiam o texto, sem cor própria por faixa. Eles vieram com as cinco faixas, já com o teste 'sem exigir cor exclusiva', no PR #34 (e8c17e2, 06/11/2026).
+
+**Verificação:**
+- **Portão completo local em eb7f145:**
+  - Ambiente: PostgreSQL 16.15, Node 22.23.4 e um roteiro que espelha o job do `deploy.yml`. A árvore estava limpa no início e no fim.
+  - Testes com banco: 357 arquivos e 6.183 testes, nenhum pulado.
+  - ai-check, ai-test, lint, tipos, portão de conteúdo, build e fontes também passaram.
+- **CI:** verde em eb7f145.
+- **Testes focados:** 87 passam depois da correção da revisão.
+- **App local com dados sintéticos:** 46 de 46 conferências, nos temas claro e escuro, no desktop (1440 px) e no celular (390 px). Elas cobrem lista, filtros, detalhe, faixas do canal e impressão.
+- **Portão de conteúdo:** só varre `src/`. As linhas novas destes documentos foram conferidas à mão.
+
+**Revisão independente:** novo revisor, subagente só de leitura.
+- **Primeira rodada (eb7f145): aprovada, sem bloqueante.**
+  - O revisor mediu de novo cores e contraste e passou o axe-core em 16 combinações, sem violação.
+  - Rodou 20 mutantes: 15 morreram, inclusive voltar uma faixa ao `ok`, pôr a cor no botão e tirar a sobrescrita da impressão.
+  - **Achado importante:** a amostra dos filtros vinha de um segundo mapa, e trocar duas cores só nele passava nos testes.
+  - **Achados menores:** a guarda dos filtros só olhava a tag de abertura do botão; o fundo do neutro não estava fixado; a guarda de uso não via classe montada pelo prefixo; e o registro misturava métricas. Os demais (contraste contra a superfície, vermelho da marca, borda na impressão, resumo dos filtros, relação com a 177 e verificação desatualizada) estão nos itens 6, "Verificação" e "Limites".
+- **Correção no commit seguinte:** um mapa só para selo e amostra, com teste que liga a amostra ao selo em cada faixa; a contagem de todas as cores nos filtros; o fundo do neutro fixado; e a guarda pelo prefixo. Os mutantes sobreviventes agora morrem.
+- **Confirmação (1a3ebbc): aprovada.** O revisor rodou 18 mutantes numa cópia isolada e todos morreram: os 5 que sobreviviam, 9 novos (6 contra o mapa único e o neutro, 3 contra a guarda pelo prefixo) e 4 que já morriam. Os 3 ajustes de redação que ele sugeriu entraram no commit seguinte.
+- **Confirmação do texto (7e59454):** dois ajustes de fidelidade: a origem do teste antigo, um erro que veio da sugestão anterior do próprio revisor, e a conta dos mutantes. O texto sugerido entrou exatamente como veio no commit seguinte, junto com esta linha. A checagem final fica no PR e na página de evidências.
+
+**Limites:**
+- Não testado em Safari/iOS nem com leitor de tela.
+- **Daltonismo, simulado em ΔE2000.** A palavra continua no selo. Os pares mais próximos:
+  - na deuteranopia, verde e vermelho (8,4) e amarelo e laranja (10,7);
+  - na protanopia, verde e laranja (11,0).
+- **Decisões do dono, sem bloqueio:**
+  - O vermelho do Crítico (#B3001B) fica a 6,5 em ΔE2000 do vermelho da marca e do botão principal (#BC382E). O selo é bem menor que o botão, mas pode lembrá-lo.
+  - O Confortável em amarelo pode ser lido como alerta.
+  - Contra a superfície, os selos se destacam de forma diferente em cada tema. No escuro: Crítico 2,15:1 e Muito favorável 2,30:1. No claro: amarelo 1,67:1 e laranja 2,78:1. A palavra mantém de 4,93:1 a 8,50:1 sobre o próprio fundo.
+  - A associação de cores segue a ordem do farol do sistema. Outra preferência muda só `APRESENTACAO_DA_FAIXA`.
+- **Impressão:** o selo colorido perde a borda, que fica branca, e o neutro mantém a sua. Continua legível e monocromático.
+- **Filtros aplicados:** os botões do resumo ("Faixa: Loja · Confortável") mostram só o texto.
+- **Fora do escopo, anterior a esta mudança:** a 320 px, a lista estoura 1 px por causa do botão "Nova ficha", e a edição estoura 11 px por causa de "Escolher foto" e "Principal".
+
+**Reversão:** reverter os commits desta decisão (ou o merge do PR). Só voltar os tons em `APRESENTACAO_DA_FAIXA` não compila, porque o selo e a amostra dependem da cor. Não há migration nem dado.

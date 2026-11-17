@@ -10,7 +10,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('react-dom', async original => ({ ...await original<typeof import('react-dom')>(), useFormStatus: () => ({ pending: false }) }));
 vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: () => [resposta.estado, undefined] }));
 import { FormFaixasDeCmv } from '@/components/erp/telas/fichas/form-faixas-cmv';
-import { FarolDeCmv, IntervalosDoFarol, SeloDaFaixa } from '@/components/erp/telas/fichas/farol';
+import { AmostraDaFaixa, APRESENTACAO_DA_FAIXA, FarolDeCmv, IntervalosDoFarol, SeloDaFaixa } from '@/components/erp/telas/fichas/farol';
 import { FiltrosDasFichas } from '@/components/erp/telas/fichas/filtros';
 import { PrecoEMargemPorCanal, type PrecosParaTela } from '@/components/erp/telas/fichas/custo-por-canal';
 import { FormEmbalagens } from '@/components/erp/telas/fichas/form-embalagens';
@@ -19,7 +19,7 @@ import { DocumentoDaFicha } from '@/components/erp/telas/fichas/impressao';
 import { TelaListaFichas, type LinhaNaTela } from '@/components/erp/telas/fichas/lista';
 import { concluirEtapaDaFicha } from '@/components/erp/telas/fichas/continuar';
 import { cmvDoCanal } from '@/lib/erp/cmv-produto-campos';
-import { CAMPOS_DO_FAROL, campoDaFaixa, type ConfiguracaoDoFarol, type CortesDoFarol, type ResultadoDoFarol, type FiltroDaFaixaDoCmv } from '@/lib/erp/cmv-faixas-campos';
+import { CAMPOS_DO_FAROL, campoDaFaixa, ESTADOS_DAS_FAIXAS_DO_CMV, FAIXAS_DO_CMV, type ConfiguracaoDoFarol, type CortesDoFarol, type ResultadoDoFarol, type FiltroDaFaixaDoCmv } from '@/lib/erp/cmv-faixas-campos';
 import { ORDEM_DOS_CANAIS, type CanalVenda } from '@/lib/erp/canal-campos';
 import { entradaParaTela, type EntradaDoCanal } from '@/lib/erp/preco-campos';
 import { deSeguroDaFicha, lerFiltrosDeFicha, type FiltroDoCmv } from '@/lib/erp/ficha-campos';
@@ -69,14 +69,53 @@ describe('3B configuração explícita, sem valores padrão', () => {
 });
 
 describe('3B farol e meta independentes na apresentação', () => {
+  // Paleta de 17/11/2026: uma cor própria e cheia por faixa, do mais favorável ao crítico; os estados sem faixa, neutros.
   it.each([
-    ['muitoFavoravel', 'text-ok', true], ['favoravel', 'text-ok', false], ['confortavel', 'text-ok', false],
-    ['atencao', 'text-atencao', false], ['critico', 'text-erro', false], ['semDados', 'text-suave', false],
-    ['naoOfertado', 'text-suave', false], ['faixasNaoConfiguradas', 'text-suave', false],
-  ] satisfies [ResultadoDoFarol['faixa'], string, boolean][])('%s usa o tom aprovado e texto, sem exigir cor exclusiva', (faixa, tom, cheio) => {
-    const h = render(SeloDaFaixa, { faixa }); expect(h).toContain(tom);
-    expect(h.includes('bg-ok-fundo')).toBe(cheio); expect(h).not.toContain('bg-destaque');
-    expect(h).toContain('whitespace-normal');
+    ['muitoFavoravel', 'Muito favorável', 'azul'], ['favoravel', 'Favorável', 'verde'], ['confortavel', 'Confortável', 'amarelo'],
+    ['atencao', 'Atenção', 'laranja'], ['critico', 'Crítico', 'vermelho'], ['semDados', 'Sem dados', null],
+    ['naoOfertado', 'Não ofertado', null], ['faixasNaoConfiguradas', 'Faixas não configuradas', null],
+  ] satisfies [ResultadoDoFarol['faixa'], string, string | null][])('%s: rótulo de sempre, cor própria e cheia ou neutro', (faixa, rotulo, cor) => {
+    const h = render(SeloDaFaixa, { faixa });
+    expect(h).toContain(rotulo); expect(h).toContain('whitespace-normal');
+    if (cor) for (const classe of [`border-cmv-${cor}`, `bg-cmv-${cor}`, `text-sobre-cmv-${cor}`]) expect(h).toContain(classe);
+    else {
+      // O neutro é o `Selo` de sempre: contorno, texto suave e o fundo da superfície (não o fundo "cheio").
+      expect(h).toContain('text-suave'); expect(h).toContain('border-linha-forte'); expect(h).toContain('bg-painel');
+      expect(h).not.toMatch(/cmv-|bg-forte/);
+    }
+    // Nem o tom genérico do ERP (que a faixa usava antes) nem o farol do DRE.
+    expect(h).not.toMatch(/text-ok|text-atencao|text-erro|bg-ok-fundo|bg-destaque|farol-/);
+  });
+  it('as cinco faixas têm cinco cores diferentes, e o texto do selo é o do par da própria cor', () => {
+    const cores = FAIXAS_DO_CMV.map(faixa => render(SeloDaFaixa, { faixa }).match(/\bbg-cmv-([a-z]+)/)?.[1]);
+    expect(cores).toEqual(['azul', 'verde', 'amarelo', 'laranja', 'vermelho']);
+    for (const faixa of FAIXAS_DO_CMV) {
+      const h = render(SeloDaFaixa, { faixa }); const cor = h.match(/\bbg-cmv-([a-z]+)/)![1];
+      expect(h.match(/\btext-sobre-cmv-([a-z]+)/)![1]).toBe(cor); expect(h.match(/\bborder-cmv-([a-z]+)/)![1]).toBe(cor);
+    }
+  });
+  it('a amostra dos filtros tem a mesma cor do selo, faixa por faixa; sem faixa, só o contorno', () => {
+    for (const faixa of [...FAIXAS_DO_CMV, ...ESTADOS_DAS_FAIXAS_DO_CMV]) {
+      const cor = APRESENTACAO_DA_FAIXA[faixa].cor;
+      const amostra = render(AmostraDaFaixa, { faixa }), selo = render(SeloDaFaixa, { faixa });
+      expect(amostra.match(/\bbg-cmv-([a-z]+)/)?.[1] ?? null, `amostra de ${faixa}`).toBe(cor);
+      expect(selo.match(/\bbg-cmv-([a-z]+)/)?.[1] ?? null, `selo de ${faixa}`).toBe(cor);
+      expect(amostra).toContain('aria-hidden');
+      if (!cor) expect(amostra).toContain('border border-linha-forte');
+    }
+  });
+  it('detalhe e prévia dos intervalos usam a mesma cor; a impressão fica só com a palavra, sem cor', () => {
+    expect(render(FarolDeCmv, { conta: conta(3000) })).toContain('bg-cmv-amarelo');
+    expect(render(FarolDeCmv, { conta: conta(3504) })).toContain('bg-cmv-laranja');
+    const papel = render(FarolDeCmv, { conta: conta(3504), modo: 'impressao' });
+    expect(papel).toContain('Atenção'); expect(papel).not.toContain('cmv-');
+    const intervalos = render(IntervalosDoFarol, { cortes });
+    for (const cor of ['azul', 'verde', 'amarelo', 'laranja', 'vermelho']) expect(intervalos).toContain(`bg-cmv-${cor}`);
+  });
+  it('estados sem faixa no detalhe continuam neutros e distintos', () => {
+    for (const [x, rotulo] of [[conta(3000, { cortesDoFarol: null }), 'Faixas não configuradas'], [conta(0), 'Sem dados'], [conta(3000, { ofertado: false }), 'Não ofertado']] as const) {
+      const h = render(FarolDeCmv, { conta: x }); expect(h).toContain(rotulo); expect(h).not.toContain('cmv-');
+    }
   });
   it('duas contas exibidas como 30,0% conservam faixas exatas diferentes e intervalos explicáveis', () => {
     const abaixo = render(FarolDeCmv, { conta: conta(2996) });
@@ -135,6 +174,12 @@ describe('3B: dois grupos explícitos e retorno completo', () => {
     const h = render(FiltrosDasFichas, { base: '/erp/fichas', filtros });
     const marcados = (nome: string) => campos(h, nome).filter(s => s.includes('checked=""'));
     expect(campos(h, 'faixaCmv')).toHaveLength(24);
+    // A cor de cada faixa vem numa amostra ao lado do nome (5 cores × 3 canais, mais o botão "Loja · Confortável"); os três
+    // estados sem faixa ficam só com o contorno (3 × 3, mais "Delivery · Sem dados"). Caixa e botão continuam neutros.
+    expect(h.match(/rounded-full bg-cmv-[a-z]+/g)).toHaveLength(16);
+    expect(h.match(/\bbg-cmv-[a-z]+/g)).toHaveLength(16); // nenhuma cor além das amostras (nem selo cheio dentro do botão)
+    expect(h.match(/rounded-full border border-linha-forte/g)).toHaveLength(10);
+    expect(h).not.toMatch(/<(?:button|input|label)\b[^>]*cmv-/);
     expect(marcados('cmv')).toHaveLength(2); expect(marcados('faixaCmv')).toHaveLength(2);
     expect(marcados('faixaCmv').join(' ')).toContain('LOJA-confortavel');
     expect(marcados('faixaCmv').join(' ')).toContain('DELIVERY_PROPRIO-semDados');
@@ -156,7 +201,7 @@ describe('3B: dois grupos explícitos e retorno completo', () => {
     expect(resumo.match(/30,0%/g)).toHaveLength(3);
     expect(resumo.match(/Acima da meta/g)).toHaveLength(3);
     const canais = resumo.slice(resumo.indexOf('<dl'), resumo.indexOf('</dl>'));
-    expect(canais.match(/Confortável/g)).toHaveLength(3);
+    expect(canais.match(/Confortável/g)).toHaveLength(3); expect(canais.match(/\bbg-cmv-amarelo\b/g)).toHaveLength(3);
     expect(resumo).not.toContain('todos os canais');
     expect(resumo).toContain('Ver preço, meta e detalhes do CMV de Prato');
     expect(resumo).toContain('href="/erp/fichas/f?de=');

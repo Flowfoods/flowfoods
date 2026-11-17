@@ -155,6 +155,74 @@ describe('padrão visual · tokens aprovados, claro e escuro', () => {
   });
 });
 
+/** CIELAB (D65), para medir saturação (croma), matiz e distância entre as cores. */
+const lab = (c: RGB): [number, number, number] => {
+  const [r, g, b] = c.map((n) => n / 255).map((n) => (n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4));
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const [x, y, z] = [(0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047, 0.2126 * r + 0.7152 * g + 0.0722 * b, (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883];
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+};
+
+describe('farol do CMV de Fichas (17/11/2026): cinco cores próprias, cheias e só de Fichas', () => {
+  const inicio = css.indexOf('--ff-cmv-azul');
+  const CMV: Record<string, string> = Object.fromEntries(
+    [...css.slice(css.lastIndexOf('{', inicio) + 1, css.indexOf('}', inicio)).matchAll(/--ff-((?:sobre-)?cmv-[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]),
+  );
+  const CORES = ['azul', 'verde', 'amarelo', 'laranja', 'vermelho'] as const;
+  const cor = (nome: string) => canais(CMV[nome]);
+
+  it('a paleta é a registrada, num bloco só, igual nos dois temas (os temas não a redefinem)', () => {
+    expect(CMV).toEqual({
+      'cmv-azul': '29 78 216', 'sobre-cmv-azul': '255 253 248',
+      'cmv-verde': '21 128 61', 'sobre-cmv-verde': '255 253 248',
+      'cmv-amarelo': '242 194 0', 'sobre-cmv-amarelo': '41 43 39',
+      'cmv-laranja': '249 115 22', 'sobre-cmv-laranja': '41 43 39',
+      'cmv-vermelho': '179 0 27', 'sobre-cmv-vermelho': '255 253 248',
+    });
+    for (const tema of [CLARO, ESCURO, SISTEMA]) expect(Object.keys(tema).filter((k) => k.includes('cmv-'))).toEqual([]);
+  });
+
+  it('o texto de cada selo tem ≥ 4,5:1 sobre a cor dele (o selo não depende de onde está pousado)', () => {
+    for (const c of CORES) expect(contraste(cor(`sobre-cmv-${c}`), cor(`cmv-${c}`)), c).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('as cinco cores são saturadas e inconfundíveis; vermelho, laranja e amarelo bem separados', () => {
+    const medidas = Object.fromEntries(CORES.map((c) => [c, lab(cor(`cmv-${c}`))]));
+    // Croma ≥ 50 (o verde de antes, `ok`, tinha 26): nada pastel nem acinzentado.
+    for (const c of CORES) expect(Math.hypot(medidas[c][1], medidas[c][2]), c).toBeGreaterThanOrEqual(50);
+    // Distância ≥ 40 entre qualquer par (antes, três faixas tinham distância zero: a mesma cor).
+    for (const [i, a] of CORES.entries()) for (const b of CORES.slice(i + 1)) {
+      expect(Math.hypot(...medidas[a].map((v, k) => v - medidas[b][k])), `${a} × ${b}`).toBeGreaterThanOrEqual(40);
+    }
+    // Matiz: vermelho < laranja < amarelo, com ≥ 20° entre vizinhos (o amarelo não vira laranja nem o laranja, vermelho).
+    const matiz = (c: (typeof CORES)[number]) => (Math.atan2(medidas[c][2], medidas[c][1]) * 180) / Math.PI;
+    expect(matiz('laranja') - matiz('vermelho')).toBeGreaterThanOrEqual(20);
+    expect(matiz('amarelo') - matiz('laranja')).toBeGreaterThanOrEqual(20);
+  });
+
+  it('na impressão, o selo vira a palavra em preto sobre branco', () => {
+    const papel = css.slice(css.indexOf('@media print'));
+    for (const c of CORES) {
+      expect(papel).toContain(`--ff-cmv-${c}: 255 255 255;`);
+      expect(papel).toContain(`--ff-sobre-cmv-${c}: 0 0 0;`);
+    }
+  });
+
+  it('o Tailwind lê os tokens novos, com o próprio valor de reserva', () => {
+    const cores = (config.theme!.extend as { colors: Record<string, string> }).colors;
+    for (const [nome, valor] of Object.entries(CMV)) expect(cores[nome], nome).toBe(`rgb(var(--ff-${nome}, ${valor}) / <alpha-value>)`);
+  });
+
+  it('só Fichas usa essas cores: o farol do DRE e o resto do ERP continuam como estão', () => {
+    const arquivos = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? arquivos(`${dir}/${d.name}`) : /\.(tsx?|css)$/.test(d.name) ? [`${dir}/${d.name}`] : []));
+    // O nome da cor por extenso, ou uma classe montada pelo prefixo (`bg-cmv-${cor}`), fora de Fichas e dos tokens: nada.
+    const uso = /cmv-(?:azul|verde|amarelo|laranja|vermelho)|\b(?:bg|border|text|ring|fill|stroke|from|via|to|outline|shadow|decoration|divide|accent|caret)(?:-[trblxyse])?-(?:sobre-)?cmv-/;
+    const usos = arquivos('src').filter((p) => uso.test(readFileSync(p, 'utf8'))).sort();
+    expect(usos).toEqual(['src/components/erp/telas/fichas/farol.tsx', 'src/components/erp/tokens.css']);
+  });
+});
+
 describe('padrão visual · tema lido no servidor, sem flash', () => {
   it('os três temas resolvem no CSS pelo atributo do wrapper; o fundo do html acompanha o escuro', () => {
     expect(css).toMatch(/\.ff-app,\s*\n\.ff-app\[data-tema='claro'\] \{/);

@@ -87,6 +87,18 @@ const config: Config = {
         'farol-amarelo': token('farol-amarelo', '226 197 90'),
         'farol-laranja': token('farol-laranja', '240 145 58'),
         'farol-vermelho': token('farol-vermelho', '244 101 108'),
+        // Farol do CMV de Fichas (17/11/2026): selo cheio, uma cor por faixa, igual nos dois temas; `sobre-cmv-*` é o
+        // texto do selo. Só as telas de Fichas usam (teste-guarda); o farol do DRE acima não muda.
+        'cmv-azul': token('cmv-azul', '29 78 216'),
+        'sobre-cmv-azul': token('sobre-cmv-azul', '255 253 248'),
+        'cmv-verde': token('cmv-verde', '21 128 61'),
+        'sobre-cmv-verde': token('sobre-cmv-verde', '255 253 248'),
+        'cmv-amarelo': token('cmv-amarelo', '242 194 0'),
+        'sobre-cmv-amarelo': token('sobre-cmv-amarelo', '41 43 39'),
+        'cmv-laranja': token('cmv-laranja', '249 115 22'),
+        'sobre-cmv-laranja': token('sobre-cmv-laranja', '41 43 39'),
+        'cmv-vermelho': token('cmv-vermelho', '179 0 27'),
+        'sobre-cmv-vermelho': token('sobre-cmv-vermelho', '255 253 248'),
         linha: 'var(--ff-linha, #3b3d35)',
         'linha-forte': 'var(--ff-linha-forte, rgb(238 234 224 / 0.2))',
       },

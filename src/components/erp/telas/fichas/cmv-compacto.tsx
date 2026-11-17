@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { CANAIS } from '@/lib/erp/canal-campos';
 import { porcentagemDoCmv, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
-import { Selo } from '../../ui/superficies';
-import { APRESENTACAO_DA_FAIXA } from './farol';
+import { APRESENTACAO_DA_FAIXA, SeloDoFarol } from './farol';
 
 /** Apresentação da conta autorizada pelo servidor; não recalcula nem reclassifica o CMV. */
 export function CmvCompacto({ conta: x }: { conta: CmvDoCanal }) {
@@ -17,7 +16,7 @@ export function CmvCompacto({ conta: x }: { conta: CmvDoCanal }) {
 
   return <span className="block min-w-0 space-y-1 text-[12px] leading-snug">
     {numero && <span className="block text-sm font-semibold tabular-nums text-texto">{numero}</span>}
-    <span className="block"><Selo tom={faixa.tom} cheio={faixa.cheio}><span className="min-w-0 whitespace-normal">{estado}</span></Selo></span>
+    <span className="block"><SeloDoFarol faixa={x.farol.faixa}><span className="min-w-0 whitespace-normal">{estado}</span></SeloDoFarol></span>
     {faltaPrecoTambem && <span className="block text-suave">Sem preço</span>}
     {meta && <span className="block text-suave">{meta}</span>}
   </span>;
