@@ -2,8 +2,8 @@
  * Busca ⌘K com nomes curtos e sinônimos (plano de módulos de 11/11/2026, critério 3: "a busca considera nomes novos e
  * antigos; cada atalho aponta ao domínio existente correto"). Sem banco e sem navegador.
  *
- * - os sinônimos só ACRESCENTAM: em toda consulta, os resultados que já existiam vêm primeiro, na mesma ordem (o Enter abre
- *   o mesmo de antes), e o que só casa por sinônimo vem depois;
+ * - os sinônimos só ACRESCENTAM: em toda consulta, os resultados da busca de antes (copiada aqui como referência) vêm
+ *   primeiro, na mesma ordem (o Enter abre o mesmo de antes), e o que só casa por sinônimo vem depois;
  * - o sinônimo casa pelo começo de uma palavra dele ("fin" acha Financeiro; "está" não acha Gestão);
  * - os nomes curtos do plano acham as telas que existem: Financeiro → Faturamento e DRE, Gestão → Rede e Equipe,
  *   Configurações → Lojas e marcas, Integrações e Equipe, iFood e Integração → Integrações, Analytics → o hub;
@@ -25,7 +25,16 @@ const doNivel1 = () => locaisDaNavegacao(comParceiroAtual(navegacaoDoNivel1(), '
 const doNivel1ForaDoParceiro = () => locaisDaNavegacao(navegacaoDoNivel1(), PARCEIROS);
 const rotulos = (r: { rotulo: string }[]) => r.map((x) => x.rotulo);
 const hrefs = (r: { href: string }[]) => r.map((x) => x.href);
-const semTermos = (locais: LocalDaBusca[]) => locais.map(({ termos: _t, ...r }) => r);
+/**
+ * A busca de antes dos sinônimos (9e573a1, `BuscaGlobal`), copiada aqui como referência fixa: nome e detalhe, sem acento,
+ * na ordem do menu; sem termo, as telas. A regressão compara com ela, e não com a função nova, para que uma mudança no
+ * casamento por nome também apareça.
+ */
+const normalizarDeAntes = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const buscaDeAntes = (locais: LocalDaBusca[], q: string) => {
+  const termo = normalizarDeAntes(q.trim());
+  return termo ? locais.filter((r) => normalizarDeAntes(`${r.rotulo} ${r.detalhe}`).includes(termo)) : locais.filter((r) => r.tipo === 'tela');
+};
 
 const CENARIOS: [string, () => LocalDaBusca[]][] = [
   ['Dono', () => doParceiro('DONO')],
@@ -38,20 +47,22 @@ const CENARIOS: [string, () => LocalDaBusca[]][] = [
 ];
 
 describe('busca ⌘K · os sinônimos só acrescentam', () => {
-  it('em toda consulta (palavras e começos de palavra dos nomes e detalhes), os resultados de antes vêm primeiro, na mesma ordem', () => {
+  it('em toda consulta (palavras, começos de palavra e pares de palavras dos nomes e detalhes), os resultados de antes vêm primeiro, na mesma ordem', () => {
     let consultas = 0;
     for (const [nome, locaisDe] of CENARIOS) {
       const locais = locaisDe();
-      const antes = semTermos(locais);
       const palavras = new Set<string>();
       for (const l of locais) {
-        for (const p of normalizarBusca(`${l.rotulo} ${l.detalhe} ${l.termos ?? ''}`).split(/[^a-z0-9]+/)) {
+        const todas = normalizarBusca(`${l.rotulo} ${l.detalhe} ${l.termos ?? ''}`).split(/[^a-z0-9]+/).filter(Boolean);
+        for (const p of todas) {
           for (let n = 2; n <= p.length; n++) palavras.add(p.slice(0, n));
         }
+        // Consultas de duas palavras seguidas ("rede e", "lojas e marcas" vira "lojas e" e "e marcas").
+        for (let i = 0; i + 1 < todas.length; i++) palavras.add(`${todas[i]} ${todas[i + 1]}`);
       }
       for (const q of palavras) {
         const agora = filtrarLocais(locais, q).map(({ rotulo, href, tipo }) => ({ rotulo, href, tipo }));
-        const deAntes = filtrarLocais(antes, q).map(({ rotulo, href, tipo }) => ({ rotulo, href, tipo }));
+        const deAntes = buscaDeAntes(locais, q).map(({ rotulo, href, tipo }) => ({ rotulo, href, tipo }));
         expect(agora.slice(0, deAntes.length), `${nome}: "${q}"`).toEqual(deAntes);
         consultas++;
       }
@@ -64,6 +75,16 @@ describe('busca ⌘K · os sinônimos só acrescentam', () => {
     expect(filtrarLocais(doNivel1(), 'indicadores')[0].href).toBe('/rodolfo/erp/alfa/producao/indicadores');
     expect(filtrarLocais(doParceiro('DONO'), 'resultado')[0].rotulo).toBe('DRE');
     expect(filtrarLocais(doParceiro('DONO'), 'cad')[0].href).not.toBe('/erp');
+  });
+
+  it('espaços repetidos contam como um só, na consulta e no texto: um parceiro gravado com espaço duplo continua achado', () => {
+    const comEspacoDuplo = [{ slug: 'bar-do-ze', nome: 'Bar  do Zé', rotuloStatus: 'Ativo' }];
+    const locais = locaisDaNavegacao(navegacaoDoNivel1(), comEspacoDuplo);
+    for (const q of ['bar do', 'bar  do', 'BAR   DO ZE']) expect(rotulos(filtrarLocais(locais, q)), q).toEqual(['Bar  do Zé']);
+    // Na consulta: com espaços repetidos, acha o mesmo que com um espaço só.
+    const doDono = doParceiro('DONO');
+    expect(filtrarLocais(doDono, 'lojas   e marcas')).toEqual(filtrarLocais(doDono, 'lojas e marcas'));
+    expect(rotulos(filtrarLocais(doDono, 'lojas   e marcas'))).toContain('Lojas e marcas');
   });
 
   it('o sinônimo casa pelo começo de uma palavra dele, não por pedaço do meio', () => {
@@ -144,14 +165,6 @@ describe('busca ⌘K · nomes curtos do plano', () => {
     expect(filtrarLocais(doParceiro('OPERADOR'), 'ifood')).toEqual([]);
     expect(rotulos(filtrarLocais(doParceiro('DONO', NENHUM_MODULO_LIBERADO), 'ifood'))).not.toContain('Integrações');
     expect(rotulos(filtrarLocais(doParceiro('DONO', NENHUM_MODULO_LIBERADO), 'integração'))).not.toContain('Integrações');
-    // Em todos os cenários, todo resultado é uma tela, ação ou parceiro do próprio menu.
-    for (const [nome, locaisDe] of CENARIOS) {
-      const locais = locaisDe();
-      const doMenu = new Set(hrefs(locais));
-      for (const q of ['financeiro', 'gestão', 'configurações', 'ifood', 'integração', 'analytics']) {
-        for (const r of filtrarLocais(locais, q)) expect(doMenu.has(r.href), `${nome}: ${q} → ${r.href}`).toBe(true);
-      }
-    }
   });
 
   it('módulo sem tela não vira resultado (CRM Clube, Checklists, Flow Ads, Patrimônio); Delivery e Pessoas só acham telas que existem', () => {

@@ -77,7 +77,8 @@ function casaComTermos(termos: string, termo: string): boolean {
 export function filtrarLocais<T extends { tipo: string; rotulo: string; detalhe: string; termos?: string }>(locais: readonly T[], q: string): T[] {
   const termo = normalizarBusca(q.trim()).replace(/\s+/g, ' ');
   if (!termo) return locais.filter((r) => r.tipo === 'tela');
-  const pelaTela = (r: T) => normalizarBusca(`${r.rotulo} ${r.detalhe}`).includes(termo);
+  // Espaços repetidos contam como um só, na consulta e no texto (um nome de parceiro com espaço duplo continua achado).
+  const pelaTela = (r: T) => normalizarBusca(`${r.rotulo} ${r.detalhe}`).replace(/\s+/g, ' ').includes(termo);
   const direto = locais.filter(pelaTela);
   const soPeloTermo = locais.filter((r) => !pelaTela(r) && !!r.termos && casaComTermos(r.termos, termo));
   return [...direto, ...soPeloTermo];
