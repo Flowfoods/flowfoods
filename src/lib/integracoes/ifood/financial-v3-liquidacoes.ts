@@ -99,11 +99,15 @@ function consolidacao(lista: unknown, merchantId: string): Pick<LiquidacoesV3, '
 }
 
 /** Lê uma resposta 200 do contrato v3 para o merchant e as datas pedidos. Saldo, títulos e grupos conservam sua natureza. */
-export function lerLiquidacoesV3(textoJson: string, pedido: PedidoLiquidacoesV3): LiquidacoesV3 {
+export function lerLiquidacoesV3(
+  textoJson: string, pedido: PedidoLiquidacoesV3, conferirFonte?: (corpo: Readonly<Record<string, unknown>>) => void,
+): LiquidacoesV3 {
   const { corpo, ...resumo } = lerEnvelopePeriodoFinancialV3(textoJson, pedido, ErroLiquidacoesV3);
-  return {
+  const liquidacoes = {
     ...resumo,
     ...consolidacao(corpo.consolidatedMerchants, resumo.merchantId),
     lancamentos: lancamentos(corpo.settlements),
   };
+  conferirFonte?.(corpo);
+  return liquidacoes;
 }

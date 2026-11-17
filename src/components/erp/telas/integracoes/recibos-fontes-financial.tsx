@@ -2,8 +2,8 @@ import Link from 'next/link';
 import type { ResultadoConferenciaFinancial } from '@/lib/integracoes/core/conferencia-financial';
 import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Contagem, Painel } from '@/components/erp/ui/superficies';
-import { diaAnalytics, dinheiroAnalytics, instanteAnalytics } from './formato-analytics';
-import { MedidaFinancial } from './medidas-conferencia-financial';
+import { diaAnalytics, instanteAnalytics } from './formato-analytics';
+import { SaldosConferenciaFinancial } from './saldos-conferencia-financial';
 
 type Consulta = Extract<ResultadoConferenciaFinancial, { ok: true }>;
 const taxa = (bp: number) => `${(bp / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
@@ -29,11 +29,7 @@ export function RecibosFontesFinancial({ consulta, retorno, destaque }: { consul
             <section aria-label="Comparação do arquivo mensal com os eventos">
               <h3 className="font-semibold">Lançamentos com impacto no repasse</h3>
               {r.somas ? <>
-                <dl className="mt-2 grid gap-3 sm:grid-cols-3">
-                  <MedidaFinancial rotulo="Arquivo mensal" valor={dinheiroAnalytics(r.somas.arquivoCentavos)} />
-                  <MedidaFinancial rotulo="Eventos financeiros" valor={dinheiroAnalytics(r.somas.eventosCentavos)} />
-                  <MedidaFinancial rotulo="Eventos menos arquivo" valor={dinheiroAnalytics((BigInt(r.somas.eventosCentavos) - BigInt(r.somas.arquivoCentavos)).toString())} />
-                </dl>
+                <SaldosConferenciaFinancial {...r.somas} />
                 <p className="mt-2 text-suave">Os totais consideram os arquivos deste envio. O fechamento da competência exige conferir a cobertura das duas fontes.</p>
               </> : <p className="mt-1 text-suave">Somas indisponíveis neste recibo. Reapresente o pacote original à FlowFoods para calculá-las.</p>}
             </section>
