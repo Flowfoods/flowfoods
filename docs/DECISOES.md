@@ -4157,7 +4157,7 @@ Ficha: no 1º commit desta decisão (antes da revisão) o botão saía da tela a
   - **Importante:** a partir de 1440 px, com trilha média ou longa, com ou sem barra de rolagem, o lugar na barra encolhia abaixo do mínimo do botão, e o botão cobria o seletor de parceiro (28 de 192 casos numa réplica fiel do topo, até 37,7 px com todos os nomes no limite).
   - **Menores:** em largura fracionária, entre 1439 e 1440 px, a barra e a faixa apareciam juntas. O mínimo real, contando o espaçamento do nome vazio, é 60 e 76 px, e não 52 e 68. O registro ainda citava 1280 e 44 px.
 - **Correção (129b381):** o lugar na barra tem o mesmo mínimo do botão: 60 px, ou 76 px com o ponto, por `has-[[data-ponto]]`, e quem cede é a trilha. A barra e a faixa usam a mesma consulta, `min-width: 1440px`. O texto foi corrigido.
-- **Segunda rodada (129b381): aprovada.** O revisor mediu a réplica do topo, com as classes exatas, em 1.664 casos: de 1280 a 1920 px, menu aberto e recolhido, com e sem rolagem de 15 px, quatro trilhas, quatro conjuntos de nomes, com e sem o ponto. A partir de 1440 px, os 1.152 casos ficaram só na barra, sem cobrir o seletor e com folga mínima de 8 px. Abaixo disso, os 512 casos ficaram só na faixa. Em largura fracionária (escala de 1,25 e 1,1), aparece só a faixa. Observação fora do escopo, anterior a esta mudança: a 1280 px, com o menu aberto e todos os nomes no limite, inclusive o da pessoa, a página estoura 7 px (22 px com rolagem), com ou sem janela.
+- **Segunda rodada (129b381): aprovada.** O revisor mediu a réplica do topo, com as classes exatas, em 1.664 casos: de 1280 a 1920 px, menu aberto e recolhido, com e sem rolagem de 15 px, quatro trilhas, quatro conjuntos de nomes, com e sem o ponto. A partir de 1440 px, os 1.152 casos ficaram só na barra, sem cobrir o seletor e com folga mínima de 8 px. Abaixo disso, os 512 casos ficaram só na faixa. Em largura fracionária entre 1439 e 1440 px (escala de 1,25 e 1,1), aparece só a faixa. Observação fora do escopo, anterior a esta mudança: a 1280 px, com o menu aberto e todos os nomes no limite, inclusive o da pessoa, a página estoura 7 px (22 px com rolagem), com ou sem janela.
 - **Validação de 129b381** (Chromium, app local, dados sintéticos, roteiros fora do repositório):
   - **Pior caso:** nomes no limite nos dois seletores, trilha longa e barra de rolagem de 15 px, trocados só na página, com e sem o ponto, de 1280 a 1920 px: 32 de 32 sem sobreposição, com ícone e ponto dentro do botão e sem estouro.
   - **Barra do topo:** de 768 a 1920 px, com o menu aberto e recolhido: 26 de 26.
@@ -4222,6 +4222,8 @@ Ficha: no 1º commit desta decisão (antes da revisão) o botão saía da tela a
   - testes não provavam o que diziam: laço do Operador vazio, primeiro resultado não conferido, Gerente e nível 1 fora do parceiro ausentes;
   - o comentário de `modulosDoParceiro` estava fora do lugar.
 
+Segunda rodada (c2b270e): aprovado. Em 1.411 consultas comparadas com o código anterior, nenhum primeiro resultado mudou. Ficaram três observações opcionais, tratadas no ajuste seguinte.
+
 **Limites:**
 - **Módulos "Em breve":** não aparecem na busca, nem como "em breve"; isso é da UX-MOD-4. Os nomes curtos de módulos futuros (CRM, Checklists, Patrimônio, Dispositivos, Flow Ads) não acham nada. "Delivery" acha a Precificação, que fala de delivery no subtítulo. "Pessoas" acha a aba Equipe pelo subtítulo, como já acontecia; não é o módulo futuro Equipe e RH.
 - **Ordem:** dentro de cada grupo (nome e sinônimo) a ordem é a do menu, sem ranqueamento por relevância. Um começo curto que casa com um sinônimo ("fin", "conf") acrescenta telas antes dos insumos do servidor.
@@ -4233,8 +4235,7 @@ Ficha: no 1º commit desta decisão (antes da revisão) o botão saía da tela a
 - Saiu o laço que não podia falhar, porque a função só filtra a lista que recebe.
 - O texto passou a citar a junção de espaços.
 
-A revisão independente dessa mudança fez duas rodadas:
-- **Primeira rodada (6efc30c):** pediu que os espaços repetidos contassem também no texto. Antes, um parceiro gravado com espaço duplo ("Bar  do Zé") deixava de ser achado. Pediu também pares de palavras na regressão. Os dois entraram em 129b381.
+A revisão independente dessa mudança fez duas rodadas e uma confirmação:
+- **Primeira rodada (6efc30c):** apontou que, com a junção só na consulta, um parceiro gravado com espaço duplo ("Bar  do Zé") deixava de ser achado, e pediu uma ressalva no texto. A correção escolhida foi mais forte: os espaços repetidos passaram a contar como um só também no texto. Pediu também pares de palavras na regressão. Os dois entraram em 129b381.
 - **Segunda rodada (129b381):** aprovada. Mutantes que invertem nome e detalhe falham com os pares de palavras.
-
-Os testes de espaços repetidos entraram no commit seguinte. Um mutante que tira a junção de espaços do texto faz o teste novo falhar.
+- **Confirmação (0a588fe, só teste e registro):** aprovada. O teste de espaços repetidos, que entrou nesse commit, falha quando o texto, a consulta ou os dois deixam de juntar os espaços. Os três ajustes de texto que ela sugeriu entraram no commit seguinte.
