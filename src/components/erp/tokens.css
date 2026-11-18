@@ -35,6 +35,12 @@
   /* Entrada de popover, modal e gaveta; cor, fundo e borda de botões e navegação. Fechar é imediato. */
   --ff-movimento: 220ms;
   --ff-curva-entrada: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /*
+   * Letra do texto (decisão 530, visual da Apple): a do sistema. A SF no iPhone, iPad e Mac; nos outros aparelhos, a do
+   * sistema deles (o Chromium já trata os dois primeiros nomes como a letra do sistema em qualquer plataforma; `system-ui`
+   * leva o Firefox ao mesmo lugar). A Libre Franklin fica de reserva. Os títulos editoriais seguem em Gelasio (`font-display`).
+   */
+  --ff-fonte-texto: -apple-system, BlinkMacSystemFont, system-ui, var(--font-franklin);
 }
 
 /*
@@ -98,6 +104,17 @@
   --ff-sombra: 0 18px 60px rgb(40 48 38 / 0.13);
   --ff-mistura-icone: 14%;
   --ff-icone-tinta: 100%;
+  /*
+   * Visual da Apple (decisão 530): o preenchimento dos controles (trilho do segmentado, campo de busca, botão secundário), o
+   * polegar do segmentado e o material das barras. O material é quase opaco (92 %): mesmo com conteúdo preto rolando por
+   * baixo, o texto secundário da barra fica com 4,5:1 (teste em `erp-padrao-visual`).
+   */
+  --ff-preenchimento: rgb(118 114 100 / 0.13);
+  --ff-preenchimento-forte: rgb(118 114 100 / 0.2);
+  --ff-polegar: 255 254 251;
+  --ff-material: rgb(255 254 251 / 0.92);
+  /* A lupa do campo de busca, na cor do texto secundário do tema. */
+  --ff-lupa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23686a61' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
   color-scheme: light;
 }
 
@@ -136,6 +153,11 @@
   --ff-sombra: 0 18px 60px rgb(0 0 0 / 0.4);
   --ff-mistura-icone: 22%;
   --ff-icone-tinta: 55%;
+  --ff-preenchimento: rgb(238 234 224 / 0.11);
+  --ff-preenchimento-forte: rgb(238 234 224 / 0.17);
+  --ff-polegar: 74 75 68;
+  --ff-material: rgb(36 37 33 / 0.92);
+  --ff-lupa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b0b1a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
 
@@ -175,6 +197,11 @@
     --ff-sombra: 0 18px 60px rgb(0 0 0 / 0.4);
     --ff-mistura-icone: 22%;
     --ff-icone-tinta: 55%;
+    --ff-preenchimento: rgb(238 234 224 / 0.11);
+    --ff-preenchimento-forte: rgb(238 234 224 / 0.17);
+    --ff-polegar: 74 75 68;
+    --ff-material: rgb(36 37 33 / 0.92);
+    --ff-lupa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b0b1a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
     color-scheme: dark;
   }
   html:has(.ff-app[data-tema='sistema']) {
@@ -224,6 +251,58 @@ html:has(.ff-app[data-tema='escuro']) {
   transition-property: background-color, border-color, color, box-shadow, opacity;
   transition-duration: var(--ff-movimento);
   transition-timing-function: ease;
+}
+
+/*
+ * Material translúcido da Apple (decisão 530) na barra do topo: o que rola por baixo aparece borrado. O borrão mora num
+ * pseudo-elemento por trás do conteúdo da barra: no próprio elemento, `backdrop-filter` faria da barra o bloco de referência
+ * dos popovers fixos que ela abre (trilha, visão, conta), e eles sairiam do lugar. A barra precisa ser posicionada e ter
+ * camada própria (`sticky` + `z-*`). Sem suporte ao borrão, ou com a transparência reduzida no aparelho, a barra fica sólida.
+ */
+.ff-app .ff-material::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--ff-material);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ff-app .ff-material::before {
+    background-color: rgb(var(--ff-painel));
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .ff-app .ff-material::before {
+    background-color: rgb(var(--ff-painel));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/*
+ * Campo de busca da Apple (decisão 530): todo `input[type=search]` do ERP fica preenchido, sem borda, com a lupa (imagem de
+ * fundo do tema), sem mexer nas telas. O texto de exemplo é o texto a 75 %: sobre o preenchimento, o `suave` cairia abaixo de
+ * 4,5:1 no fundo creme. A regra vence as classes do campo (`border-linha-forte`, `bg-campo`, `px-3`) pela especificidade.
+ */
+.ff-app input[type='search'] {
+  border-color: transparent;
+  border-radius: var(--ff-raio-botao);
+  background-color: var(--ff-preenchimento);
+  background-image: var(--ff-lupa);
+  background-repeat: no-repeat;
+  background-position: 12px center;
+  background-size: 16px 16px;
+  padding-left: 36px;
+}
+.ff-app input[type='search']:hover {
+  border-color: transparent;
+  background-color: var(--ff-preenchimento-forte);
+}
+.ff-app input[type='search']::placeholder {
+  color: rgb(var(--ff-texto) / 0.75);
 }
 
 /* Identidade das áreas (29/10): a paleta de modulos.ts também orienta cards e menu.

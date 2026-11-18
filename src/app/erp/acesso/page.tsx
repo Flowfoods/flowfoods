@@ -83,7 +83,7 @@ export default async function SeuAcessoPage() {
           <AjudaDeAcesso className="mt-5 border-t border-linha pt-4" />
         </Painel>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Painel titulo={`O que você faz em ${parceiro.nome}`}>
             <div className="space-y-4">
               <p className="text-[14px] text-suave">

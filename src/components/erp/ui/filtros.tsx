@@ -1,10 +1,12 @@
 /**
  * Filtro por link (o estado mora na URL: voltar funciona e dá para mandar o
- * link já filtrado). Controle segmentado do kit: trilho com borda, opção ativa
- * em `forte`, `aria-current`. Rola dentro do próprio trilho no celular.
+ * link já filtrado). Controle segmentado no visual da Apple (decisão 530):
+ * trilho preenchido, opção ativa num polegar claro com sombra e em negrito,
+ * `aria-current`. Rola dentro do próprio trilho no celular.
  */
 
 import Link from 'next/link';
+import { classeDeBotao } from './estilos';
 
 export function FiltroEmLinks({
   rotulo,
@@ -20,13 +22,13 @@ export function FiltroEmLinks({
   if (quebra) {
     return (
       <nav aria-label={rotulo} className="min-w-0 max-w-full">
-        <ul className="flex flex-wrap gap-1 rounded-[10px] border border-linha bg-painel p-1">
+        <ul className="flex flex-wrap gap-0.5 rounded-[10px] bg-preenchimento p-[3px]">
           {opcoes.map((o) => (
             <li key={o.href + o.rotulo}>
               <Link
                 href={o.href}
                 aria-current={o.ativo ? 'page' : undefined}
-                className="ff-transicao flex min-h-9 items-center rounded-[7px] px-3 text-[13px] text-suave hover:bg-texto/5 hover:text-texto aria-[current=page]:bg-forte aria-[current=page]:font-semibold aria-[current=page]:text-texto"
+                className="ff-transicao flex min-h-9 items-center rounded-[8px] px-3 text-[13px] font-medium text-texto hover:bg-preenchimento aria-[current=page]:bg-polegar aria-[current=page]:font-semibold aria-[current=page]:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_2px_6px_rgb(0_0_0/0.1)] aria-[current=page]:hover:bg-polegar"
               >
                 {o.rotulo}
               </Link>
@@ -44,13 +46,13 @@ export function FiltroEmLinks({
       aria-label={rotulo}
       className="min-w-0 max-w-full overflow-x-auto max-sm:pr-8 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]"
     >
-      <ul className="flex w-max gap-1 rounded-[10px] border border-linha bg-painel p-1">
+      <ul className="flex w-max gap-0.5 rounded-[10px] bg-preenchimento p-[3px]">
         {opcoes.map((o) => (
           <li key={o.href + o.rotulo}>
             <Link
               href={o.href}
               aria-current={o.ativo ? 'page' : undefined}
-              className="ff-transicao flex min-h-9 items-center whitespace-nowrap rounded-[7px] px-3 text-[13px] text-suave hover:bg-texto/5 hover:text-texto aria-[current=page]:bg-forte aria-[current=page]:font-semibold aria-[current=page]:text-texto"
+              className="ff-transicao flex min-h-9 items-center whitespace-nowrap rounded-[8px] px-3 text-[13px] font-medium text-texto hover:bg-preenchimento aria-[current=page]:bg-polegar aria-[current=page]:font-semibold aria-[current=page]:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_2px_6px_rgb(0_0_0/0.1)] aria-[current=page]:hover:bg-polegar"
             >
               {o.rotulo}
             </Link>
@@ -81,18 +83,16 @@ export function BuscaEmFormulario({
       <label htmlFor={`busca-${nome}`} className="sr-only">
         {rotulo}
       </label>
+      {/* O visual da Apple (preenchido, sem borda, com a lupa) vem da regra de `input[type=search]` em tokens.css. */}
       <input
         id={`busca-${nome}`}
         name={nome}
         type="search"
         defaultValue={valor ?? ''}
         placeholder={placeholder}
-        className="ff-transicao block min-h-11 min-w-0 flex-1 rounded-campo border border-linha-forte bg-campo px-3 text-sm text-texto placeholder:text-suave hover:border-texto/30 sm:min-h-10"
+        className="ff-transicao block min-h-11 min-w-0 flex-1 border pr-3 text-sm text-texto sm:min-h-10"
       />
-      <button
-        type="submit"
-        className="ff-transicao inline-flex min-h-11 shrink-0 items-center rounded-botao border border-linha-forte bg-painel px-4 text-sm font-semibold text-texto hover:border-texto/35 hover:bg-forte sm:min-h-10"
-      >
+      <button type="submit" className={classeDeBotao('secundario', 'shrink-0')}>
         Buscar
       </button>
     </form>

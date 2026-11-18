@@ -4417,3 +4417,56 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - Não testado em Safari/iOS nem com leitor de tela real.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 530. 2026-11-18 · Visual da Apple no ERP, fatia A1 (fundação): letra do sistema, barra translúcida e controles
+
+**Fonte e recorte:** pedido de Rodolfo em 18/11/2026 ("Faça o layout com Apple human design") e aprovação do protótipo no mesmo dia ("Execute o plano com visual da Apple"), com as escolhas marcadas: letra do sistema da Apple no texto, títulos em Gelasio, barras translúcidas. O protótipo dizia: "No iPhone e no Mac a letra é a SF do sistema; em outros aparelhos entra a do sistema deles."
+- A1 é a fundação. Seguem A2 (menu lateral em lista), A3 (iPhone: barra de abas e título grande), A4 (listas agrupadas e formulários no estilo dos Ajustes) e A5 (folhas).
+- Só no ERP (`.ff-app`): site e Portal não mudam.
+- A identidade continua: creme, quase preto, o vermelho como acento e Gelasio nos títulos.
+- Sem regra, permissão, schema, migration, dado, dependência ou infraestrutura.
+
+**O que esta decisão substitui no ERP:** a Libre Franklin no texto (os títulos seguem em Gelasio); "sem vidro" e "barra superior sem blur" (16/10 e 09/11), só na barra do topo; o botão secundário com borda; o segmentado com trilho de borda; o campo de busca com borda.
+
+1. **Letra do texto** (`--ff-fonte-texto` em `tokens.css`; `sans` em `tailwind.config.ts`):
+   - `-apple-system, BlinkMacSystemFont, system-ui`, com a Libre Franklin de reserva. A SF no iPhone, iPad e Mac; nos outros aparelhos, a do sistema deles (Segoe UI no Windows, Roboto no Android).
+   - O Chromium trata `-apple-system` e `BlinkMacSystemFont` como a letra do sistema em qualquer plataforma (conferido: aqui, no Linux, vira a Inter); `system-ui` faz o Firefox seguir a mesma regra.
+   - Fora do `.ff-app` a variável não existe, e o site continua na Libre Franklin.
+2. **Barra do topo translúcida** (`.ff-material`):
+   - A superfície a 92 % com borrão (`saturate(180%) blur(20px)`). 92 % é o mínimo para o texto secundário da barra ter 4,5:1 com conteúdo preto ou branco rolando por baixo; a 90 % já cairia (teste).
+   - O borrão mora num `::before` por trás do conteúdo. No próprio elemento, `backdrop-filter` faria da barra o bloco de referência dos popovers fixos dela (trilha, visão, conta), e eles sairiam do lugar.
+   - Sem suporte ao borrão, ou com a transparência reduzida no aparelho, a barra fica sólida.
+3. **Controles:**
+   - **Segmentado** (`Segmentos`) e **filtro em links** (`FiltroEmLinks`): trilho preenchido sem borda (a borda do erro aparece só com erro), opção marcada num polegar claro com sombra e em negrito, todas as opções na cor do texto, foco visível na opção.
+   - **Campo de busca:** todo `input[type=search]` do ERP fica preenchido, sem borda, com a lupa (regra em `tokens.css`, sem mexer nas telas). O texto de exemplo vira o texto a 75 %: sobre o preenchimento, o `suave` dava 4,19:1 no fundo creme.
+   - **Botão secundário:** o cinza da Apple (preenchimento, sem borda, texto na cor do texto). O vermelho fica no principal e no perigo, que não mudam.
+   - **Busca ⌘K na barra:** campo preenchido, com o texto na cor do texto.
+4. **Tokens novos, nos dois temas:** `preenchimento` e `preenchimento-forte`, `polegar`, `material` e `lupa`.
+
+**Verificação:**
+- **Testes:** 23 novos em `tests/erp-visual-apple.test.ts`: letra; tokens e contraste, inclusive o pior caso da barra translúcida; regra do borrão e reservas; controles; busca; larguras. Com os 37 de `erp-padrao-visual`, 60 passam (`npx vitest run tests/erp-visual-apple.test.ts tests/erp-padrao-visual.test.ts`).
+- **Mutantes, só numa cópia exportada:** 22 de 22 morrem. Entre eles: material menos opaco, borrão no próprio elemento, sem as reservas, polegar, exemplo da busca em `suave`, lupa do tema errado, letra sem `system-ui` e as três larguras.
+- **Navegador** (app local, dados sintéticos): 88 de 88 conferências, em 1280 px claro e escuro, 390 px claro e escuro, 1024 px e 320 px:
+  - barra com fundo transparente e o borrão no `::before`;
+  - letra do sistema primeiro, com Gelasio no título;
+  - busca preenchida, com a lupa;
+  - segmentado sem borda, com polegar e negrito;
+  - os painéis da barra (visão, notificações, conta) abrem abaixo do botão e dentro da tela, e a busca ⌘K abre centralizada;
+  - nenhuma rolagem lateral nova.
+- **Larguras:** 42 telas do menu, em 320, 390, 768, 1024 e 1280 px, com a letra nova (aqui a Inter, parecida com a SF) e com a Libre Franklin forçada.
+  - A letra nova apertava quatro lugares. Três foram corrigidos:
+    - a ação do cabeçalho de página, que vazava em vez de quebrar;
+    - a coluna da direita do Acesso, sem `min-w-0`;
+    - a coluna "Situação" da lista de insumos, que agora aparece a partir de 1280 px; abaixo disso, a situação vai na linha do nome.
+  - O quarto é antigo: Nova ficha em 320 px.
+  - Contra o master, nenhuma tela passou a rolar de lado. O Acesso em 320 px deixou de rolar (22 px → 0). Dois casos antigos ficaram um pouco menores: Compras em 1024 px (155 → 152 px) e Nova ficha em 320 px (11 → 10 px).
+- **Portão completo local e CI:** ficam no PR e na página de evidências.
+
+**Revisão independente:** fica no PR e na página de evidências.
+
+**Limites:**
+- Não testado em Safari/iOS com a SF de verdade: aqui, a Inter faz o papel dela (é parecida e um pouco mais larga).
+- Telas com estilo de campo, botão ou segmentado escrito à mão, fora dos componentes compartilhados, seguem como estavam até a fatia delas.
+- O protótipo mostrava ainda o menu lateral em lista, o título grande e as listas agrupadas: ficam para A2–A4.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.

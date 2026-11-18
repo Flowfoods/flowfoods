@@ -241,7 +241,9 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
         </aside>
 
         <div className="min-w-0">
-          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-linha bg-painel px-2 sm:px-4 lg:px-6">
+          {/* Material translúcido da Apple (decisão 530): o borrão fica no `::before` de `.ff-material` (tokens.css), para os
+              popovers fixos da barra continuarem presos à tela. */}
+          <header className="ff-material sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-linha px-2 sm:px-4 lg:px-6">
             <div className="flex min-w-0 items-center gap-1 sm:gap-2">
               <button
                 ref={botaoMenu}

@@ -118,11 +118,13 @@ export function BuscaGlobal({
         onClick={() => setAberta(true)}
         aria-label={`Buscar (${atalho})`}
         aria-haspopup="dialog"
-        className={`${BOTAO_ICONE} lg:inline-flex lg:w-auto lg:items-center lg:gap-2 lg:border lg:border-linha lg:px-3 lg:text-[13px]`}
+        // No computador, o campo de busca da Apple (decisão 530): preenchido, sem borda, texto na cor do texto (sobre a barra
+        // translúcida, o `suave` não garante 4,5:1 com conteúdo escuro rolando por baixo).
+        className={`${BOTAO_ICONE} lg:inline-flex lg:w-auto lg:items-center lg:gap-2 lg:bg-preenchimento lg:px-3 lg:text-[13px] lg:text-texto lg:hover:bg-preenchimento-forte`}
       >
         <Search size={18} aria-hidden />
         <span className="hidden lg:inline">Buscar</span>
-        <kbd className="ml-6 hidden rounded border border-linha px-1.5 font-sans text-[11px] text-suave xl:inline [@media(pointer:coarse)]:!hidden">
+        <kbd className="ml-6 hidden rounded border border-linha px-1.5 font-sans text-[11px] text-texto/75 xl:inline [@media(pointer:coarse)]:!hidden">
           {atalho}
         </kbd>
       </button>
