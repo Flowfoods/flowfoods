@@ -121,7 +121,9 @@ describe('abas do celular · marcação', () => {
   it('o shell põe a barra depois do conteúdo (ordem do Tab) e o Mais abre a mesma gaveta do menu', () => {
     const shell = readFileSync('src/components/erp/shell/Shell.tsx', 'utf8');
     expect(shell.indexOf('<BarraDeAbas')).toBeGreaterThan(shell.indexOf('</main>'));
-    expect(shell).toMatch(/<BarraDeAbas nav=\{nav\} caminho=\{caminho\} gavetaAberta=\{gaveta\} aoAbrirMais=\{\(\) => setGaveta\(true\)\} \/>/);
+    // Só no ERP do parceiro (/erp): no nível 1 o menu é o dos fluxos comerciais internos, fora do plano.
+    expect(shell).toMatch(/\{nav\.rotuloDaArea === 'ERP' && <BarraDeAbas nav=\{nav\} caminho=\{caminho\} gavetaAberta=\{gaveta\} aoAbrirMais=\{\(\) => setGaveta\(true\)\} \/>\}/);
+    expect(NAV_DONO.rotuloDaArea).toBe('ERP');
     expect(shell).toContain('<Dialogo id="ff-gaveta"');
   });
 });
@@ -139,7 +141,8 @@ describe('abas do celular · onde aparece', () => {
   it('some com uma barra fixa de ações na tela e com um campo de texto em foco (teclado); o fim da página fica acima dela', () => {
     expect(bloco).toMatch(/\.ff-app:has\(\[data-barra-fixa\]\) \.ff-abas,\s*\.ff-app:has\(:is\(input:not\([^)]*\), textarea, select, \[contenteditable='true'\]\):focus\) \.ff-abas \{\s*display: none;/);
     for (const t of ['checkbox', 'radio', 'button', 'submit', 'file', 'hidden']) expect(bloco).toContain(`[type='${t}']`);
-    expect(bloco).toMatch(/\.ff-app:not\(:has\(\[data-barra-fixa\]\)\) #conteudo \{\s*padding-bottom: calc\(49px \+ env\(safe-area-inset-bottom\) \+ 3rem\);/);
+    expect(bloco).toMatch(/\.ff-app:has\(\.ff-abas\):not\(:has\(\[data-barra-fixa\]\)\) #conteudo \{\s*padding-bottom: calc\(49px \+ env\(safe-area-inset-bottom\) \+ 3rem\);/);
+    expect(bloco).toMatch(/html:has\(\.ff-app \.ff-abas\):not\(:has\(\[data-barra-fixa\]\)\) \{/);
     expect(bloco).toMatch(/scroll-padding-bottom: calc\(49px \+ env\(safe-area-inset-bottom\)\);/);
   });
 

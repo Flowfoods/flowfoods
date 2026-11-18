@@ -372,8 +372,9 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           </main>
         </div>
 
-        {/* Abas do celular (A3, decisão 532): depois do conteúdo na ordem do Tab; só abaixo de 640 px (regras em tokens.css). */}
-        <BarraDeAbas nav={nav} caminho={caminho} gavetaAberta={gaveta} aoAbrirMais={() => setGaveta(true)} />
+        {/* Abas do celular (A3, decisão 532): depois do conteúdo na ordem do Tab; só abaixo de 640 px (regras em tokens.css). Só no
+            ERP do parceiro: no nível 1 (/rodolfo) o menu é o dos fluxos comerciais internos, fora deste plano. */}
+        {nav.rotuloDaArea === 'ERP' && <BarraDeAbas nav={nav} caminho={caminho} gavetaAberta={gaveta} aoAbrirMais={() => setGaveta(true)} />}
 
         {entradaDaTela && ajuda && (
           <GavetaDeAjuda

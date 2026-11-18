@@ -4547,9 +4547,10 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
    - **Onde:** fixa no pé, 49 px mais a área segura, no material translúcido da barra do topo (o borrão no `::before`). Some nas telas com barra fixa de ações, que já ocupa o pé, e enquanto um campo de texto está em foco (o teclado aberto). O conteúdo reserva o espaço dela no fim da página e ao rolar até um campo. Sem `:has()` no navegador, ela não aparece, e fica o menu de antes.
    - **Barras fixas:** toda barra fixa de ações no pé das telas leva `data-barra-fixa` (faltava em Planejar produção, Pedido e Entrega de requisição; teste). O aviso de período fechado passa a rolar o aviso para cima da barra de abas também.
    - O botão de menu do topo continua: nas telas sem abas, ele é a navegação.
+   - **Só no ERP do parceiro (`/erp`).** No nível 1 (`/rodolfo`), o menu é o dos fluxos comerciais internos, fora deste plano: lá a barra não aparece e nada muda.
 
 **Verificação:**
-- **Testes:** 17 em `tests/erp-abas-celular.test.ts`: quais abas (dono, pessoa com menos áreas, nível 1 com o "Em breve"), qual acende, nome curto, marcação, ordem no shell, regras de CSS (escondida por padrão, só com `:has()` e abaixo de 640 px, some com barra fixa e com foco, espaço reservado, impressão), toda barra fixa marcada, o aviso de período fechado, contraste sobre o material com preto e branco por baixo nos dois temas e o título grande. O título de `erp-padrao-visual` passou a 34 px. Com os arquivos de navegação, ajuda e visual, 342 passam em 9 arquivos.
+- **Testes:** 17 em `tests/erp-abas-celular.test.ts`: quais abas (dono, pessoa com menos áreas, alcance FlowFoods com o "Em breve"), qual acende, nome curto, marcação, ordem no shell e só no `/erp`, regras de CSS (escondida por padrão, só com `:has()` e abaixo de 640 px, some com barra fixa e com foco, espaço reservado, impressão), toda barra fixa marcada, o aviso de período fechado, contraste sobre o material com preto e branco por baixo nos dois temas e o título grande. O título de `erp-padrao-visual` passou a 34 px. Com os arquivos de navegação, ajuda e visual, 342 passam em 9 arquivos.
 - **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
 
 **Limites:**

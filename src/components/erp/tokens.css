@@ -309,11 +309,11 @@ html:has(.ff-app[data-tema='escuro']) {
     .ff-app:has(:is(input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='file'], [type='range'], [type='color'], [type='hidden']), textarea, select, [contenteditable='true']):focus) .ff-abas {
       display: none;
     }
-    /* O fim da página e o que rola até um campo ficam acima da barra. */
-    .ff-app:not(:has([data-barra-fixa])) #conteudo {
+    /* O fim da página e o que rola até um campo ficam acima da barra (só onde ela existe: o nível 1 não tem). */
+    .ff-app:has(.ff-abas):not(:has([data-barra-fixa])) #conteudo {
       padding-bottom: calc(49px + env(safe-area-inset-bottom) + 3rem);
     }
-    html:has(.ff-app):not(:has([data-barra-fixa])) {
+    html:has(.ff-app .ff-abas):not(:has([data-barra-fixa])) {
       scroll-padding-bottom: calc(49px + env(safe-area-inset-bottom));
     }
   }

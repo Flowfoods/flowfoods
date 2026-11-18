@@ -237,6 +237,7 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   Some nas telas com barra fixa de ações (`data-barra-fixa`, obrigatório em
   toda barra fixa no pé) e com um campo de texto em foco; sem `:has()`, não
   aparece. O conteúdo reserva o espaço dela (padding e `scroll-padding`).
+  Só no ERP do parceiro (`/erp`); no nível 1 (`/rodolfo`), não.
 - **Hub** grade 4 (≥ 1280) e 2 no tablet e no celular; card com ícone, nome
   15/600, subtítulo 13; no celular, compacto (nome 14, descrição em até 3
   linhas, sem os links das abas). O catálogo **"Em breve"** (só para quem o
