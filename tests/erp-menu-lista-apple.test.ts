@@ -56,7 +56,8 @@ describe('menu lateral em lista (A2)', () => {
     const h = menu(null, nav.inicio.href);
     const itens = linhas(h);
     expect(itens).toHaveLength(emUso.length + 1);
-    for (const i of itens) expect(i.miolo).toMatch(/ff-icone-modulo ff-icone-cheio/);
+    // O quadrado dos Ajustes do iPhone: 28 px, raio de 7 px, cor cheia com o desenho claro.
+    for (const i of itens) expect(i.miolo).toMatch(/class="ff-icone-modulo ff-icone-cheio inline-grid shrink-0 place-items-center rounded-\[7px\]" style="--cor-modulo:#[0-9A-Fa-f]{6};width:28px;height:28px"/);
     for (const m of emUso) {
       const linha = itens.find((i) => i.tag.includes(`href="${m.href}"`));
       expect(linha?.tag, m.nome).toContain(`style="--cor-modulo:${m.cor}"`);

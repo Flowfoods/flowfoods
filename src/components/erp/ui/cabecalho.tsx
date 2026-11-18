@@ -17,7 +17,8 @@ import { CaixaDaTela } from './caixa-da-tela';
 /**
  * `variante`: `tonal` (padrão) é o quadrado no tom da área, do cabeçalho e dos cards; `cheio` é a cor da área inteira com o
  * desenho claro, da grade de módulos e do seletor (referência de 12/11/2026); `futuro` é o módulo do catálogo "Em breve",
- * sem cor de área, só o contorno tracejado.
+ * sem cor de área, só o contorno tracejado. 28 px é o das áreas no menu lateral do Início (decisão 531, como nos Ajustes do
+ * iPhone), com o raio de 7 px.
  */
 export function IconeDoModulo({
   icone,
@@ -27,10 +28,10 @@ export function IconeDoModulo({
 }: {
   icone: ChaveIcone;
   cor: string;
-  tamanho?: 32 | 36 | 40 | 44;
+  tamanho?: 28 | 32 | 36 | 40 | 44;
   variante?: 'tonal' | 'cheio' | 'futuro';
 }) {
-  const raio = tamanho >= 40 ? 'rounded-[10px]' : 'rounded-[8px]';
+  const raio = tamanho >= 40 ? 'rounded-[10px]' : tamanho <= 28 ? 'rounded-[7px]' : 'rounded-[8px]';
   const forma = variante === 'cheio' ? ' ff-icone-cheio' : variante === 'futuro' ? ' ff-icone-futuro' : '';
   // avoid-ai-design-ignore: K6 — ícone em quadrado arredondado na cor do módulo é a Ref.1/Ref.2 do contrato do shell.
   return (
