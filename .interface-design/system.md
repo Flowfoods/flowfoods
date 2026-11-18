@@ -184,8 +184,9 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   secundário da barra ficar com 4,5:1 mesmo com conteúdo preto ou branco
   rolando por baixo. Sem suporte ao borrão ou com a transparência reduzida no
   aparelho (nos navegadores que informam a preferência), a barra é sólida. O
-  próprio cabeçalho nunca leva `transform`, `filter`, `will-change` nem
-  `contain`, nem com variante (`lg:`) ou valor arbitrário (`[transform:…]`):
+  próprio cabeçalho nunca leva `transform`, `filter`, `will-change`, `contain`
+  nem `content-visibility`, nem com variante (`lg:`) ou valor arbitrário
+  (`[transform:…]`):
   tiram os painéis fixos do lugar. Sob o ponteiro ou com o menu
   aberto, o texto dos botões da barra vai para `texto`.
 - **Botão** 40 px (44 no celular), padding 16, raio 10, 14 px/600. Um

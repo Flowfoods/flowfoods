@@ -4436,7 +4436,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
    - A superfície a 92 % com borrão (`saturate(180%) blur(20px)`). 92 % é o mínimo para o texto secundário da barra ter 4,5:1 com conteúdo preto ou branco rolando por baixo; a 90 % já cairia (teste).
    - O borrão mora num `::before` por trás do conteúdo. No próprio elemento, `backdrop-filter` faria da barra o bloco de referência dos popovers fixos dela (trilha, visão, conta), e eles sairiam do lugar.
    - Sem suporte ao borrão, ou com a transparência reduzida no aparelho (nos navegadores que informam essa preferência), a barra fica sólida.
-   - O próprio elemento não pode ganhar `transform`, `filter`, `will-change` nem `contain`, que tiram os painéis do lugar do mesmo jeito. O teste olha a classe inteira, com variante (`lg:`, `supports-[…]:`) e valor arbitrário (`[transform:…]`). Na revisão, `backdrop-blur` no cabeçalho deslocou os painéis 232 px a 1024 px.
+   - O próprio elemento não pode ganhar `transform`, `filter`, `will-change`, `contain` nem `content-visibility`, que tiram os painéis do lugar do mesmo jeito. O teste olha a classe inteira, com variante (`lg:`, `supports-[…]:`) e valor arbitrário (`[transform:…]`). Na revisão, `backdrop-blur` no cabeçalho deslocou os painéis 232 px a 1024 px.
    - Sob o ponteiro ou com o menu aberto, os botões da barra ganham um realce. Ali o texto fica na cor do texto: o papel da conta e o atalho da busca, que estavam em `suave` e no texto a 75 %, cairiam para 4,17:1 e 4,34:1 no pior caso.
 3. **Controles:**
    - **Segmentado** (`Segmentos`) e **filtro em links** (`FiltroEmLinks`): trilho preenchido sem borda visível (a borda do erro aparece só com erro). A opção marcada vem num polegar claro, com sombra, contorno fino e em negrito. Todas as opções ficam na cor do texto, com foco visível na opção.
@@ -4449,7 +4449,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 
 **Verificação:**
 - **Testes:** 28 em `tests/erp-visual-apple.test.ts`: letra; tokens e contraste, inclusive o pior caso da barra translúcida em repouso e sob o ponteiro; regra do borrão, reservas e o que não pode ir no cabeçalho; controles; busca e erro; impressão; larguras, inclusive a foto da ficha. Com os 37 de `erp-padrao-visual`, 65 passam (`npx vitest run tests/erp-visual-apple.test.ts tests/erp-padrao-visual.test.ts`).
-- **Mutantes, só numa cópia exportada:** 22 de 22 morrem. Entre eles: material menos opaco, borrão no próprio elemento, sem as reservas, polegar, exemplo da busca em `suave`, lupa do tema errado, letra sem `system-ui` e as três larguras. Na guarda do cabeçalho, mais 8 de 8, com variante e valor arbitrário: `lg:backdrop-blur-md`, `supports-[backdrop-filter]:backdrop-blur`, `[transform:translateZ(0)]`, `[will-change:transform]`, `[-webkit-backdrop-filter:blur(4px)]`, `md:-translate-y-px`, `motion-safe:will-change-transform` e `[contain:paint]`. Na foto da ficha, 3 de 3: `min-w-0` de volta, sem mínimo e a linha sem `flex-wrap`.
+- **Mutantes, só numa cópia exportada:** 22 de 22 morrem. Entre eles: material menos opaco, borrão no próprio elemento, sem as reservas, polegar, exemplo da busca em `suave`, lupa do tema errado, letra sem `system-ui` e as três larguras. Na guarda do cabeçalho, mais 8 de 8, com variante e valor arbitrário: `lg:backdrop-blur-md`, `supports-[backdrop-filter]:backdrop-blur`, `[transform:translateZ(0)]`, `[will-change:transform]`, `[-webkit-backdrop-filter:blur(4px)]`, `md:-translate-y-px`, `motion-safe:will-change-transform` e `[contain:paint]`; depois da confirmação, mais 3 de 3: `[content-visibility:auto]`, `[container-type:inline-size]` e `lg:[transform:none]`. Na foto da ficha, 5 de 5: `min-w-0` de volta, sem mínimo, o mínimo do texto (`min-w-min`), a linha sem `flex-wrap` e o texto longo durante o envio.
 - **Navegador** (app local, dados sintéticos): 88 de 88 conferências, em 1280 px claro e escuro, 390 px claro e escuro, 1024 px e 320 px:
   - barra com fundo transparente e o borrão no `::before`;
   - letra do sistema primeiro, com Gelasio no título;
@@ -4462,7 +4462,10 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
     - a ação do cabeçalho de página, que vazava em vez de quebrar;
     - a coluna da direita do Acesso, sem `min-w-0`;
     - a coluna "Situação" da lista de insumos, que agora aparece a partir de 1280 px; abaixo disso, a situação vai na linha do nome.
-  - O quarto é antigo e também foi corrigido: na Nova ficha em 320 px, a coluna ao lado da foto encolhia até 78 px e o botão "Escolher foto" saía da tela. Agora ela não encolhe abaixo do botão e, onde ele não cabe ao lado da miniatura, desce para a linha de baixo (só abaixo de 375 px; dali para cima, o layout é o de antes).
+  - O quarto é antigo e também foi corrigido: na Nova ficha em 320 px, a coluna ao lado da foto encolhia até 78 px e o botão "Escolher foto" saía da tela.
+    - Agora ela não encolhe abaixo de 8rem, um pouco mais que o maior texto do botão (123 px). Onde não cabe ao lado da miniatura, desce para a linha de baixo: abaixo de 375 px; dali para cima, o layout é o de antes.
+    - O mínimo é fixo, e não o do texto, para a coluna não pular de lugar quando o botão muda de texto.
+    - Pelo mesmo motivo, o texto durante o envio virou "Enviando…": "Enviando a foto…" tinha 152 px e fazia a coluna descer e voltar a 360–390 px.
   - Contra o master, nenhuma tela passou a rolar de lado. O Acesso em 320 px deixou de rolar (22 px → 0), e a Nova ficha em 320 px caiu de 11 para 2 px. Os 2 px vêm do rótulo "Principal" da validade e aparecem igual com a Libre Franklin. Compras em 1024 px rola 154 px, contra 155 com a Libre Franklin.
 - **Portão completo local e CI:** ficam no PR e na página de evidências.
 
@@ -4478,13 +4481,19 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - **55ef669: aprovado com ressalvas**, sem bloqueante. As 7 correções funcionam no app e nos testes. Duas ressalvas menores, tratadas no commit seguinte:
   - a guarda do cabeçalho olhava só o começo de cada classe e deixava passar 4 mutantes, entre eles o sexto;
   - números desta decisão que a volta das bordas transparentes (+2 px) deixou velhos.
+- **f0e95ca: aprovado com ressalvas**, sem bloqueante. Conferiu a guarda (17 de 18 mutantes), a foto da ficha na criação e na edição, de 320 a 1024 px, e os números desta decisão. Duas ressalvas menores, tratadas no commit seguinte:
+  - a coluna da foto descia e voltava durante o envio;
+  - a explicação da contagem da trilha.
+  - O mutante vivo, `[content-visibility:auto]`, também tira os painéis do lugar. O revisor não pediu mudança, mas a guarda passou a cobri-lo.
 - **Confirmação do commit seguinte:** fica no PR e na página de evidências.
 
 **Limites:**
 - Não testado em Safari/iOS com a SF de verdade: aqui, a Inter faz o papel dela (é parecida e um pouco mais larga).
 - Telas com estilo de campo, botão ou segmentado escrito à mão, fora dos componentes compartilhados, seguem como estavam até a fatia delas.
 - O protótipo mostrava ainda o menu lateral em lista, o título grande e as listas agrupadas: ficam para A2–A4.
-- A letra nova corta mais a trilha do topo a 1280 px. Medido numa janela de 1280 × 860 px, o nome da tela atual sai cortado em 7 das 40 telas com trilha, contra 4 com a Libre Franklin forçada. As novas são Compras do período, o detalhe do insumo e Novo insumo. A 1440 px, nenhuma. A contagem depende da janela: o revisor, com outras condições, contou 4 contra 3.
+- A letra nova corta mais a trilha do topo a 1280 px. Numa janela de 1280 × 860 px, o nome da tela atual sai cortado em 7 das 40 telas com trilha, contra 4 com a Libre Franklin forçada. A 1440 px, nenhuma.
+  - As novas são Compras do período e Novo insumo, com 1 px de corte cada, e o detalhe do insumo.
+  - No detalhe, depende do nome: "Cebola roxa" corta 1 px só com a letra nova, nomes curtos não cortam e os longos cortam com as duas. Por isso a contagem varia com os dados.
 - O polegar marcado do segmentado tem pouco contraste com o trilho (1,17:1 no claro, 1,28:1 no escuro), como no da Apple. A marcação vem também do contorno fino, do negrito, da sombra e, para o leitor de tela, do rádio marcado ou do `aria-current`.
 - Antigos, fora do escopo: Compras rola 154 px a 1024 px; a Nova ficha rola 2 px a 320 px, pelo rótulo "Principal" da validade, que fica para a fatia dos formulários (A4); no hub do nível 1, a 1024 px, o "…" da trilha fica recortado sob o seletor de parceiro.
 

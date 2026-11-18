@@ -147,7 +147,7 @@ describe('foto da ficha: somente a escolha vigente pode mudar o formulário', ()
     const b = h.selecionar(foto('B.jpg')); await tick();
     responder('A.jpg', tipo === 'arquivo' ? { arquivo: 'salva-A.jpg' } : { erro: 'Erro antigo' }); await a;
     expect(h.aoOcupar.mock.calls).toEqual([[true], [true]]);
-    expect(h.mensagem()).toContain('Enviando a foto');
+    expect(h.mensagem()).toContain('Enviando…');
     expect(h.mensagem()).not.toContain('Erro antigo');
     expect(h.entrada.value).toBe('B.jpg');
     responder('B.jpg', { arquivo: 'salva-B.jpg' }); await b;
