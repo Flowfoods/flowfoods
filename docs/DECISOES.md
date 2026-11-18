@@ -4535,3 +4535,26 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - Antigo, fora do escopo (achado da revisão): de 900 a 908 px, logo que a lateral aparece, a tabela de insumos rola de lado (9 px a 900, 7 com a Libre Franklin forçada; 1 px a 908). A 899 px e a partir de 909 px, nada.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 532. 2026-11-18 · Visual da Apple no ERP, fatia A3: título grande e barra de abas no celular
+
+**Fonte e recorte:** terceira fatia do visual da Apple aprovado por Rodolfo em 18/11/2026 (decisões 530 e 531). O protótipo mostrava, no computador e no iPhone, o título grande em Gelasio sem o quadrado da área e, no iPhone, a barra de abas "Início · Cadastros · Compras · Estoque · Mais". Só o shell do ERP e o cabeçalho de página: sem regra, permissão, destino novo, schema, migration, dado ou infraestrutura.
+
+1. **Título grande** (`PageHeader`, todas as larguras): h1 em Gelasio 34 px/1,15, peso regular, sem o quadrado da área ao lado. Substitui o padrão de 09/11 (29 px, 25 no celular, com o quadrado de 40 px). O subtítulo fica logo abaixo, 13 px no celular e 14 a partir de 640 px. As telas seguem passando `icone` e `cor`: a identidade da área continua no menu (decisão 531), nos cards e na aba do celular.
+2. **Barra de abas do celular** (`BarraDeAbas`, abaixo de 640 px):
+   - **Quais abas** (`abasDoCelular`): Início, as três primeiras áreas da pessoa que têm tela, na ordem do menu (já filtradas por permissão e liberação: o "Em breve" não entra), e Mais, que abre a mesma gaveta do botão de menu. O nome na aba é a primeira palavra da área ("Cadastros e Cardápio" → "Cadastros"). Não cria destino: só repete entradas do menu.
+   - **Qual acende:** a da área da tela atual, em qualquer tela dela (`aria-current="page"` na própria entrada, `"true"` dentro da área); se a área ficou fora das abas, o Mais. A atual fica em 600 na cor do texto, com o ícone na tinta da área. O nome na cor da área não daria 4,5:1 em toda a paleta.
+   - **Onde:** fixa no pé, 49 px mais a área segura, no material translúcido da barra do topo (o borrão no `::before`). Some nas telas com barra fixa de ações, que já ocupa o pé, e enquanto um campo de texto está em foco (o teclado aberto). O conteúdo reserva o espaço dela no fim da página e ao rolar até um campo. Sem `:has()` no navegador, ela não aparece, e fica o menu de antes.
+   - **Barras fixas:** toda barra fixa de ações no pé das telas leva `data-barra-fixa` (faltava em Planejar produção, Pedido e Entrega de requisição; teste). O aviso de período fechado passa a rolar o aviso para cima da barra de abas também.
+   - O botão de menu do topo continua: nas telas sem abas, ele é a navegação.
+
+**Verificação:**
+- **Testes:** 17 em `tests/erp-abas-celular.test.ts`: quais abas (dono, pessoa com menos áreas, nível 1 com o "Em breve"), qual acende, nome curto, marcação, ordem no shell, regras de CSS (escondida por padrão, só com `:has()` e abaixo de 640 px, some com barra fixa e com foco, espaço reservado, impressão), toda barra fixa marcada, o aviso de período fechado, contraste sobre o material com preto e branco por baixo nos dois temas e o título grande. O título de `erp-padrao-visual` passou a 34 px. Com os arquivos de navegação, ajuda e visual, 342 passam em 9 arquivos.
+- **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
+
+**Limites:**
+- Não testado em Safari/iOS de verdade: área segura, teclado e o borrão no iPhone ficam para a validação no aparelho (UX-MOD-3).
+- Com o teclado aberto, a barra some pelo foco do campo; um teclado que abre sem foco num campo (raro) não a esconde.
+- Abaixo de 640 px o título grande ocupa mais altura que antes.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
