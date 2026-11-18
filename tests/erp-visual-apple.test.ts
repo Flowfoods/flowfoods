@@ -174,8 +174,11 @@ describe('visual da Apple · barra do topo translúcida', () => {
   });
 
   it('nenhuma classe no cabeçalho cria um bloco de referência para os painéis fixos (testado à mão: com `backdrop-blur`, eles saíam 232 px do lugar)', () => {
+    // A classe inteira, não só o começo: variantes (`lg:`, `supports-[…]:`) e valores arbitrários (`[transform:…]`) também contam.
+    const PERIGOSA = /(^|:|\[)(-webkit-|-)?(backdrop|blur|transform|translate|rotate|scale|skew|filter|drop-shadow|will-change|contain|perspective)/;
+    for (const c of ['backdrop-blur', 'lg:backdrop-blur-md', 'supports-[backdrop-filter]:backdrop-blur', '[transform:translateZ(0)]', '[will-change:transform]', '[-webkit-backdrop-filter:blur(4px)]', '-translate-y-px', 'contain-paint', 'md:filter']) expect(c, c).toMatch(PERIGOSA);
     const barra = shell.match(/<header className="([^"]+)"/)![1].split(' ');
-    for (const c of barra) expect(c, c).not.toMatch(/^(backdrop-|blur|transform|translate-|-?translate-|rotate-|-?rotate-|scale-|skew-|filter|drop-shadow|will-change|contain-|perspective)/);
+    for (const c of barra) expect(c, c).not.toMatch(PERIGOSA);
     // Nem regra de CSS no próprio `.ff-material` (só no ::before).
     for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
       const seletores = m[1].trim().split(',').map((x) => x.trim()).filter((x) => x.includes('ff-material') && !x.endsWith('::before'));
@@ -305,6 +308,15 @@ describe('visual da Apple · larguras que a letra nova (um pouco mais larga) ape
   it('acesso: a coluna da direita pode encolher (sem `min-w-0`, o conteúdo dela alargava a grade inteira no celular)', () => {
     const pagina = readFileSync('src/app/erp/acesso/page.tsx', 'utf8');
     expect(pagina).toMatch(/<div className="min-w-0 space-y-4">\s*<Painel titulo=\{`O que você faz em/);
+  });
+
+  it('foto da ficha: a coluna ao lado da miniatura não encolhe abaixo do botão (com `min-w-0`, a 320 px ela ficava com 78 px e o botão saía da tela)', () => {
+    const foto = readFileSync('src/components/erp/telas/fichas/campo-foto.tsx', 'utf8');
+    const coluna = foto.match(/<div className="([^"]+)">\s*\{enviada && !remover && <input type="hidden" name="fotoNova"/)![1].split(' ');
+    expect(coluna).toEqual(expect.arrayContaining(['min-w-min', 'flex-1']));
+    expect(coluna).not.toContain('min-w-0');
+    // Sem `flex-wrap` na linha, a coluna não teria para onde descer.
+    expect(foto).toMatch(/<div className="flex flex-wrap items-start gap-4">\s*<div className="grid aspect-\[4\/3\] w-40 shrink-0 /);
   });
 });
 

@@ -146,7 +146,9 @@ export function CampoFoto({
             <span className="px-3 text-center" role="status">{remover ? 'A foto será removida ao salvar.' : temFotoAtual ? 'Foto salva. A visualização não está disponível neste acesso.' : 'Sem foto'}</span>
           )}
         </div>
-        <div className="min-w-0 flex-1 space-y-2">
+        {/* A coluna não encolhe abaixo do botão (o maior trecho que não quebra): onde ele não cabe ao lado da miniatura, ela
+            desce para a linha de baixo. Com min-w-0, a 320 px ela ficava com 78 px e o botão saía da tela. */}
+        <div className="min-w-min flex-1 space-y-2">
           {enviada && !remover && <input type="hidden" name="fotoNova" value={enviada} />}
           <input
             ref={entrada}
