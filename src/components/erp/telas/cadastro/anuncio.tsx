@@ -9,7 +9,9 @@
  *    depois da montagem. O aviso fica na página (não some sozinho, não cobre botão nenhum), vem para a vista e traz os
  *    caminhos do que fazer em seguida;
  *  - `useAcaoSegura`: a conexão que cai no meio do envio não derruba a tela nem apaga o que foi digitado: volta a frase
- *    dizendo que o resultado é incerto e que pode tentar de novo sem medo de duplicar (o servidor reconhece o reenvio).
+ *    dizendo que o resultado é incerto e que pode tentar de novo sem medo de duplicar (o servidor reconhece o reenvio). Se o
+ *    ERP foi atualizado com a tela aberta, o resultado DESTE envio é certo (não foi processado), e a frase pede para recarregar;
+ *    um envio anterior que ficou sem confirmação continua podendo ter sido salvo.
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -56,22 +58,71 @@ export function AvisoDeSalvo({ titulo, apoio, children }: { titulo: string; apoi
 export const FRASE_SEM_CONEXAO =
   'Não deu para confirmar se o envio chegou (a conexão pode ter caído). O que você digitou continua aqui. Toque em salvar de novo: se já tiver sido salvo, o sistema reconhece e não cria outro.';
 
+/**
+ * INS-SALVAR-CONFIRMACAO (17/11/2026): o ERP foi atualizado com a tela aberta. O resultado DESTE envio é certo: o servidor
+ * novo não conhece a ação desta tela e não rodou nada. Salvar de novo falharia igual; só recarregar resolve. A frase fala só
+ * deste envio (vale também para excluir): um envio anterior que ficou sem confirmação pode ter sido salvo.
+ */
+export const FRASE_VERSAO_NOVA =
+  'O ERP foi atualizado enquanto esta tela estava aberta, e este envio não foi processado. Recarregue a página e tente de novo.';
+export const FRASE_VERSAO_NOVA_COM_RASCUNHO =
+  'O ERP foi atualizado enquanto esta tela estava aberta, e este envio não foi processado. Recarregue a página: o que você digitou volta preenchido para você conferir e salvar.';
+/** Um envio anterior desta tela ficou sem confirmação: sem o rascunho (que leva a chave do envio), só dá para pedir que confira. */
+export const FRASE_ENVIO_ANTERIOR_INCERTO = 'Um envio anterior desta tela pode ter chegado: confira antes de repetir.';
+/** Com o rascunho, a chave do envio volta junto: o servidor reconhece o reenvio (a proteção de sempre) e não cria outro. */
+export const FRASE_ENVIO_ANTERIOR_RECONHECIDO = 'Um envio anterior pode ter sido salvo: ao salvar, o sistema reconhece e não cria outro.';
+
 /** O redirecionamento do Next é uma exceção de controle: nunca vira mensagem de erro. */
 function ehRedirecionamento(e: unknown): boolean {
   return typeof e === 'object' && e !== null && typeof (e as { digest?: unknown }).digest === 'string' && (e as { digest: string }).digest.startsWith('NEXT_REDIRECT');
 }
 
-/** A action do formulário com a rede protegida: falha de conexão volta como erro geral, com o formulário intacto. */
-export function useAcaoSegura(acao: AcaoDeCadastro): AcaoDeCadastro {
+/**
+ * A ação desta tela não existe no servidor: o cliente e o servidor são de deploys diferentes. O Next 16 lança
+ * `UnrecognizedActionError` (resposta com `x-nextjs-action-not-found`) e diz que só recarregar resolve. Pelo nome que o
+ * próprio Next dá ao erro, sem importar de `next/navigation` (um teste com a classe real confere que os dois concordam).
+ */
+export function ehVersaoNova(e: unknown): boolean {
+  return e instanceof Error && e.name === 'UnrecognizedActionError';
+}
+
+/**
+ * A action do formulário com a rede protegida: falha de conexão volta como erro geral, com o formulário intacto.
+ * `aoVersaoNova`: o formulário guarda o que foi digitado (devolve se conseguiu) antes de pedir para recarregar; `incerto` diz se
+ * algum envio anterior DESTA tela ficou sem confirmação (aí ele pode ter sido salvo, e o rascunho precisa levar a chave do envio).
+ * `jaIncerto`: a tela veio de um rascunho em que isso já valia (a incerteza atravessa a recarga).
+ */
+export function useAcaoSegura(
+  acao: AcaoDeCadastro,
+  opcoes?: { aoVersaoNova?: (form: FormData, contexto: { incerto: boolean }) => boolean; jaIncerto?: boolean },
+): AcaoDeCadastro {
+  const aoVersaoNova = opcoes?.aoVersaoNova;
+  // Vale para a vida desta tela: depois de um envio sem confirmação, nada aqui afirma que ele não foi salvo.
+  const algumIncerto = useRef(opcoes?.jaIncerto === true);
   return useCallback(
     async (anterior: EstadoCadastro, form: FormData) => {
       try {
         return await acao(anterior, form);
       } catch (e) {
         if (ehRedirecionamento(e)) throw e;
-        return { ok: false, erros: { geral: FRASE_SEM_CONEXAO }, vez: (anterior?.vez ?? 0) + 1 } satisfies NonNullable<EstadoCadastro>;
+        const vez = (anterior?.vez ?? 0) + 1;
+        if (ehVersaoNova(e)) {
+          const incerto = algumIncerto.current;
+          let rascunhoGuardado = false;
+          try {
+            rascunhoGuardado = aoVersaoNova?.(form, { incerto }) === true;
+          } catch {
+            // Guardar é conforto: se falhar, a frase manda tentar de novo depois de recarregar.
+          }
+          const frase = rascunhoGuardado
+            ? `${FRASE_VERSAO_NOVA_COM_RASCUNHO}${incerto ? ` ${FRASE_ENVIO_ANTERIOR_RECONHECIDO}` : ''}`
+            : `${FRASE_VERSAO_NOVA}${incerto ? ` ${FRASE_ENVIO_ANTERIOR_INCERTO}` : ''}`;
+          return { ok: false, erros: { geral: frase }, versaoNova: true, rascunhoGuardado, ...(incerto ? { incerto } : {}), vez } satisfies NonNullable<EstadoCadastro>;
+        }
+        algumIncerto.current = true;
+        return { ok: false, erros: { geral: FRASE_SEM_CONEXAO }, incerto: true, vez } satisfies NonNullable<EstadoCadastro>;
       }
     },
-    [acao],
+    [acao, aoVersaoNova],
   );
 }

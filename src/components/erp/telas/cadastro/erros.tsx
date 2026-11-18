@@ -44,16 +44,87 @@ export function ResumoDeErros({
   );
 }
 
-/** Erro geral, com "Recarregar" quando foi conflito de versão. */
-export function ErroGeral({ estado, recarregar }: { estado: EstadoCadastro; recarregar: string }) {
+/** A pergunta de sair vale agora? (Desligada só no instante de uma recarga em que o que foi digitado já está guardado.) */
+export function deveAvisarAoSair(sujo: boolean): boolean {
+  return sujo && !dispensaDoUnload;
+}
+
+/** Quanto tempo a pergunta fica desligada: o aviso de descarregar sai no começo da recarga; se ela for interrompida, volta. */
+export const RELIGAR_O_AVISO_MS = 1500;
+let religar: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Recarrega a página sem a pergunta de sair: só quando o que está na tela acabou de ser guardado no rascunho da aba (a tela volta
+ * preenchida). Se a recarga for interrompida (Esc numa rede lenta), a pergunta volta sozinha.
+ */
+export function recarregarSemPerguntar(): void {
+  dispensaDoUnload = true;
+  clearTimeout(religar);
+  religar = setTimeout(() => { dispensaDoUnload = false; }, RELIGAR_O_AVISO_MS);
+  window.location.reload();
+}
+
+/**
+ * "Recarregar a página" depois de o ERP mudar de versão. Guarda o que está na tela AGORA (com o que foi editado depois do aviso,
+ * e com o prazo do rascunho renovado) e só dispensa a pergunta se guardou; senão, recarregar passa pela pergunta de sempre.
+ */
+export function recarregarDepoisDeGuardar(
+  guardar: (() => boolean) | undefined,
+  recarregar: { semPerguntar: () => void; comPergunta: () => void } = { semPerguntar: recarregarSemPerguntar, comPergunta: () => window.location.reload() },
+): 'sem-perguntar' | 'com-pergunta' {
+  let guardou = false;
+  try {
+    guardou = guardar?.() === true;
+  } catch {
+    // Sem armazenamento: recarrega com a pergunta.
+  }
+  if (guardou) {
+    recarregar.semPerguntar();
+    return 'sem-perguntar';
+  }
+  recarregar.comPergunta();
+  return 'com-pergunta';
+}
+
+/**
+ * Erro geral, com "Recarregar" quando foi conflito de versão ou o ERP foi atualizado com a tela aberta. Neste último caso, o foco
+ * vai para o botão (a única saída), que entra na vista: depois de salvar, o alerta ficava acima da tela.
+ * `aoGuardarAntesDeRecarregar`: o formulário guarda o que está nele no toque (devolve se conseguiu).
+ */
+export function ErroGeral({ estado, recarregar, aoGuardarAntesDeRecarregar }: { estado: EstadoCadastro; recarregar: string; aoGuardarAntesDeRecarregar?: (form: FormData) => boolean }) {
+  const caixa = useRef<HTMLDivElement>(null);
+  const botao = useRef<HTMLButtonElement>(null);
+  const vez = estado?.vez;
+  const versaoNova = !!estado?.versaoNova;
+  useEffect(() => {
+    if (!versaoNova) return;
+    // O alerta inteiro no meio da tela (o cabeçalho fixo não o cobre), e o foco no botão sem rolar de novo.
+    caixa.current?.scrollIntoView({ block: 'center' });
+    botao.current?.focus({ preventScroll: true });
+  }, [vez, versaoNova]);
   if (!estado?.erros.geral) return null;
   return (
-    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
+    <div ref={caixa} role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
       <p className="text-erro">{estado.erros.geral}</p>
-      {estado.conflito && (
-        <a href={recarregar} className={classeDeBotao('secundario')}>
-          Recarregar
-        </a>
+      {estado.versaoNova ? (
+        // A ação desta tela não existe no servidor novo: precisa carregar a página de novo (o JavaScript novo), não navegar.
+        <button
+          ref={botao}
+          type="button"
+          className={classeDeBotao('secundario')}
+          onClick={(e) => {
+            const form = e.currentTarget.form;
+            recarregarDepoisDeGuardar(form && aoGuardarAntesDeRecarregar ? () => aoGuardarAntesDeRecarregar(new FormData(form)) : undefined);
+          }}
+        >
+          Recarregar a página
+        </button>
+      ) : (
+        estado.conflito && (
+          <a href={recarregar} className={classeDeBotao('secundario')}>
+            Recarregar
+          </a>
+        )
       )}
     </div>
   );
@@ -75,7 +146,7 @@ export function useAvisoDeSaida(resultado?: ResultadoDoEnvio) {
   }, [resultado]);
   useEffect(() => {
     const aviso = (e: BeforeUnloadEvent) => {
-      if (!sujo.current || dispensaDoUnload) return;
+      if (!deveAvisarAoSair(sujo.current)) return;
       e.preventDefault();
       e.returnValue = '';
     };

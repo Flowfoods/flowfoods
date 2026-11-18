@@ -4314,3 +4314,106 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - **Fora do escopo, anterior a esta mudança:** a 320 px, a lista estoura 1 px por causa do botão "Nova ficha", e a edição estoura 11 px por causa de "Escolher foto" e "Principal".
 
 **Reversão:** reverter os commits desta decisão (ou o merge do PR). Só voltar os tons em `APRESENTACAO_DA_FAIXA` não compila, porque o selo e a amostra dependem da cor. Não há migration nem dado.
+
+### 529. 2026-11-17 · Formulário aberto durante um deploy: o resultado certo deste envio, recarregar e recuperar o Novo insumo
+
+**Fonte e recorte:** incidente INS-SALVAR-CONFIRMACAO, do relato de Rodolfo em 16/11/2026. Ao salvar um Novo insumo em Rede Completa, a tela mostrou "Não deu para confirmar se o envio chegou (a conexão pode ter caído)…". É prioridade alta do plano, autorizada por Rodolfo em 17/11/2026 ("continue com o plano"). Sem regra, permissão, schema, migration, dado, dependência ou infraestrutura.
+
+1. **Causa reproduzida, não comprovada no incidente:**
+   - O build de produção não leva a pasta `.next` do build anterior (`.dockerignore`). Por isso, o Next 16 gera uma chave nova em cada build, e ela também é o sal dos identificadores das ações do servidor.
+   - Assim, todo deploy troca o identificador de todas as ações. Num teste local, as 269 ações mudaram entre dois builds com chaves diferentes; com a mesma chave, nenhuma mudou.
+   - Um formulário aberto antes de um deploy chama uma ação que o servidor novo não conhece. O servidor responde 409 com `x-nextjs-action-not-found` sem executar nada, e o cliente recebe `UnrecognizedActionError`.
+2. **Antes:** `useAcaoSegura` tratava qualquer exceção como resultado incerto ("a conexão pode ter caído… toque em salvar de novo").
+   - Nesse caso, salvar de novo falhava igual, e recarregar apagava o que foi digitado.
+   - Reprodução no app local, em build de produção, com dois builds e banco sintético: deu a mesma tela do relato, e nada foi gravado.
+3. **Agora, a ação segura** (`cadastro/anuncio.tsx`):
+   - Reconhece o erro (`ehVersaoNova`) pelo nome que o Next dá; um teste com a classe real confere.
+   - A frase fala só **deste** envio: "este envio não foi processado. Recarregue a página…". Por isso ela serve também para excluir.
+   - Na vida da tela, lembra se algum envio anterior ficou sem confirmação. Se ficou, a frase não diz "nada": com o rascunho, diz que o sistema reconhece o reenvio; sem ele, pede que a pessoa confira antes de repetir.
+   - Essa lembrança atravessa a recarga: a tela que nasce de um rascunho com envio incerto já começa incerta, inclusive numa segunda atualização seguida.
+   - Falha de rede ou do servidor continua incerta, com a frase de sempre.
+4. **"Recarregar a página"** (`cadastro/erros.tsx`):
+   - Recarrega em vez de navegar.
+   - No toque, o formulário guarda o que está na tela naquele momento, inclusive o que mudou depois do aviso, e o prazo do rascunho é renovado. Só então recarrega sem a pergunta de sair. Sem guardar, a pergunta continua.
+   - Se a recarga for interrompida, a pergunta volta em 1,5 s.
+   - O alerta vai para o meio da tela e o foco para o botão.
+5. **Novo insumo** (`insumos/form-insumo.tsx`):
+   - **O rascunho da aba:** guarda os valores, a **chave do envio**, a incerteza e se algum prazo não voltou. O escopo é a pessoa e o parceiro, vindos do servidor.
+   - **Recuperação:** o formulário volta com a mesma chave. Assim, o servidor reconhece o reenvio ("criado-repetido"), a proteção de sempre, sem uma segunda deduplicação.
+   - **Aviso:**
+     - A região que o anuncia ao leitor de tela fica fora do formulário que nasce de novo. Ela existe vazia desde o primeiro desenho, e o mesmo elemento recebe o texto quando o rascunho é lido.
+     - Não promete "nada salvo" quando um envio anterior pode ter chegado.
+     - Pede para conferir o prazo que não voltou.
+   - **"Descartar e começar de novo":** leva o foco ao nome.
+   - **Proteção:** o formulário recuperado conta como alteração, então sair pergunta. Cada envio novo descarta o rascunho anterior. O formulário só remonta quando há o que recuperar.
+   - **Corrigir depois de recuperar** (`lib/erp/insumos.ts`):
+     - Se o envio anterior tinha gravado e a pessoa mudou um campo, o servidor recusa o mesmo envio com outros dados, como antes.
+     - Agora a recusa traz o insumo já cadastrado, e a tela mostra "Abrir o insumo que já existe". A chave é por pessoa, então isso só chega a quem cadastrou.
+     - A frase manda corrigir nesse insumo e deixa recarregar só para cadastrar outro. Antes, mandava recarregar para cadastrar de novo: a correção se perdia, e o novo cadastro caía no nome repetido.
+6. **O que não muda:**
+   - a proteção do reenvio (chave por pessoa e hash dos campos), que só ganhou a frase e o link do item 5;
+   - o conflito de versão lida;
+   - editar insumo, que mostra a frase sem rascunho e pergunta ao recarregar;
+   - os outros formulários, que passam a dizer a verdade e oferecer recarregar, mas sem recuperar.
+
+**Verificação:**
+- **Portão completo local:** PostgreSQL 16.15, Node 22.23.4 e o roteiro que espelha o `deploy.yml`, com a árvore limpa. Nenhum teste com banco pulado; lint, tipos, build e fontes passaram.
+  - d64d0ec: 361 arquivos e 6.240 testes.
+  - b328481: 362 arquivos e 6.256 testes.
+  - O do commit da segunda correção fica no PR e na página de evidências.
+- **CI:** verde em d64d0ec e em b328481.
+- **Testes da correção, sem banco:** 133 passam em 8 arquivos. Comando: `npx vitest run` com `erp-acao-segura-versao`, `erp-insumo-recuperado`, `erp-insumo-recuperado-montagem`, `erp-insumo-recuperado-efeitos`, `erp-saida-nao-salva`, `erp-insumo-clareza`, `erp-insumos` e `erp-validade`. Entre eles estão os de integração da fiação e os dos efeitos.
+- **Com banco:** 156 passam em 7 arquivos, nenhum pulado. Comando: `ERP_DB_TESTE=… npx vitest run --no-file-parallelism` com `erp-categorias.db`, `erp-fornecedor.db` e os cinco de insumos.
+- **Mutantes, só numa cópia exportada do repositório:**
+  - primeira correção: os 6 que a revisão achou e 8 novos; os 14 morrem;
+  - segunda correção: 24 sobre o código final. São os 13 da segunda revisão, entre eles os cinco dos efeitos, e 11 novos: região do anúncio que nasce com o texto ou remonta com o formulário, incerteza perdida na recarga, recusa sem o insumo existente e frases antigas. Os 24 morrem, nenhum por tempo esgotado.
+- **Navegador**, com a resposta real do servidor de outro deploy injetada (409 e `x-nextjs-action-not-found`): 27 de 27 no desktop claro, no celular escuro e no celular claro. Os cenários:
+  - versão nova;
+  - rede;
+  - envio incerto que gravou seguido de versão nova, com reenvio reconhecido e um registro só;
+  - duas atualizações seguidas, com a incerteza mantida nas duas recargas;
+  - corrigir um campo depois de recuperar, com o link para o insumo que já existe;
+  - a região do anúncio: o mesmo elemento, vazio no HTML e fora do formulário, recebe o aviso;
+  - edição depois do aviso;
+  - rascunho vencido;
+  - novo F5;
+  - envio que passa depois do aviso;
+  - editar.
+- **Dois builds de produção, com a primeira versão da correção:** 14 de 14.
+
+**Revisão independente:** novo revisor, subagente só de leitura.
+- **Primeira rodada (d64d0ec): reprovada.**
+  - **Bloqueante:** se um envio anterior ficou incerto e já tinha gravado, a versão nova dizia "nada foi salvo". Além disso, a recuperação trocava a chave do envio, e só o nome único evitava o duplicado.
+  - **Importantes:**
+    - recarregava sem pergunta mesmo com edição depois do aviso ou com o rascunho vencido;
+    - os testes não provavam a integração: seis mutantes viviam.
+  - **Menores:**
+    - remontagem em toda abertura;
+    - recuperado desprotegido e aviso não anunciado;
+    - rascunho que só saía ao ser lido;
+    - frase de "salvar" no excluir;
+    - alerta fora da tela;
+    - prazo inválido que sumia sem aviso;
+    - pergunta desligada se a recarga fosse interrompida.
+- **Correção (b328481):** tratados como descrito nos itens 3 a 5, menos o anúncio do aviso, que só ficou certo na segunda rodada.
+- **Segunda rodada (b328481): aprovada com ressalvas.** O bloqueante e os importantes da primeira foram conferidos no navegador.
+  - **Processo, fora do código do PR:** o servidor local de desenvolvimento servia código mutado nas rotas de editar e excluir. O roteiro de mutantes escrevia no próprio repositório e restaurava os arquivos com a data antiga. O repositório, o portão e o CI não foram afetados. Agora os mutantes rodam só numa cópia exportada, nunca durante um portão, e o servidor local foi reiniciado com o cache apagado.
+  - **Menores:**
+    - a região do anúncio nascia junto com o texto;
+    - a incerteza não atravessava a recarga (duas atualizações seguidas);
+    - corrigir um campo depois de recuperar levava a um beco sem saída;
+    - cinco efeitos sem teste (rolagem e foco do alerta, a marca de alteração do recuperado, o anúncio e o foco ao descartar);
+    - um comentário desatualizado;
+    - na decisão, a contagem de testes sem o comando e o "anunciado" que não se sustentava.
+- **Correção no commit seguinte:** todos tratados, como descrito nos itens 3, 5 e na verificação.
+- **Confirmação:** fica no PR e na página de evidências.
+
+**Limites:**
+- **Causa do incidente real:** falta procurar "Failed to find Server Action" nos registros de produção no horário do relato e conferir o catálogo. As duas coisas dependem de leitura autorizada de Rodolfo.
+- **Evitar a troca a cada deploy:** fixar a chave das ações no build (`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`). Isso é segredo e infraestrutura, então fica como decisão de Rodolfo.
+- A recuperação vale só para o Novo insumo.
+- O formulário recuperado é lido uma vez: um segundo F5, se a pessoa confirmar a saída, volta vazio.
+- **Efeitos sem DOM de teste:** o projeto não tem um. Os efeitos são testados chamando a função do componente com os ganchos do React trocados por versões que rodam o efeito na hora. O caminho real fica com o roteiro de navegador, que está fora do repositório.
+- Não testado em Safari/iOS nem com leitor de tela real.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
