@@ -4498,3 +4498,28 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - Antigos, fora do escopo: Compras rola 154 px a 1024 px; a Nova ficha rola 2 px a 320 px, pelo rótulo "Principal" da validade, que fica para a fatia dos formulários (A4); no hub do nível 1, a 1024 px, o "…" da trilha fica recortado sob o seletor de parceiro.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 531. 2026-11-18 · Visual da Apple no ERP, fatia A2: o menu lateral em lista, como a barra lateral do iPad
+
+**Fonte e recorte:** segunda fatia do visual da Apple aprovado por Rodolfo em 18/11/2026 (decisão 530), sobre o protótipo que mostrava a barra lateral em lista. Só o menu lateral do ERP (`NavLateral`, `tokens.css`): sem regra, permissão, destino, schema, migration, dado ou infraestrutura.
+
+1. **Lista no lugar da grade** (`.ff-nav-lista`): uma linha por tela, com o ícone (20 px, na tinta da área) à esquerda e o nome (14 px) alinhado à esquerda, 44 px de altura mínima. O nome quebra em linhas e nunca é cortado. Substitui a grade de duas colunas aprovada em 09/11.
+2. **Ativo:**
+   - a linha preenchida na cor da área, com o nome e o ícone claros, em 600 e com `aria-current`;
+   - o nome claro tem ≥ 4,5:1 sobre toda a paleta das áreas;
+   - no escuro, o contorno na tinta da área (≥ 3:1 sobre a lateral, o mesmo de antes) separa a linha da lateral;
+   - sob o ponteiro, a linha ativa não muda.
+3. **Início:** cada área com o quadrado de cor cheia (28 px, desenho claro), como nos Ajustes do iPhone. Os destinos são os mesmos.
+4. **Grupos:** o nome em 13 px/600, em letra normal (sem a caixa alta de antes), com a seta de abrir e fechar e `aria-expanded`.
+5. **O que não muda:** o seletor de área e a grade de módulos (referência de 12/11), o recolhido (só ícones, com o nome na dica e para o leitor de tela) e a gaveta do celular, que mostra a mesma lista.
+
+**Verificação:**
+- **Testes:** a lista, o ativo e o contraste em `erp-padrao-visual`; a marcação do menu em `erp-menu-lista-apple` (5 novos): uma coluna, nome que não corta, ativo único, quadrados no Início, grupo sem caixa alta e recolhido. Com `erp-identidade-modulos`, 50 passam nos 3 arquivos.
+- **Navegador** (app local, dados sintéticos): 38 de 38 conferências em 1280 px claro e escuro, 390 px claro e escuro (na gaveta) e 1024 px. Elas cobrem: uma coluna; nenhum nome cortado; altura de 44 px ou mais; ativo na cor cheia com nome e ícone claros; grupos sem caixa alta; quadrados no Início; recolhido com dica; nenhuma rolagem lateral.
+- **Portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
+
+**Limites:**
+- Não testado em Safari/iOS nem com leitor de tela real.
+- A grade de módulos do seletor de área segue a referência de 12/11; trocá-la por todas as áreas no menu, como no protótipo, mudaria a navegação e fica para decisão de Rodolfo.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
