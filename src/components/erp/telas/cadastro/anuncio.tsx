@@ -10,7 +10,8 @@
  *    caminhos do que fazer em seguida;
  *  - `useAcaoSegura`: a conexão que cai no meio do envio não derruba a tela nem apaga o que foi digitado: volta a frase
  *    dizendo que o resultado é incerto e que pode tentar de novo sem medo de duplicar (o servidor reconhece o reenvio). Se o
- *    ERP foi atualizado com a tela aberta, o resultado é certo: nada foi salvo, e a frase pede para recarregar.
+ *    ERP foi atualizado com a tela aberta, o resultado DESTE envio é certo (não foi processado), e a frase pede para recarregar;
+ *    um envio anterior que ficou sem confirmação continua podendo ter sido salvo.
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -89,11 +90,15 @@ export function ehVersaoNova(e: unknown): boolean {
  * A action do formulário com a rede protegida: falha de conexão volta como erro geral, com o formulário intacto.
  * `aoVersaoNova`: o formulário guarda o que foi digitado (devolve se conseguiu) antes de pedir para recarregar; `incerto` diz se
  * algum envio anterior DESTA tela ficou sem confirmação (aí ele pode ter sido salvo, e o rascunho precisa levar a chave do envio).
+ * `jaIncerto`: a tela veio de um rascunho em que isso já valia (a incerteza atravessa a recarga).
  */
-export function useAcaoSegura(acao: AcaoDeCadastro, opcoes?: { aoVersaoNova?: (form: FormData, contexto: { incerto: boolean }) => boolean }): AcaoDeCadastro {
+export function useAcaoSegura(
+  acao: AcaoDeCadastro,
+  opcoes?: { aoVersaoNova?: (form: FormData, contexto: { incerto: boolean }) => boolean; jaIncerto?: boolean },
+): AcaoDeCadastro {
   const aoVersaoNova = opcoes?.aoVersaoNova;
   // Vale para a vida desta tela: depois de um envio sem confirmação, nada aqui afirma que ele não foi salvo.
-  const algumIncerto = useRef(false);
+  const algumIncerto = useRef(opcoes?.jaIncerto === true);
   return useCallback(
     async (anterior: EstadoCadastro, form: FormData) => {
       try {

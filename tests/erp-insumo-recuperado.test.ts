@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 
-type Opcoes = { aoVersaoNova?: (form: FormData, c: { incerto: boolean }) => boolean };
+type Opcoes = { aoVersaoNova?: (form: FormData, c: { incerto: boolean }) => boolean; jaIncerto?: boolean };
 const estado = vi.hoisted(() => ({
   resposta: null as EstadoCadastro,
   rascunho: null as unknown,
@@ -97,17 +97,19 @@ describe('o que foi enviado vira o rascunho', () => {
 });
 
 describe('Novo insumo recuperado: mesma chave do envio, valores, aviso anunciável e saída', () => {
-  it('com rascunho: os campos e a chave antiga voltam; o aviso nasce visível e a região viva nasce vazia', () => {
+  it('com rascunho: os campos e a chave antiga voltam; o aviso aparece e a região viva, fora do formulário, recebe o texto', () => {
     estado.rascunho = rascunhoDoEnvio(enviado(), false);
     const h = html();
-    expect(h).toContain(textoDoRecuperado({ incerto: false, prazoNaoVoltou: false }));
+    const texto = textoDoRecuperado({ incerto: false, prazoNaoVoltou: false });
+    expect(h).toContain(`<p class="text-texto">${texto}</p>`);
     expect(h).toContain('Descartar e começar de novo');
     for (const valor of ['value="KRAFT 01"', 'value="Kraft Brasil"', 'value="100"', 'value="45,90"', 'value="5,00"', 'value="30"']) expect(h, valor).toContain(valor);
     expect(h).toMatch(/<option value="cat-emb" selected="">/);
     // O reenvio é o MESMO envio para o servidor: a chave da abertura antiga volta, não a nova.
     expect(h).toContain('name="envio" value="chave-da-abertura-antiga"');
     expect(h).not.toContain('chave-nova');
-    expect(h).toContain('<p role="status" aria-live="polite" class="sr-only"></p>');
+    // A região viva fica depois do formulário que nasce de novo (o leitor de tela anuncia a mudança no mesmo nó).
+    expect(h.endsWith(`</form><p role="status" aria-live="polite" class="sr-only">${texto}</p>`)).toBe(true);
   });
   it('rascunho com outra forma (outra versão do ERP) é ignorado', () => {
     estado.rascunho = { nome: 'KRAFT 01' };
@@ -116,12 +118,16 @@ describe('Novo insumo recuperado: mesma chave do envio, valores, aviso anunciáv
     expect(h).toContain('name="envio" value="chave-nova"');
   });
   it('sem rascunho, ou ao editar: nada é recuperado nem anunciado', () => {
-    expect(html()).not.toContain('Recuperamos');
+    // Sem rascunho é também o primeiro desenho de verdade (o rascunho só é lido depois dele): a região viva já existe, vazia.
+    const vazio = html();
+    expect(vazio).not.toContain('Recuperamos');
+    expect(vazio.endsWith('</form><p role="status" aria-live="polite" class="sr-only"></p>')).toBe(true);
     estado.rascunho = rascunhoDoEnvio(enviado(), false);
     const h = html(editar);
     expect(h).not.toContain('Recuperamos');
     expect(h).toContain('value="Farinha"');
     expect(h).not.toContain('KRAFT 01');
+    expect(h.endsWith('</form>')).toBe(true);
   });
   it('o envio que encontra o ERP atualizado mostra a frase certa e o botão de recarregar', () => {
     estado.resposta = { ok: false, erros: { geral: FRASE_VERSAO_NOVA_COM_RASCUNHO }, versaoNova: true, rascunhoGuardado: true, vez: 1 };
@@ -149,6 +155,23 @@ describe('a fiação: guarda só no cadastro novo, com a chave do envio; guarda 
     const agora = enviado(); agora.set('nome', 'KRAFT 01 editado depois do aviso');
     expect(estado.erroGeral?.aoGuardarAntesDeRecarregar?.(agora)).toBe(true);
     expect(estado.guardados).toEqual([['parceiro:pessoa:/erp/insumos/novo', rascunhoDoEnvio(agora, true)]]);
+  });
+  it('a incerteza atravessa a recarga: a tela recuperada de um envio incerto começa incerta e guarda de novo como incerta', () => {
+    estado.rascunho = rascunhoDoEnvio(enviado(), true);
+    // A versão nova de agora chega sem a marca (mesmo assim, o rascunho de que a tela nasceu já dizia "pode ter sido salvo").
+    estado.resposta = { ok: false, erros: { geral: 'x' }, versaoNova: true, rascunhoGuardado: true, vez: 1 };
+    html();
+    expect(estado.opcoes?.jaIncerto).toBe(true);
+    const agora = enviado();
+    expect(estado.erroGeral?.aoGuardarAntesDeRecarregar?.(agora)).toBe(true);
+    expect(estado.guardados).toEqual([['parceiro:pessoa:/erp/insumos/novo', rascunhoDoEnvio(agora, true)]]);
+    // Recuperada de um envio certo (nenhum ficou sem confirmação): começa certa.
+    estado.guardados = [];
+    estado.rascunho = rascunhoDoEnvio(enviado(), false);
+    html();
+    expect(estado.opcoes?.jaIncerto).toBe(false);
+    expect(estado.erroGeral?.aoGuardarAntesDeRecarregar?.(agora)).toBe(true);
+    expect(estado.guardados).toEqual([['parceiro:pessoa:/erp/insumos/novo', rascunhoDoEnvio(agora, false)]]);
   });
   it('cada envio novo descarta o rascunho de antes (nada volta depois dizendo que não foi salvo); editar não mexe', () => {
     html();

@@ -14,13 +14,15 @@ import {
 import { deveAvisarAoSair, ErroGeral, recarregarDepoisDeGuardar, recarregarSemPerguntar, RELIGAR_O_AVISO_MS } from '@/components/erp/telas/cadastro/erros';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 
-// Fora de um componente: o hook só embrulha a action (`useCallback`) e lembra, na vida da tela, se algum envio ficou incerto (`useRef`);
-// o efeito do foco do `ErroGeral` não roda (a função do componente é chamada direto para tocar o botão).
+// Fora de um componente: o hook só embrulha a action (`useCallback`) e lembra, na vida da tela, se algum envio ficou incerto (`useRef`).
+// A função do `ErroGeral` é chamada direto (para tocar o botão); o efeito dele só roda quando um teste pede, com as referências
+// que o teste entrega, na ordem em que o componente as cria.
+const ganchos = vi.hoisted(() => ({ refs: [] as { current: unknown }[], rodarEfeitos: false }));
 vi.mock('react', async (original) => ({
   ...(await original<typeof import('react')>()),
   useCallback: (fn: unknown) => fn,
-  useRef: (current: unknown) => ({ current }),
-  useEffect: () => {},
+  useRef: (current: unknown) => ganchos.refs.shift() ?? { current },
+  useEffect: (efeito: () => void) => { if (ganchos.rodarEfeitos) efeito(); },
 }));
 
 /** O primeiro elemento da árvore que satisfaz o teste (a árvore que a função do componente devolve, sem renderizar). */
@@ -37,7 +39,7 @@ const form = () => {
   f.set('nome', 'KRAFT 01');
   return f;
 };
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); ganchos.refs = []; ganchos.rodarEfeitos = false; });
 
 describe('o erro de versão do Next é reconhecido como o próprio Next o reconhece', () => {
   it('a classe real do Next: os dois detectores dizem sim', () => {
@@ -93,6 +95,15 @@ describe('useAcaoSegura: o certo (este envio não foi processado) separado do in
     expect(await semRascunho(null, form())).toMatchObject({ erros: { geral: `${FRASE_VERSAO_NOVA} ${FRASE_ENVIO_ANTERIOR_INCERTO}` }, incerto: true });
     // Outra tela (outro uso do hook) começa sem incerteza.
     expect(await useAcaoSegura(async () => { throw falha; })(null, form())).toMatchObject({ erros: { geral: FRASE_VERSAO_NOVA } });
+  });
+  it('a tela que nasceu de um rascunho incerto já começa incerta: a incerteza atravessa a recarga', async () => {
+    const guardar = vi.fn(() => true);
+    const r = await useAcaoSegura(async () => { throw versaoVelha(); }, { aoVersaoNova: guardar, jaIncerto: true })(null, form());
+    expect(r).toEqual({ ok: false, erros: { geral: `${FRASE_VERSAO_NOVA_COM_RASCUNHO} ${FRASE_ENVIO_ANTERIOR_RECONHECIDO}` }, versaoNova: true, rascunhoGuardado: true, incerto: true, vez: 1 });
+    expect(guardar).toHaveBeenCalledExactlyOnceWith(expect.any(FormData), { incerto: true });
+    expect(await useAcaoSegura(async () => { throw versaoVelha(); }, { jaIncerto: true })(null, form())).toMatchObject({ erros: { geral: `${FRASE_VERSAO_NOVA} ${FRASE_ENVIO_ANTERIOR_INCERTO}` }, incerto: true });
+    // Rascunho de um envio certo (nenhum ficou sem confirmação): a tela começa certa.
+    expect(await useAcaoSegura(async () => { throw versaoVelha(); }, { jaIncerto: false })(null, form())).toEqual({ ok: false, erros: { geral: FRASE_VERSAO_NOVA }, versaoNova: true, rascunhoGuardado: false, vez: 1 });
   });
   it('redirecionamento do Next segue adiante; resposta da action volta como veio; nada é guardado', async () => {
     const guardar = vi.fn(() => true);
@@ -169,6 +180,30 @@ describe('o toque no botão do ErroGeral: guarda o que está no formulário e s�
       tocar(guardar, form);
       expect(reload).toHaveBeenCalledOnce();
       expect(deveAvisarAoSair(true)).toBe(true);
+    }
+  });
+});
+
+describe('o alerta da versão nova vem para o meio da tela, e o foco vai para o botão sem rolar de novo', () => {
+  const efeitoCom = (estado: EstadoCadastro) => {
+    const caixa = { current: { scrollIntoView: vi.fn() } };
+    const botao = { current: { focus: vi.fn() } };
+    ganchos.refs = [caixa, botao];
+    ganchos.rodarEfeitos = true;
+    ErroGeral({ estado, recarregar: '/erp/insumos/novo' });
+    return { rolar: caixa.current.scrollIntoView, focar: botao.current.focus };
+  };
+  it('versão nova: o alerta inteiro no meio (o cabeçalho fixo não o cobre) e o foco no botão, a única saída', () => {
+    const { rolar, focar } = efeitoCom({ ok: false, erros: { geral: FRASE_VERSAO_NOVA }, versaoNova: true, rascunhoGuardado: false, vez: 1 });
+    expect(rolar).toHaveBeenCalledExactlyOnceWith({ block: 'center' });
+    expect(focar).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+  });
+  it('conflito, falha de rede ou nenhum erro: a rolagem e o foco ficam como estão', () => {
+    const outros: EstadoCadastro[] = [{ ok: false, erros: { geral: 'Outra pessoa salvou.' }, conflito: true, vez: 1 }, { ok: false, erros: { geral: FRASE_SEM_CONEXAO }, incerto: true, vez: 1 }, null];
+    for (const estado of outros) {
+      const { rolar, focar } = efeitoCom(estado);
+      expect(rolar).not.toHaveBeenCalled();
+      expect(focar).not.toHaveBeenCalled();
     }
   });
 });

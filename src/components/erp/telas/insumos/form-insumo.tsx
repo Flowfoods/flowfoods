@@ -162,19 +162,29 @@ export function FormInsumo(props: PropsDoFormInsumo) {
   const novo = props.modo === 'criar';
   const recuperado = novo && !descartou && ehRascunhoDoInsumo(r.valores) ? r.valores : null;
   return (
-    <FormInsumoBase
-      key={chaveDaMontagem(!!recuperado, descartou)}
-      {...props}
-      inicial={recuperado?.valores ?? props.inicial}
-      envio={recuperado?.envio || props.envio}
-      recuperado={recuperado ? { incerto: recuperado.incerto, prazoNaoVoltou: recuperado.prazoNaoVoltou } : null}
-      chaveDoRascunho={novo ? r.chave : ''}
-      focarNoNome={descartou}
-      aoDescartarRecuperado={() => {
-        r.descartar();
-        setDescartou(true);
-      }}
-    />
+    <>
+      <FormInsumoBase
+        key={chaveDaMontagem(!!recuperado, descartou)}
+        {...props}
+        inicial={recuperado?.valores ?? props.inicial}
+        envio={recuperado?.envio || props.envio}
+        recuperado={recuperado ? { incerto: recuperado.incerto, prazoNaoVoltou: recuperado.prazoNaoVoltou } : null}
+        chaveDoRascunho={novo ? r.chave : ''}
+        focarNoNome={descartou}
+        aoDescartarRecuperado={() => {
+          r.descartar();
+          setDescartou(true);
+        }}
+      />
+      {/* O aviso do recuperado para o leitor de tela. A região viva fica FORA do formulário que nasce de novo: existe vazia desde
+          o primeiro desenho (o rascunho só é lido depois dele) e o mesmo nó recebe o texto quando o rascunho chega. Uma região
+          que nasce junto com o texto costuma não ser anunciada. */}
+      {novo && (
+        <p role="status" aria-live="polite" className="sr-only">
+          {recuperado ? textoDoRecuperado(recuperado) : ''}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -244,10 +254,11 @@ function FormInsumoBase({
     (form: FormData, { incerto }: { incerto: boolean }) => !!chaveDoRascunho && guardarRascunho(chaveDoRascunho, rascunhoDoEnvio(form, incerto)),
     [chaveDoRascunho],
   );
-  const acaoSegura = useAcaoSegura(acao, { aoVersaoNova });
+  // A incerteza atravessa a recarga: um envio de antes dela pode ter sido salvo (e o novo rascunho continua dizendo isso).
+  const acaoSegura = useAcaoSegura(acao, { aoVersaoNova, jaIncerto: !!recuperado?.incerto });
   const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acaoSegura, null);
   // Guarda de novo no toque em "Recarregar a página": o que está na tela agora, inclusive o que mudou depois do aviso.
-  const incertoAteAqui = !!estado?.incerto;
+  const incertoAteAqui = !!estado?.incerto || !!recuperado?.incerto;
   const guardarAntesDeRecarregar = useCallback(
     (form: FormData) => !!chaveDoRascunho && guardarRascunho(chaveDoRascunho, rascunhoDoEnvio(form, incertoAteAqui)),
     [chaveDoRascunho, incertoAteAqui],
@@ -267,12 +278,8 @@ function FormInsumoBase({
     marcouRecuperado.current = true;
     saida.aoMudar();
   });
-  // O aviso do recuperado nasce no HTML; a região viva só recebe o texto depois de montar, para o leitor de tela anunciar.
+  // O aviso visível (a região viva que o anuncia fica no invólucro, fora deste formulário).
   const textoRecuperado = recuperado ? textoDoRecuperado(recuperado) : '';
-  const anuncioRecuperado = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    if (anuncioRecuperado.current) anuncioRecuperado.current.textContent = textoRecuperado;
-  }, [textoRecuperado]);
   // Descartou o recuperado: o foco volta para o nome.
   useEffect(() => {
     if (focarNoNome) document.getElementById(`${idBase}-nome`)?.focus();
@@ -348,7 +355,6 @@ function FormInsumoBase({
           <button type="button" onClick={aoDescartarRecuperado} className="ff-transicao min-h-11 rounded-[7px] px-3 text-[13px] font-medium text-suave underline underline-offset-4 hover:text-texto sm:min-h-9 [@media(pointer:coarse)]:min-h-11">
             Descartar e começar de novo
           </button>
-          <p ref={anuncioRecuperado} role="status" aria-live="polite" className="sr-only" />
         </div>
       )}
       <SalvandoAnunciado />

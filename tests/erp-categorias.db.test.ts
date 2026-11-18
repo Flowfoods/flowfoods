@@ -438,7 +438,9 @@ describe.skipIf(!URL_TESTE)('ERP I.1a · categorias, cadastro e classificação 
   it('mesma chave com conteúdo diferente é recusada (outro pedido, não reenvio) e nada é criado; a chave é por parceiro', async () => {
     const antes = await a.insumo.count();
     const r = await cadastrarInsumo(a, novo('Outro nome qualquer', { envio: 'envio-0001-abcd' }), 'Marina');
-    expect(r).toMatchObject({ ok: false, conflito: true, erros: { geral: expect.stringMatching(/Azeite extra virgem.*dados diferentes/s) } });
+    // Para corrigir, o caminho é o insumo que esse envio já cadastrou (a tela leva até ele); recarregar é para cadastrar outro.
+    const azeite = await a.insumo.findFirstOrThrow({ where: { nome: 'Azeite extra virgem' }, select: { id: true } });
+    expect(r).toMatchObject({ ok: false, conflito: true, existenteId: azeite.id, erros: { geral: expect.stringMatching(/Azeite extra virgem.*dados diferentes.*Para corrigir, abra o insumo que já existe; para cadastrar outro, recarregue a página\./s) } });
     expect(await a.insumo.count()).toBe(antes);
     // O parceiro B pode usar a mesma chave: a chave só vale dentro do parceiro.
     const rb = await cadastrarInsumo(b, { ...farinha, nome: 'Azeite de B', categoriaId: catB.MERCEARIA, envio: 'envio-0001-abcd' }, 'Bia');

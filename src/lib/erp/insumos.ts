@@ -142,8 +142,13 @@ function erroDeNomeRepetido(achado: { id: string; nome: string; ativo: boolean }
 export const FRASE_MATERIAL_EM_USO = 'Este insumo já está em uma ficha técnica ou na embalagem de um prato, e material de limpeza e uso não entra em ficha. Tire-o de lá antes de mudar o tipo.';
 
 const FRASE_ENVIO_TORTO = 'O envio deste formulário não tem uma chave válida. Recarregue a página e tente de novo; nada foi gravado.';
+/**
+ * INS-SALVAR-CONFIRMACAO: o mesmo envio (mesma pessoa, mesma chave) voltou com outros dados. Um envio que ficou sem confirmação já
+ * cadastrou o insumo. Para corrigir, o caminho é ele (a tela mostra "Abrir o insumo que já existe"): recarregar e cadastrar de novo
+ * cairia no nome repetido. Recarregar serve para cadastrar OUTRO insumo (uma chave nova).
+ */
 const FRASE_ENVIO_DIFERENTE = (nome: string) =>
-  `Este envio já cadastrou “${nome}” e agora chegou com dados diferentes. Recarregue a página para cadastrar de novo; nada foi gravado.`;
+  `Este envio já cadastrou “${nome}” e agora chegou com dados diferentes; nada foi gravado agora. Para corrigir, abra o insumo que já existe; para cadastrar outro, recarregue a página.`;
 
 /** A impressão do conteúdo do envio: mesma chave com impressão diferente é outro pedido, não um reenvio. */
 export function hashDoEnvio(d: DadosInsumo): string {
@@ -194,7 +199,8 @@ export async function cadastrarInsumo(
         const j = await tx.insumo.findFirst({ where: { chaveEnvio: chave }, select: { id: true, nome: true, hashEnvio: true } });
         if (j) {
           if (j.hashEnvio === hash) return { ok: true as const, id: j.id, nome: j.nome, mudou: [], repetido: true };
-          throw new Recusa({ ok: false, erros: { geral: FRASE_ENVIO_DIFERENTE(j.nome) }, conflito: true });
+          // A chave é desta pessoa: o id volta só para quem cadastrou.
+          throw new Recusa({ ok: false, erros: { geral: FRASE_ENVIO_DIFERENTE(j.nome) }, conflito: true, existenteId: j.id });
         }
       }
       const cat = await categoriaParaClassificar(tx, d.categoriaId!);
