@@ -107,7 +107,7 @@
   /*
    * Visual da Apple (decisão 530): o preenchimento dos controles (trilho do segmentado, campo de busca, botão secundário), o
    * polegar do segmentado e o material das barras. O material é quase opaco (92 %): mesmo com conteúdo preto rolando por
-   * baixo, o texto secundário da barra fica com 4,5:1 (teste em `erp-padrao-visual`).
+   * baixo, o texto secundário da barra fica com 4,5:1 (teste em `erp-visual-apple`).
    */
   --ff-preenchimento: rgb(118 114 100 / 0.13);
   --ff-preenchimento-forte: rgb(118 114 100 / 0.2);
@@ -257,7 +257,9 @@ html:has(.ff-app[data-tema='escuro']) {
  * Material translúcido da Apple (decisão 530) na barra do topo: o que rola por baixo aparece borrado. O borrão mora num
  * pseudo-elemento por trás do conteúdo da barra: no próprio elemento, `backdrop-filter` faria da barra o bloco de referência
  * dos popovers fixos que ela abre (trilha, visão, conta), e eles sairiam do lugar. A barra precisa ser posicionada e ter
- * camada própria (`sticky` + `z-*`). Sem suporte ao borrão, ou com a transparência reduzida no aparelho, a barra fica sólida.
+ * camada própria (`sticky` + `z-*`), e o próprio elemento não pode ganhar `transform`, `filter`, `will-change` nem `contain`
+ * (o mesmo problema). Sem suporte ao borrão, ou com a transparência reduzida no aparelho (nos navegadores que informam essa
+ * preferência), a barra fica sólida.
  */
 .ff-app .ff-material::before {
   content: '';
@@ -303,6 +305,10 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 .ff-app input[type='search']::placeholder {
   color: rgb(var(--ff-texto) / 0.75);
+}
+/* Com erro, a borda do erro volta (a regra acima a apagaria). */
+.ff-app input[type='search'][aria-invalid='true'] {
+  border-color: rgb(var(--ff-erro));
 }
 
 /* Identidade das áreas (29/10): a paleta de modulos.ts também orienta cards e menu.
@@ -713,6 +719,12 @@ html:has(.ff-app dialog.ff-janela[open]) {
     --ff-sobre-cmv-laranja: 0 0 0;
     --ff-cmv-vermelho: 255 255 255;
     --ff-sobre-cmv-vermelho: 0 0 0;
+    /* Visual da Apple (decisão 530): no papel, sem preenchimento, sem material e sem a lupa; o polegar fica branco. */
+    --ff-preenchimento: transparent;
+    --ff-preenchimento-forte: transparent;
+    --ff-polegar: 255 255 255;
+    --ff-material: rgb(255 255 255);
+    --ff-lupa: none;
     color-scheme: light;
     background: #fff;
     color: #000;

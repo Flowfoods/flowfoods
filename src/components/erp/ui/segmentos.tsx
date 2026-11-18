@@ -2,8 +2,9 @@
 
 /**
  * Controle segmentado de escolha única (rádio de verdade, por baixo), no visual da Apple (decisão 530): trilho preenchido,
- * opção marcada num polegar claro com sombra e em negrito, todas as opções na cor do texto, foco visível na opção. Usado
- * onde a escolha é curta e cabe numa linha (unidade, situação ao nascer). Com erro, o trilho ganha a borda do erro.
+ * opção marcada num polegar claro com sombra, contorno fino e em negrito, todas as opções na cor do texto, foco visível na
+ * opção. Usado onde a escolha é curta e cabe numa linha (unidade, situação ao nascer). Com erro, o trilho ganha a borda do
+ * erro; sem erro, a borda transparente só aparece no alto contraste do aparelho (cores forçadas).
  */
 
 export function Segmentos<T extends string>({
@@ -49,7 +50,7 @@ export function Segmentos<T extends string>({
               required={obrigatorio}
               className="peer sr-only"
             />
-            <span className="ff-transicao flex min-h-9 cursor-pointer items-center justify-center rounded-[8px] px-2 text-center text-[13px] font-medium text-texto hover:bg-preenchimento peer-checked:bg-polegar peer-checked:font-semibold peer-checked:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_2px_6px_rgb(0_0_0/0.1)] peer-checked:hover:bg-polegar peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-acento">
+            <span className="ff-transicao flex min-h-9 cursor-pointer items-center justify-center rounded-[8px] px-2 text-center text-[13px] font-medium text-texto hover:bg-preenchimento peer-checked:bg-polegar peer-checked:font-semibold peer-checked:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_2px_6px_rgb(0_0_0/0.1)] peer-checked:ring-1 peer-checked:ring-linha-forte peer-checked:hover:bg-polegar peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-acento">
               {rotulo}
             </span>
           </label>

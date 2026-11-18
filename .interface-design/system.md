@@ -183,18 +183,23 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   do lugar os popovers fixos da barra). 92 % é o mínimo para o texto
   secundário da barra ficar com 4,5:1 mesmo com conteúdo preto ou branco
   rolando por baixo. Sem suporte ao borrão ou com a transparência reduzida no
-  aparelho, a barra é sólida.
+  aparelho (nos navegadores que informam a preferência), a barra é sólida. O
+  próprio cabeçalho nunca leva `transform`, `filter`, `will-change` nem
+  `contain` (tiram os painéis fixos do lugar). Sob o ponteiro ou com o menu
+  aberto, o texto dos botões da barra vai para `texto`.
 - **Botão** 40 px (44 no celular), padding 16, raio 10, 14 px/600. Um
   primário por tela. Variantes: primario (texto `sobre-acao`), secundario (o
-  cinza da Apple: `preenchimento`, sem borda, texto na cor do texto), perigo
-  (sob o ponteiro, `destaque`), fantasma (`classeDeBotao`).
+  cinza da Apple: `preenchimento`, borda transparente que só aparece no alto
+  contraste, texto na cor do texto), perigo (sob o ponteiro, `destaque`),
+  fantasma (`classeDeBotao`).
 - **Controle segmentado** (`Segmentos`, `FiltroEmLinks`): trilho em
-  `preenchimento` sem borda (borda `erro` só com erro), opção marcada num
-  polegar claro (`polegar`) com sombra e em 600; todas as opções na cor do
-  texto; foco visível na opção.
+  `preenchimento` com borda transparente (borda `erro` só com erro), opção
+  marcada num polegar claro (`polegar`) com sombra, contorno fino em
+  `linha-forte` e 600; todas as opções na cor do texto; foco visível na opção.
 - **Campo de busca** (todo `input[type=search]` do ERP): `preenchimento`, sem
-  borda, raio 10, lupa à esquerda. Texto de exemplo no texto a 75 %: sobre o
-  preenchimento, o `suave` cairia abaixo de 4,5:1 no fundo creme.
+  borda, raio 10, lupa à esquerda; com `aria-invalid`, a borda `erro` volta.
+  Texto de exemplo no texto a 75 %: sobre o preenchimento, o `suave` daria
+  4,22:1 no fundo creme.
 - **Campo** 42 px (44 no celular, fonte 16 px), raio 9, borda `linha-forte`,
   fundo `campo`, rótulo persistente 13 px/500, erro embaixo ligado por
   `aria-describedby`. Texto de exemplo em `suave` inteiro (a 70 % caía a 3:1).
@@ -288,7 +293,9 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | Selo sobre superfície opaca; tinta só no `cheio`, pelos pares aprovados | `ok` a 15 % dava 4,28:1 com a cor nova; o fundo opaco tira o selo da conta de onde ele pousa | 2026-11-11 |
 | Visual da Apple no ERP, em fatias (decisão 530); substitui "sem vidro" e a Libre Franklin no texto | pedido de Rodolfo e protótipo aprovado; a identidade (creme, vermelho, Gelasio) continua | 2026-11-18 |
 | Material da barra a 92 %, com o borrão num `::before` | menos opaco, o texto secundário cai abaixo de 4,5:1 com conteúdo escuro por baixo; no próprio elemento, o borrão desloca os popovers fixos | 2026-11-18 |
-| Texto de exemplo da busca no texto a 75 % | o `suave` sobre o preenchimento dava 4,19:1 no fundo creme | 2026-11-18 |
+| Texto de exemplo da busca no texto a 75 % | o `suave` sobre o preenchimento dava 4,22:1 no fundo creme | 2026-11-18 |
+| Na barra translúcida, sob o ponteiro, o texto vai para `texto` | o `suave` e o texto a 75 % sobre o realce caíam a 4,17:1 e 4,34:1 no pior caso | 2026-11-18 |
+| Borda transparente no secundário, no trilho do filtro e na busca da barra | some no visual normal e devolve o contorno no alto contraste (cores forçadas) | 2026-11-18 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,

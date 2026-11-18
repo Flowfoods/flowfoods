@@ -120,11 +120,22 @@ describe('visual da Apple · tokens novos, nos dois temas', () => {
         expect(contraste(canais(t.texto), barra), `texto, ${atras}`).toBeGreaterThanOrEqual(4.5);
         expect(contraste(canais(t.suave), barra), `suave, ${atras}`).toBeGreaterThanOrEqual(4.5);
         expect(contraste(canais(t.acento), barra), `acento, ${atras}`).toBeGreaterThanOrEqual(3);
-        // O campo de busca da barra (preenchimento sobre a barra): o texto e o atalho a 75 %.
-        const campo = sobre(comAlfa(t.preenchimento), barra);
-        expect(contraste(canais(t.texto), campo), `busca, ${atras}`).toBeGreaterThanOrEqual(4.5);
-        expect(contraste(sobre({ cor: canais(t.texto), alfa: 0.75 }, campo), campo), `atalho, ${atras}`).toBeGreaterThanOrEqual(4.5);
+        // Sob o ponteiro ou com o menu aberto, os botões da barra ganham um realce (texto a 5 %, ou o preenchimento mais forte
+        // na busca): ali o texto é sempre o `texto` (o `suave` e o texto atenuado cairiam abaixo de 4,5:1).
+        for (const [nome, realce] of [['texto a 5 %', { cor: canais(t.texto), alfa: 0.05 }], ['preenchimento', comAlfa(t.preenchimento)], ['preenchimento-forte', comAlfa(t['preenchimento-forte'])]] as const) {
+          const fundo = sobre(realce, barra);
+          expect(contraste(canais(t.texto), fundo), `texto em ${nome}, ${atras}`).toBeGreaterThanOrEqual(4.5);
+        }
       }
+    });
+
+    it(`${tema}: o motivo das escolhas — sob o ponteiro, o \`suave\` e o texto a 75 % cairiam abaixo de 4,5:1 no pior caso`, () => {
+      const piores = [PRETO, BRANCO].map((atras) => sobre(comAlfa(t.material), atras));
+      const realceDaConta = piores.map((b) => sobre({ cor: canais(t.texto), alfa: 0.05 }, b));
+      const realceDaBusca = piores.map((b) => sobre(comAlfa(t['preenchimento-forte']), b));
+      const minimo = (cor: (f: RGB) => RGB, fundos: RGB[]) => Math.min(...fundos.map((f) => contraste(cor(f), f)));
+      if (tema === 'claro') expect(minimo(() => canais(t.suave), realceDaConta)).toBeLessThan(4.5);
+      else expect(minimo((f) => sobre({ cor: canais(t.texto), alfa: 0.75 }, f), realceDaBusca)).toBeLessThan(4.5);
     });
   }
 
@@ -162,6 +173,16 @@ describe('visual da Apple · barra do topo translúcida', () => {
     expect(antes).toMatch(/\n\s*backdrop-filter: saturate\(180%\) blur\(20px\);/);
   });
 
+  it('nenhuma classe no cabeçalho cria um bloco de referência para os painéis fixos (testado à mão: com `backdrop-blur`, eles saíam 232 px do lugar)', () => {
+    const barra = shell.match(/<header className="([^"]+)"/)![1].split(' ');
+    for (const c of barra) expect(c, c).not.toMatch(/^(backdrop-|blur|transform|translate-|-?translate-|rotate-|-?rotate-|scale-|skew-|filter|drop-shadow|will-change|contain-|perspective)/);
+    // Nem regra de CSS no próprio `.ff-material` (só no ::before).
+    for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+      const seletores = m[1].trim().split(',').map((x) => x.trim()).filter((x) => x.includes('ff-material') && !x.endsWith('::before'));
+      for (const x of seletores) expect(m[2], x).not.toMatch(/transform|filter|will-change|contain|perspective/);
+    }
+  });
+
   it('nenhuma regra põe o borrão (nem filtro) no próprio elemento: ele viraria a referência dos popovers fixos da barra', () => {
     for (const m of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
       if (!/backdrop-filter|(^|[\s;])filter:/.test(m[2])) continue;
@@ -192,7 +213,7 @@ describe('visual da Apple · controles', () => {
     const spans = [...h.matchAll(/<span class="([^"]+)">(kg|L|un)<\/span>/g)].map((m) => m[1].split(' '));
     expect(spans).toHaveLength(3);
     for (const s of spans) {
-      expect(s).toEqual(expect.arrayContaining(['text-texto', 'peer-checked:bg-polegar', 'peer-checked:font-semibold', 'peer-checked:hover:bg-polegar', 'peer-focus-visible:outline-acento']));
+      expect(s).toEqual(expect.arrayContaining(['text-texto', 'peer-checked:bg-polegar', 'peer-checked:font-semibold', 'peer-checked:hover:bg-polegar', 'peer-checked:ring-1', 'peer-checked:ring-linha-forte', 'peer-focus-visible:outline', 'peer-focus-visible:outline-[3px]', 'peer-focus-visible:outline-offset-2', 'peer-focus-visible:outline-acento']));
       expect(s).not.toContain('text-suave');
       expect(s.some((c) => c.startsWith('peer-checked:shadow-['))).toBe(true);
     }
@@ -201,10 +222,13 @@ describe('visual da Apple · controles', () => {
   it('filtro em links: o mesmo trilho e o mesmo polegar, marcado por `aria-current`', () => {
     for (const quebra of [false, true]) {
       const h = renderToStaticMarkup(createElement(FiltroEmLinks, { rotulo: 'Filtrar por situação', quebra, opcoes: [{ href: '/a', rotulo: 'Ativos', ativo: true }, { href: '/b', rotulo: 'Todos', ativo: false }] }));
-      expect(h.match(/<ul class="([^"]+)"/)![1].split(' ')).toEqual(expect.arrayContaining(['bg-preenchimento', 'rounded-[10px]']));
+      // A borda transparente só aparece no alto contraste do aparelho (cores forçadas): o trilho não some.
+      expect(h.match(/<ul class="([^"]+)"/)![1].split(' ')).toEqual(expect.arrayContaining(['bg-preenchimento', 'rounded-[10px]', 'border', 'border-transparent']));
       expect(h).not.toMatch(/border-linha|bg-painel/);
       const ativo = h.match(/<a [^>]*aria-current="page"[^>]*class="([^"]+)"|<a [^>]*class="([^"]+)"[^>]*aria-current="page"/)!;
-      expect((ativo[1] ?? ativo[2]).split(' ')).toEqual(expect.arrayContaining(['text-texto', 'aria-[current=page]:bg-polegar', 'aria-[current=page]:font-semibold']));
+      const classes = (ativo[1] ?? ativo[2]).split(' ');
+      expect(classes).toEqual(expect.arrayContaining(['text-texto', 'aria-[current=page]:bg-polegar', 'aria-[current=page]:font-semibold', 'aria-[current=page]:ring-1', 'aria-[current=page]:ring-linha-forte', 'aria-[current=page]:hover:bg-polegar']));
+      expect(classes.some((c) => c.startsWith('aria-[current=page]:shadow-['))).toBe(true);
     }
   });
 
@@ -222,6 +246,9 @@ describe('visual da Apple · controles', () => {
     expect(sob).toContain('border-color: transparent;');
     expect(sob).toContain('background-color: var(--ff-preenchimento-forte);');
     expect(bloco(".ff-app input[type='search']::placeholder")).toContain('color: rgb(var(--ff-texto) / 0.75);');
+    // Com erro, a borda do erro volta (a regra de cima a apagaria) e vem depois dela.
+    expect(bloco(".ff-app input[type='search'][aria-invalid='true']")).toContain('border-color: rgb(var(--ff-erro));');
+    expect(css.indexOf(".ff-app input[type='search'][aria-invalid='true'] {")).toBeGreaterThan(css.indexOf(".ff-app input[type='search']:hover {"));
   });
 
   it('a busca da lista (`BuscaEmFormulario`) é um `input[type=search]` sem cor própria que dispute com a regra; "Buscar" é o botão secundário', () => {
@@ -235,8 +262,9 @@ describe('visual da Apple · controles', () => {
 
   it('botão secundário: o cinza da Apple, sem borda e com o texto na cor do texto; principal e perigo como antes', () => {
     const secundario = classeDeBotao('secundario');
-    expect(secundario).toContain('bg-preenchimento text-texto hover:bg-preenchimento-forte');
-    expect(secundario).not.toMatch(/\bborder\b|border-linha|bg-painel/);
+    // A borda é transparente: some no visual normal e aparece no alto contraste do aparelho (cores forçadas).
+    expect(secundario).toContain('border border-transparent bg-preenchimento text-texto hover:bg-preenchimento-forte');
+    expect(secundario).not.toMatch(/border-linha|bg-painel/);
     expect(classeDeBotao()).toBe(secundario);
     expect(classeDeBotao('primario')).toContain('bg-acao text-sobre-acao hover:bg-acao-hover');
     expect(classeDeBotao('perigo')).toContain('border border-erro/45 text-erro hover:bg-destaque');
@@ -244,9 +272,15 @@ describe('visual da Apple · controles', () => {
 
   it('a busca da barra do topo, no computador, é um campo preenchido com o texto na cor do texto', () => {
     const busca = readFileSync('src/components/erp/shell/BuscaGlobal.tsx', 'utf8');
-    expect(busca).toMatch(/lg:bg-preenchimento lg:px-3 lg:text-\[13px\] lg:text-texto lg:hover:bg-preenchimento-forte/);
-    expect(busca).not.toMatch(/lg:border lg:border-linha/);
-    expect(busca).toMatch(/<kbd className="[^"]*text-texto\/75/);
+    expect(busca).toMatch(/lg:border lg:border-transparent lg:bg-preenchimento lg:px-3 lg:text-\[13px\] lg:text-texto lg:hover:bg-preenchimento-forte/);
+    expect(busca).not.toMatch(/lg:border-linha/);
+    // O atalho na cor do texto: sob o ponteiro, sobre a barra translúcida, o texto atenuado cairia abaixo de 4,5:1.
+    expect(busca).toMatch(/<kbd className="[^"]*\btext-texto xl:inline/);
+    expect(busca).not.toMatch(/<kbd className="[^"]*text-texto\//);
+    // E o papel da conta vai para a cor do texto sob o ponteiro e com o menu aberto.
+    const conta = readFileSync('src/components/erp/shell/MenuUsuario.tsx', 'utf8');
+    expect(conta).toMatch(/classeDoBotao="group /);
+    expect(conta).toMatch(/text-suave group-hover:text-texto group-aria-expanded:text-texto">\{usuario\.papel\}/);
   });
 });
 
@@ -271,6 +305,18 @@ describe('visual da Apple · larguras que a letra nova (um pouco mais larga) ape
   it('acesso: a coluna da direita pode encolher (sem `min-w-0`, o conteúdo dela alargava a grade inteira no celular)', () => {
     const pagina = readFileSync('src/app/erp/acesso/page.tsx', 'utf8');
     expect(pagina).toMatch(/<div className="min-w-0 space-y-4">\s*<Painel titulo=\{`O que você faz em/);
+  });
+});
+
+describe('visual da Apple · impressão', () => {
+  it('no papel: sem preenchimento, sem material e sem lupa; o polegar fica branco', () => {
+    const i = css.indexOf('@media print {');
+    const corpo = css.slice(css.indexOf('{', css.indexOf('.ff-app[data-tema] {', i)) + 1, css.indexOf('}', css.indexOf('.ff-app[data-tema] {', i)));
+    expect(corpo).toContain('--ff-preenchimento: transparent;');
+    expect(corpo).toContain('--ff-preenchimento-forte: transparent;');
+    expect(corpo).toContain('--ff-polegar: 255 255 255;');
+    expect(corpo).toContain('--ff-material: rgb(255 255 255);');
+    expect(corpo).toContain('--ff-lupa: none;');
   });
 });
 

@@ -1,8 +1,9 @@
 /**
  * Filtro por link (o estado mora na URL: voltar funciona e dá para mandar o
  * link já filtrado). Controle segmentado no visual da Apple (decisão 530):
- * trilho preenchido, opção ativa num polegar claro com sombra e em negrito,
- * `aria-current`. Rola dentro do próprio trilho no celular.
+ * trilho preenchido, opção ativa num polegar claro com sombra, contorno fino e
+ * em negrito, `aria-current`. Rola dentro do próprio trilho no celular. A borda
+ * transparente do trilho só aparece no alto contraste do aparelho (cores forçadas).
  */
 
 import Link from 'next/link';
@@ -22,13 +23,13 @@ export function FiltroEmLinks({
   if (quebra) {
     return (
       <nav aria-label={rotulo} className="min-w-0 max-w-full">
-        <ul className="flex flex-wrap gap-0.5 rounded-[10px] bg-preenchimento p-[3px]">
+        <ul className="flex flex-wrap gap-0.5 rounded-[10px] border border-transparent bg-preenchimento p-[3px]">
           {opcoes.map((o) => (
             <li key={o.href + o.rotulo}>
               <Link
                 href={o.href}
                 aria-current={o.ativo ? 'page' : undefined}
-                className="ff-transicao flex min-h-9 items-center rounded-[8px] px-3 text-[13px] font-medium text-texto hover:bg-preenchimento aria-[current=page]:bg-polegar aria-[current=page]:font-semibold aria-[current=page]:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_2px_6px_rgb(0_0_0/0.1)] aria-[current=page]:hover:bg-polegar"
+                className="ff-transicao flex min-h-9 items-center rounded-[8px] px-3 text-[13px] font-medium text-texto hover:bg-preenchimento aria-[current=page]:bg-polegar aria-[current=page]:font-semibold aria-[current=page]:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_2px_6px_rgb(0_0_0/0.1)] aria-[current=page]:ring-1 aria-[current=page]:ring-linha-forte aria-[current=page]:hover:bg-polegar"
               >
                 {o.rotulo}
               </Link>
@@ -46,13 +47,13 @@ export function FiltroEmLinks({
       aria-label={rotulo}
       className="min-w-0 max-w-full overflow-x-auto max-sm:pr-8 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]"
     >
-      <ul className="flex w-max gap-0.5 rounded-[10px] bg-preenchimento p-[3px]">
+      <ul className="flex w-max gap-0.5 rounded-[10px] border border-transparent bg-preenchimento p-[3px]">
         {opcoes.map((o) => (
           <li key={o.href + o.rotulo}>
             <Link
               href={o.href}
               aria-current={o.ativo ? 'page' : undefined}
-              className="ff-transicao flex min-h-9 items-center whitespace-nowrap rounded-[8px] px-3 text-[13px] font-medium text-texto hover:bg-preenchimento aria-[current=page]:bg-polegar aria-[current=page]:font-semibold aria-[current=page]:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_2px_6px_rgb(0_0_0/0.1)] aria-[current=page]:hover:bg-polegar"
+              className="ff-transicao flex min-h-9 items-center whitespace-nowrap rounded-[8px] px-3 text-[13px] font-medium text-texto hover:bg-preenchimento aria-[current=page]:bg-polegar aria-[current=page]:font-semibold aria-[current=page]:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_2px_6px_rgb(0_0_0/0.1)] aria-[current=page]:ring-1 aria-[current=page]:ring-linha-forte aria-[current=page]:hover:bg-polegar"
             >
               {o.rotulo}
             </Link>

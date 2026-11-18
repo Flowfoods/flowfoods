@@ -4435,16 +4435,20 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 2. **Barra do topo translúcida** (`.ff-material`):
    - A superfície a 92 % com borrão (`saturate(180%) blur(20px)`). 92 % é o mínimo para o texto secundário da barra ter 4,5:1 com conteúdo preto ou branco rolando por baixo; a 90 % já cairia (teste).
    - O borrão mora num `::before` por trás do conteúdo. No próprio elemento, `backdrop-filter` faria da barra o bloco de referência dos popovers fixos dela (trilha, visão, conta), e eles sairiam do lugar.
-   - Sem suporte ao borrão, ou com a transparência reduzida no aparelho, a barra fica sólida.
+   - Sem suporte ao borrão, ou com a transparência reduzida no aparelho (nos navegadores que informam essa preferência), a barra fica sólida.
+   - O próprio elemento não pode ganhar `transform`, `filter`, `will-change` nem `contain`, que tiram os painéis do lugar do mesmo jeito (teste). Na revisão, `backdrop-blur` no cabeçalho deslocou os painéis 232 px a 1024 px.
+   - Sob o ponteiro ou com o menu aberto, os botões da barra ganham um realce. Ali o texto fica na cor do texto: o papel da conta e o atalho da busca, que estavam em `suave` e no texto a 75 %, cairiam para 4,17:1 e 4,34:1 no pior caso.
 3. **Controles:**
-   - **Segmentado** (`Segmentos`) e **filtro em links** (`FiltroEmLinks`): trilho preenchido sem borda (a borda do erro aparece só com erro), opção marcada num polegar claro com sombra e em negrito, todas as opções na cor do texto, foco visível na opção.
-   - **Campo de busca:** todo `input[type=search]` do ERP fica preenchido, sem borda, com a lupa (regra em `tokens.css`, sem mexer nas telas). O texto de exemplo vira o texto a 75 %: sobre o preenchimento, o `suave` dava 4,19:1 no fundo creme.
-   - **Botão secundário:** o cinza da Apple (preenchimento, sem borda, texto na cor do texto). O vermelho fica no principal e no perigo, que não mudam.
+   - **Segmentado** (`Segmentos`) e **filtro em links** (`FiltroEmLinks`): trilho preenchido sem borda visível (a borda do erro aparece só com erro). A opção marcada vem num polegar claro, com sombra, contorno fino e em negrito. Todas as opções ficam na cor do texto, com foco visível na opção.
+   - **Campo de busca:** todo `input[type=search]` do ERP fica preenchido, sem borda, com a lupa (regra em `tokens.css`, sem mexer nas telas). Com erro, a borda do erro volta. O texto de exemplo vira o texto a 75 %: sobre o preenchimento, o `suave` dava 4,22:1 no fundo creme.
+   - **Botão secundário:** o cinza da Apple (preenchimento, texto na cor do texto). O vermelho fica no principal e no perigo, que não mudam.
+   - **Alto contraste do aparelho (cores forçadas):** botão secundário, trilho do filtro e busca da barra levam uma borda transparente. Ela não aparece no visual normal e devolve o contorno nesse modo.
+   - **Impressão:** sem preenchimento, sem material e sem lupa; o polegar fica branco.
    - **Busca ⌘K na barra:** campo preenchido, com o texto na cor do texto.
 4. **Tokens novos, nos dois temas:** `preenchimento` e `preenchimento-forte`, `polegar`, `material` e `lupa`.
 
 **Verificação:**
-- **Testes:** 23 novos em `tests/erp-visual-apple.test.ts`: letra; tokens e contraste, inclusive o pior caso da barra translúcida; regra do borrão e reservas; controles; busca; larguras. Com os 37 de `erp-padrao-visual`, 60 passam (`npx vitest run tests/erp-visual-apple.test.ts tests/erp-padrao-visual.test.ts`).
+- **Testes:** 27 em `tests/erp-visual-apple.test.ts`: letra; tokens e contraste, inclusive o pior caso da barra translúcida em repouso e sob o ponteiro; regra do borrão, reservas e o que não pode ir no cabeçalho; controles; busca e erro; impressão; larguras. Com os 37 de `erp-padrao-visual`, 64 passam (`npx vitest run tests/erp-visual-apple.test.ts tests/erp-padrao-visual.test.ts`).
 - **Mutantes, só numa cópia exportada:** 22 de 22 morrem. Entre eles: material menos opaco, borrão no próprio elemento, sem as reservas, polegar, exemplo da busca em `suave`, lupa do tema errado, letra sem `system-ui` e as três larguras.
 - **Navegador** (app local, dados sintéticos): 88 de 88 conferências, em 1280 px claro e escuro, 390 px claro e escuro, 1024 px e 320 px:
   - barra com fundo transparente e o borrão no `::before`;
@@ -4462,11 +4466,23 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
   - Contra o master, nenhuma tela passou a rolar de lado. O Acesso em 320 px deixou de rolar (22 px → 0). Dois casos antigos ficaram um pouco menores: Compras em 1024 px (155 → 152 px) e Nova ficha em 320 px (11 → 10 px).
 - **Portão completo local e CI:** ficam no PR e na página de evidências.
 
-**Revisão independente:** fica no PR e na página de evidências.
+**Revisão independente:** novo revisor, subagente só de leitura.
+- **1ecd4c1: aprovado com ressalvas**, sem bloqueante. O revisor conferiu os 9 campos de busca, 59 aberturas dos painéis da barra, a transparência reduzida, a letra, o escopo e o axe-core (nenhuma violação em 24 combinações). Também mediu 210 larguras e rodou 46 mutantes, dos quais 6 sobreviveram.
+- **Achados tratados no commit seguinte:**
+  - o contraste sob o ponteiro na barra;
+  - o contorno no alto contraste;
+  - o contorno fino do polegar;
+  - a borda de erro da busca;
+  - os 6 mutantes vivos, com testes novos para foco, polegar do filtro e o que não pode ir no cabeçalho;
+  - textos: o 4,22, a ressalva da preferência, a referência do teste e a impressão.
+- **Confirmação:** fica no PR e na página de evidências.
 
 **Limites:**
 - Não testado em Safari/iOS com a SF de verdade: aqui, a Inter faz o papel dela (é parecida e um pouco mais larga).
 - Telas com estilo de campo, botão ou segmentado escrito à mão, fora dos componentes compartilhados, seguem como estavam até a fatia delas.
 - O protótipo mostrava ainda o menu lateral em lista, o título grande e as listas agrupadas: ficam para A2–A4.
+- A letra nova corta mais a trilha do topo a 1280 px: o nome da tela atual sai cortado em 5 de 39 telas, contra 3 com a Libre Franklin (Compras do período e Novo insumo são as novas). A 1440 px, nenhuma.
+- O polegar marcado do segmentado tem pouco contraste com o trilho (1,17:1 no claro, 1,28:1 no escuro), como no da Apple. A marcação vem também do contorno fino, do negrito, da sombra e, para o leitor de tela, do rádio marcado ou do `aria-current`.
+- Antigos, fora do escopo: Compras rola 152 px a 1024 px; Nova ficha rola 10 px a 320 px; no hub do nível 1, a 1024 px, o "…" da trilha fica recortado sob o seletor de parceiro.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
