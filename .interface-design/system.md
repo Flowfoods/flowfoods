@@ -87,7 +87,7 @@ editoriais: h1 da página
 (29 px/1,2, peso regular; 25 px no celular), título de diálogo e de gaveta
 (20 px), número grande e título de estado vazio (sempre
 `lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 20 · 25–29; título de
-painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px). Caixa
+painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px; no menu lateral, desde a decisão 531, o grupo é em letra normal). Caixa
 alta só no rótulo de seção do hub e nos grupos do menu.
 
 ## Espaço e raio
@@ -102,17 +102,19 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 ## Padrões
 
 - **Menu lateral** 232 px (68 recolhido), altura total, borda direita, na cor
-  da superfície. Os itens formam uma **grade compacta** de ícone + nome
-  (12 px), em **duas colunas quando o nome cabe**: a coluna mínima é 8,1em
-  (o maior nome sem partir palavra) e no máximo metade da largura, então a
-  grade cai para uma coluna sozinha se o texto crescer. Nome nunca cortado
-  (quebra em linhas; a célula cresce, mínimo 64 px). Ativo = célula preenchida
-  com contorno na tinta da área (≥ 3:1) + peso 600. A largura de 232 px ficou:
-  a de referência (142 px) só comporta duas colunas com nomes curtos; os nomes
-  reais das áreas ("Movimentações", 92 px) pediriam uma coluna só. Barra de
-  rolagem fina: as duas colunas cabem também com a barra clássica.
-  Seletor de área no topo; grupos com botão `aria-expanded`; fase no rodapé.
-  < 900 px: gaveta com a mesma grade.
+  da superfície. Desde a decisão 531 (visual da Apple, fatia A2), os itens
+  formam uma **lista**, como a barra lateral do iPad: uma linha por tela, com
+  o ícone (20 px, na tinta da área) à esquerda e o nome (14 px) alinhado à
+  esquerda; 44 px de altura mínima; o nome nunca é cortado (quebra em linhas e
+  a linha cresce). No Início, cada área vem com o **quadrado de cor cheia**
+  (28 px, desenho claro), como nos Ajustes do iPhone. **Ativo** = a linha
+  preenchida na cor da área, com o nome e o ícone claros (≥ 4,5:1 em toda a
+  paleta), peso 600 e `aria-current`; no escuro, o contorno na tinta da área
+  (≥ 3:1) separa a linha da lateral; sob o ponteiro, a ativa não muda. Grupo
+  com o nome em 13 px/600, em letra normal (sem caixa alta), e a seta de abrir
+  e fechar (`aria-expanded`). Recolhido: a mesma coluna, só de ícones, com o
+  nome na dica e para o leitor de tela. Seletor de área no topo; fase no
+  rodapé. < 900 px: gaveta com a mesma lista.
 - **Seletor de áreas** abre a **grade de módulos** (referência de 12/11/2026):
   painel flutuante de 620 px sob o seletor, com um bloco por área em uso,
   sem cartão nem borda: ícone de cor cheia (a cor da área, desenho claro,
@@ -298,6 +300,7 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | Texto de exemplo da busca no texto a 75 % | o `suave` sobre o preenchimento dava 4,22:1 no fundo creme | 2026-11-18 |
 | Na barra translúcida, sob o ponteiro, o texto vai para `texto` | o `suave` e o texto a 75 % sobre o realce caíam a 4,17:1 e 4,34:1 no pior caso | 2026-11-18 |
 | Borda transparente no secundário, no trilho do filtro e na busca da barra | some no visual normal e devolve o contorno no alto contraste (cores forçadas) | 2026-11-18 |
+| Menu lateral em lista, ativo na cor cheia da área (decisão 531); substitui a grade de duas colunas | barra lateral do iPad, do protótipo aprovado; a seleção cheia tem nome claro ≥ 4,5:1 e contorno ≥ 3:1 no escuro | 2026-11-18 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,

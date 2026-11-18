@@ -5,11 +5,13 @@
  * celular): marca, contexto, SELETOR DE ÁREA no topo, os grupos da área
  * (abrem e fecham; cada item é uma aba) e a versão no rodapé.
  *
- * Padrão aprovado em 09/11/2026: os itens formam uma GRADE compacta de ícone +
- * nome, em duas colunas quando o nome cabe (a regra está em `tokens.css`,
- * `.ff-nav-grade`). O nome nunca é cortado: quebra em linhas e a célula cresce.
- * Item ativo = célula preenchida com contorno e peso, na cor da área, com
- * `aria-current`. Recolhido (desktop): só ícones, com nome acessível e dica.
+ * Visual da Apple (decisão 531, fatia A2): os itens formam uma LISTA, uma
+ * linha por tela, com o ícone à esquerda e o nome alinhado, como a barra lateral
+ * do iPad (a regra está em `tokens.css`, `.ff-nav-lista`). O nome nunca é
+ * cortado: quebra em linhas e a linha cresce. Item ativo = a linha preenchida
+ * na cor da área, com o nome e o ícone claros, em 600 e com `aria-current`. No
+ * Início, cada área vem com o quadrado de cor cheia, como nos Ajustes do
+ * iPhone. Recolhido (desktop): só ícones, com nome acessível e dica.
  *
  * O seletor abre a GRADE DE MÓDULOS (referência de 12/11/2026): um bloco por
  * área em uso, com ícone de cor cheia, nome e função, e, num grupo separado, o
@@ -32,12 +34,12 @@ export interface EstadoDaNav {
   hrefAtivo: string | null;
 }
 
-// Célula da grade: ícone em cima, nome embaixo; 64 px de altura mínima (alvo de toque com folga) e cresce com o nome.
-const ITEM = 'ff-nav-item ff-identidade-modulo ff-transicao flex w-full text-suave hover:text-texto';
-const ITEM_ABERTO = 'min-h-16 flex-col items-center justify-center gap-1.5 px-0.5 py-2 text-center';
+// Linha da lista: ícone à esquerda, nome alinhado à esquerda; 44 px de altura mínima (alvo de toque) e cresce com o nome.
+const ITEM = 'ff-nav-item ff-identidade-modulo ff-transicao flex w-full text-texto';
+const ITEM_ABERTO = 'min-h-11 items-center gap-3 px-3 py-2 text-left';
 // Recolhido: 44 px na gaveta (toque); 40 px na barra fixa do desktop (≥ 900 px).
 const ITEM_RECOLHIDO = 'min-h-11 min-[900px]:min-h-10 items-center justify-center';
-const GRADE = 'ff-nav-grade';
+const LISTA = 'ff-nav-lista';
 
 export function NavLateral({
   nav,
@@ -75,10 +77,11 @@ export function NavLateral({
         <SeletorDeModulo nav={nav} atual={modulo} recolhido={recolhido} />
       </div>
 
-      {/* Barra de rolagem fina: com a barra clássica (Windows) ainda cabem as duas colunas quando o menu rola. */}
+      {/* Barra de rolagem fina: com a barra clássica (Windows), o nome ainda cabe na linha quando o menu rola. */}
       <nav aria-label="Menu" className={`min-h-0 flex-1 overflow-y-auto pb-4 [scrollbar-width:thin] ${recolhido ? 'px-2' : 'px-1.5'}`}>
         {noHub ? (
-          <ul className={`${GRADE} mt-3`} data-recolhido={recolhido}>
+          <ul className={`${LISTA} mt-3`} data-recolhido={recolhido}>
+            {/* No Início, cada área com o quadrado de cor cheia, como nos Ajustes do iPhone. */}
             <li>
               <ItemDoMenu
                 href={nav.inicio.href}
@@ -87,13 +90,14 @@ export function NavLateral({
                 cor={COR.inicio}
                 ativo={hrefAtivo === nav.inicio.href}
                 recolhido={recolhido}
+                quadrado
               />
             </li>
             {nav.modulos
               .filter((m) => m.href)
               .map((m) => (
                 <li key={m.chave}>
-                  <ItemDoMenu href={m.href!} rotulo={m.nome} icone={m.icone} cor={m.cor} ativo={false} recolhido={recolhido} />
+                  <ItemDoMenu href={m.href!} rotulo={m.nome} icone={m.icone} cor={m.cor} ativo={false} recolhido={recolhido} quadrado />
                 </li>
               ))}
           </ul>
@@ -102,7 +106,7 @@ export function NavLateral({
             // Grupo de um item só que repete o nome ("INSUMOS › Insumos"): fica só o item, sem o rótulo que abre e fecha. Se o rótulo diz
             // outra coisa ("RELATÓRIOS › Consumo e conciliação"), ele fica: é ele que mostra onde a tela mora.
             g.itens.length === 1 && g.itens[0].rotulo.toLowerCase() === g.rotulo.toLowerCase() ? (
-              <ul key={g.rotulo} className={`${GRADE} mt-3`} data-recolhido={recolhido}>
+              <ul key={g.rotulo} className={`${LISTA} mt-3`} data-recolhido={recolhido}>
                 <li>
                   <ItemDoMenu
                     href={g.itens[0].href}
@@ -161,6 +165,7 @@ function ItemDoMenu({
   cor,
   ativo,
   recolhido,
+  quadrado = false,
 }: {
   href: string;
   rotulo: string;
@@ -168,6 +173,8 @@ function ItemDoMenu({
   cor: string;
   ativo: boolean;
   recolhido: boolean;
+  /** Área no Início: o ícone no quadrado de cor cheia (desenho claro), como nos Ajustes do iPhone. */
+  quadrado?: boolean;
 }) {
   return (
     <Link
@@ -177,9 +184,13 @@ function ItemDoMenu({
       className={`${ITEM} ${recolhido ? ITEM_RECOLHIDO : ITEM_ABERTO}`}
       style={{ '--cor-modulo': cor } as CSSProperties}
     >
-      <Icone nome={icone} size={recolhido ? 18 : 20} className="ff-nav-icone shrink-0" />
+      {quadrado ? (
+        <IconeDoModulo icone={icone} cor={cor} tamanho={28} variante="cheio" />
+      ) : (
+        <Icone nome={icone} size={recolhido ? 18 : 20} className="ff-nav-icone shrink-0" />
+      )}
       {/* O nome de uma área é longo ("Estoque e Movimentações"): quebra em quantas linhas precisar, nunca corta. */}
-      <span className={recolhido ? 'sr-only' : 'ff-nav-rotulo block w-full min-w-0 leading-tight'}>{rotulo}</span>
+      <span className={recolhido ? 'sr-only' : 'ff-nav-rotulo block min-w-0 flex-1 leading-snug'}>{rotulo}</span>
     </Link>
   );
 }
@@ -206,24 +217,23 @@ function Grupo({
           <Icone nome={icone} size={13} aria-hidden className="ff-nav-icone" />
           <span className="sr-only">{rotulo}</span>
         </div>
-        <ul className={`${GRADE} mt-1`} data-recolhido>{children}</ul>
+        <ul className={`${LISTA} mt-1`} data-recolhido>{children}</ul>
       </div>
     );
   }
   return (
     <div className="ff-identidade-modulo mt-4" style={{ '--cor-modulo': cor } as CSSProperties}>
+      {/* Cabeçalho de seção da barra lateral da Apple: o nome em letra normal (sem caixa alta) e a seta de abrir e fechar. */}
       <button
         type="button"
         aria-expanded={aberto}
         onClick={() => setAberto((v) => !v)}
-        className="ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[7px] px-1.5 text-[11px] font-semibold uppercase tracking-[0.11em] text-suave hover:text-texto min-[900px]:min-h-8"
+        className="ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[7px] px-3 text-[13px] font-semibold text-suave hover:text-texto min-[900px]:min-h-8"
       >
-        <Icone nome={icone} size={13} aria-hidden className="ff-nav-icone shrink-0" />
-        {/* avoid-ai-design-ignore: SD4 — grupo do menu em caixa alta é pedido do contrato do shell (só aqui e no hub). */}
         <span className="min-w-0 flex-1 py-1 text-left leading-snug">{rotulo}</span>
         <ChevronDown size={14} aria-hidden className={`shrink-0 transition-transform ${aberto ? '' : '-rotate-90'}`} />
       </button>
-      {aberto && <ul className={`${GRADE} mt-1`}>{children}</ul>}
+      {aberto && <ul className={`${LISTA} mt-1`}>{children}</ul>}
     </div>
   );
 }
