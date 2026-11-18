@@ -91,7 +91,7 @@ export function FormPlanejar({
       )}
       {bloqueio && <p className="text-sm text-suave">{bloqueio}</p>}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
+      <div data-barra-fixa className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <span className="text-[13px] tabular-nums text-suave">{lista.prontos === 0 ? 'Nenhum insumo ainda' : lista.prontos === 1 ? '1 insumo' : `${lista.prontos} insumos`}</span>
           <BotaoEnviar pendente="Planejando…" disabled={!!bloqueio} className="min-w-[160px]">

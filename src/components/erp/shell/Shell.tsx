@@ -23,6 +23,7 @@ import { assinaturaDaPreferencia, CaixaDeAula, GavetaDeAjuda, PerguntaDasDicas, 
 import { ProvedorDosPontos, type TelaNoCard } from './pontos';
 import { IndicadorDeNavegacao } from './indicador-navegacao';
 import { acaoGuardarMenu } from './acoes';
+import { BarraDeAbas } from './BarraDeAbas';
 import { BuscaGlobal } from './BuscaGlobal';
 import { MenuUsuario } from './MenuUsuario';
 import { NavLateral, type EstadoDaNav } from './NavLateral';
@@ -370,6 +371,9 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
             <ContextoDaCaixa.Provider value={caixa}>{children}</ContextoDaCaixa.Provider>
           </main>
         </div>
+
+        {/* Abas do celular (A3, decisão 532): depois do conteúdo na ordem do Tab; só abaixo de 640 px (regras em tokens.css). */}
+        <BarraDeAbas nav={nav} caminho={caminho} gavetaAberta={gaveta} aoAbrirMais={() => setGaveta(true)} />
 
         {entradaDaTela && ajuda && (
           <GavetaDeAjuda

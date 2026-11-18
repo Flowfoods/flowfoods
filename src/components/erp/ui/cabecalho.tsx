@@ -1,12 +1,11 @@
 /**
  * Cabeçalho de página (Ref.2) e o quadrado do ícone do módulo.
  *
- * Quadrado de 40 px com o ícone na cor do módulo · h1 editorial em Gelasio
- * (29 px/1,2, peso regular: padrão aprovado em 09/11/2026; 25 px no celular) ·
- * subtítulo com contexto e contagem ("Rede Completa · 43 insumos") · a ação
- * principal à direita (uma por tela) · a caixa "Como funciona" (quando a
- * pessoa ainda não fechou) · busca e filtros logo abaixo. Um h1 por tela. A
- * identidade da área também orienta menu/cards; o conteúdo operacional é neutro.
+ * Título grande da Apple (decisão 532, sobre o protótipo aprovado em 18/11/2026): h1 em Gelasio 34 px/1,15, peso regular,
+ * sem o quadrado da área (até então, 40 px ao lado de um título de 29 px, 25 no celular, padrão de 09/11) · subtítulo com
+ * contexto e contagem ("Rede Completa · 43 insumos") · a ação principal à direita (uma por tela) · a caixa "Como funciona"
+ * (quando a pessoa ainda não fechou) · busca e filtros logo abaixo. Um h1 por tela. A identidade da área fica no menu, nos
+ * cards e na aba do celular; o conteúdo operacional é neutro.
  */
 
 import type { CSSProperties, ReactNode } from 'react';
@@ -46,14 +45,16 @@ export function IconeDoModulo({
 }
 
 export function PageHeader({
-  icone,
-  cor,
   titulo,
   subtitulo,
   acao,
   aviso,
   children,
 }: {
+  /**
+   * A área da tela. Desde a decisão 532 o cabeçalho não desenha mais o quadrado; as telas seguem dizendo a área (contrato
+   * de 29/10), e quem quiser a identidade de volta no cabeçalho a tem aqui.
+   */
   icone: ChaveIcone;
   cor: string;
   titulo: string;
@@ -68,14 +69,11 @@ export function PageHeader({
   return (
     <header className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <div className="flex min-w-0 items-center gap-3.5">
-          <IconeDoModulo icone={icone} cor={cor} />
-          <div className="min-w-0">
-            <h1 className="break-words font-display text-[25px] font-normal leading-[1.2] tracking-[-0.02em] [text-wrap:balance] sm:text-[29px]">
-              {titulo}
-            </h1>
-            {subtitulo && <p className="mt-0.5 break-words text-sm text-suave">{subtitulo}</p>}
-          </div>
+        <div className="min-w-0">
+          <h1 className="break-words font-display text-[34px] font-normal leading-[1.15] tracking-[-0.01em] [text-wrap:balance]">
+            {titulo}
+          </h1>
+          {subtitulo && <p className="mt-1 break-words text-[13px] text-suave sm:text-sm">{subtitulo}</p>}
         </div>
         {/* Sozinha numa linha estreita (celular), a ação encolhe e os botões quebram em vez de vazar da tela; a quebra entre o
             título e a ação não muda (ela se decide pela largura cheia de cada um). */}

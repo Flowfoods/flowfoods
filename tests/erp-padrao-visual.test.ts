@@ -273,9 +273,9 @@ describe('padrão visual · geometria', () => {
     expect(css).toMatch(/@media \(pointer: coarse\) \{[\s\S]*?min-height: 44px;/);
   });
 
-  it('título editorial em Gelasio 29 px/1,2 (25 no celular); selo sempre sobre superfície opaca', () => {
+  it('título grande em Gelasio 34 px/1,15 (decisão 532; antes 29 px, 25 no celular); selo sempre sobre superfície opaca', () => {
     const h = renderToStaticMarkup(createElement(PageHeader, { icone: 'inicio', cor: COR.inicio, titulo: 'Título' }));
-    expect(h).toMatch(/<h1 class="[^"]*font-display text-\[25px\] font-normal leading-\[1\.2\][^"]*sm:text-\[29px\]/);
+    expect(h).toMatch(/<h1 class="[^"]*font-display text-\[34px\] font-normal leading-\[1\.15\][^"]*"/);
     for (const tom of ['ok', 'alerta', 'erro', 'neutro'] as const) {
       expect(renderToStaticMarkup(createElement(Selo, { tom, children: 'Texto' })), tom).toContain('bg-painel');
     }

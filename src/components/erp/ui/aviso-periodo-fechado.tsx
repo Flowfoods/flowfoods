@@ -46,7 +46,8 @@ export function AvisoDoPeriodoFechado({
     const ajustar = () => {
       const el = caixa.current;
       if (!el) return;
-      const barras = Array.from(document.querySelectorAll('[data-barra-fixa]'))
+      // A barra de abas do celular (decisão 532) também cobre o pé, nas telas sem barra fixa; escondida, mede 0 e sai da conta.
+      const barras = Array.from(document.querySelectorAll('[data-barra-fixa], [data-barra-de-abas]'))
         .map((b) => b.getBoundingClientRect())
         .filter((r) => r.height > 0 && r.top < window.innerHeight);
       const limite = barras.length ? Math.min(...barras.map((r) => r.top)) : window.innerHeight;
