@@ -4463,7 +4463,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
     - a coluna da direita do Acesso, sem `min-w-0`;
     - a coluna "Situação" da lista de insumos, que agora aparece a partir de 1280 px; abaixo disso, a situação vai na linha do nome.
   - O quarto é antigo e também foi corrigido: na Nova ficha em 320 px, a coluna ao lado da foto encolhia até 78 px e o botão "Escolher foto" saía da tela.
-    - Agora ela não encolhe abaixo de 8rem, um pouco mais que o maior texto do botão (123 px). Onde não cabe ao lado da miniatura, desce para a linha de baixo: abaixo de 375 px; dali para cima, o layout é o de antes.
+    - Agora ela não encolhe abaixo de 8rem, um pouco mais que o maior texto do botão (123 px). Onde não cabe ao lado da miniatura, desce para a linha de baixo: abaixo de uns 370 px pela conta da largura (medido: embaixo a 320 e 360 px, ao lado a 375 px); dali para cima, o layout é o de antes.
     - O mínimo é fixo, e não o do texto, para a coluna não pular de lugar quando o botão muda de texto.
     - Pelo mesmo motivo, o texto durante o envio virou "Enviando…": "Enviando a foto…" tinha 152 px e fazia a coluna descer e voltar a 360–390 px.
   - Contra o master, nenhuma tela passou a rolar de lado. O Acesso em 320 px deixou de rolar (22 px → 0), e a Nova ficha em 320 px caiu de 11 para 2 px. Os 2 px vêm do rótulo "Principal" da validade e aparecem igual com a Libre Franklin. Compras em 1024 px rola 154 px, contra 155 com a Libre Franklin.
