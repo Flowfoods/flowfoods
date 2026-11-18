@@ -101,6 +101,10 @@ const config: Config = {
         'sobre-cmv-vermelho': token('sobre-cmv-vermelho', '255 253 248'),
         linha: 'var(--ff-linha, #3b3d35)',
         'linha-forte': 'var(--ff-linha-forte, rgb(238 234 224 / 0.2))',
+        // Visual da Apple (decisão 530): preenchimento dos controles (já com a opacidade) e o polegar do segmentado.
+        preenchimento: 'var(--ff-preenchimento, rgb(238 234 224 / 0.11))',
+        'preenchimento-forte': 'var(--ff-preenchimento-forte, rgb(238 234 224 / 0.17))',
+        polegar: token('polegar', '74 75 68'),
       },
       // Geometria aprovada (tokens em tokens.css): cartão 16, modal 19, popover 13, navegação 12, botão 10, campo 9.
       borderRadius: {
@@ -112,8 +116,9 @@ const config: Config = {
         campo: 'var(--ff-raio-campo, 9px)',
       },
       fontFamily: {
-        // Títulos em Gelasio, texto em Libre Franklin — o site inteiro e o portal.
-        sans:    ['var(--font-franklin)', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        // Títulos em Gelasio, texto em Libre Franklin — o site inteiro e o portal. No ERP (`.ff-app`), o texto usa a letra do
+        // sistema da Apple quando houver (decisão 530; `--ff-fonte-texto` em tokens.css); fora dele, a variável não existe.
+        sans:    ['var(--ff-fonte-texto, var(--font-franklin))', 'Helvetica Neue', 'Arial', 'sans-serif'],
         display: ['var(--font-gelasio)',  'Georgia', 'serif'],
         serifa:  ['var(--font-gelasio)',  'Georgia', 'serif'],
         franklin: ['var(--font-franklin)', 'Helvetica Neue', 'Arial', 'sans-serif'],

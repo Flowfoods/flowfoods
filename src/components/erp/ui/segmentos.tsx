@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * Controle segmentado de escolha única (rádio de verdade, por baixo): trilho
- * com borda, opção marcada em `forte`, foco visível na opção. Usado onde a
- * escolha é curta e cabe numa linha (unidade, situação ao nascer).
+ * Controle segmentado de escolha única (rádio de verdade, por baixo), no visual da Apple (decisão 530): trilho preenchido,
+ * opção marcada num polegar claro com sombra, contorno fino e em negrito, todas as opções na cor do texto, foco visível na
+ * opção. Usado onde a escolha é curta e cabe numa linha (unidade, situação ao nascer). Com erro, o trilho ganha a borda do
+ * erro; sem erro, a borda transparente só aparece no alto contraste do aparelho (cores forçadas).
  */
 
 export function Segmentos<T extends string>({
@@ -35,7 +36,7 @@ export function Segmentos<T extends string>({
         {obrigatorio && <span className="font-normal text-suave"> (obrigatório)</span>}
       </legend>
       <div
-        className={`grid gap-1 rounded-[10px] border bg-campo p-1 ${invalido ? 'border-erro' : 'border-linha-forte'}`}
+        className={`grid gap-0.5 rounded-[10px] border bg-preenchimento p-[3px] ${invalido ? 'border-erro' : 'border-transparent'}`}
         style={{ gridTemplateColumns: `repeat(${opcoes.length}, minmax(0, 1fr))` }}
       >
         {opcoes.map(([v, rotulo]) => (
@@ -49,7 +50,7 @@ export function Segmentos<T extends string>({
               required={obrigatorio}
               className="peer sr-only"
             />
-            <span className="ff-transicao flex min-h-9 cursor-pointer items-center justify-center rounded-[7px] px-2 text-center text-[13px] text-suave hover:text-texto peer-checked:bg-forte peer-checked:font-semibold peer-checked:text-texto peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-acento">
+            <span className="ff-transicao flex min-h-9 cursor-pointer items-center justify-center rounded-[8px] px-2 text-center text-[13px] font-medium text-texto hover:bg-preenchimento peer-checked:bg-polegar peer-checked:font-semibold peer-checked:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_2px_6px_rgb(0_0_0/0.1)] peer-checked:ring-1 peer-checked:ring-linha-forte peer-checked:hover:bg-polegar peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-acento">
               {rotulo}
             </span>
           </label>

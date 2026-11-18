@@ -29,6 +29,16 @@ raios e movimento abaixo valem para o shell e os componentes compartilhados
 mesmos tokens). Site e Portal do cliente (`.ff-site`) não mudam: a paleta
 escura deles deixou de ser a do ERP (o teste `paleta-escura` trava as duas).
 
+**Revisão de 18/11/2026 (visual da Apple, decisão 530):** Rodolfo pediu o
+layout no padrão Apple (Human Interface Guidelines) e aprovou o protótipo com
+as escolhas marcadas: letra do sistema da Apple no texto, títulos em Gelasio,
+barras translúcidas. A identidade continua: creme, quase preto, o vermelho
+como acento e Gelasio nos títulos. Entra por fatias: **A1 fundação** (letra,
+barra do topo translúcida, segmentado, busca e botão secundário, aplicada);
+A2 menu lateral em lista; A3 iPhone (barra de abas, título grande); A4 listas
+agrupadas e formulários no estilo dos Ajustes; A5 folhas. Só no `.ff-app`:
+site e Portal não mudam. Onde esta revisão e a de 09/11 divergem, vale esta.
+
 ## Tokens (`src/components/erp/tokens.css`, escopo `.ff-app`)
 
 | Token | Claro | Escuro | Uso |
@@ -49,6 +59,10 @@ escura deles deixou de ser a do ERP (o teste `paleta-escura` trava as duas).
 | `atencao` / `atencao-fundo` | #926626 / #FAF2E1 | #E5BB76 / #393222 | idem |
 | `bloqueio` | #262A23 a 32 % | preto a 56 % | fundo de modal e gaveta (a página segue reconhecível) |
 | `sombra` | 0 18px 60px, 13 % | 0 18px 60px, 40 % | só no que flutua |
+| `preenchimento` / `-forte` | #767264 a 13 % / 20 % | #EEEAE0 a 11 % / 17 % | trilho do segmentado, campo de busca, botão secundário (decisão 530) |
+| `polegar` | #FFFEFB | #4A4B44 | opção marcada do segmentado |
+| `material` | superfície a 92 % | superfície a 92 % | barra translúcida, com borrão |
+| `lupa` | lupa em `suave` | lupa em `suave` | ícone do campo de busca (imagem de fundo) |
 
 Farol e séries dos gráficos não mudaram, com uma exceção: `farol-vermelho` no
 escuro passou de #F5424D para #F4656C (4,24:1 → 5,09:1 sobre a nova superfície).
@@ -66,7 +80,10 @@ palavras e controles próprios; "Em breve" é neutro (`COR.futuro`), sem cor de
 
 ## Tipo
 
-Libre Franklin em tudo; Gelasio nos títulos editoriais: h1 da página
+Texto na letra do sistema (decisão 530): a SF no iPhone, iPad e Mac; nos outros
+aparelhos, a do sistema deles (Segoe UI no Windows, Roboto no Android); a
+Libre Franklin fica de reserva (`--ff-fonte-texto`). Gelasio nos títulos
+editoriais: h1 da página
 (29 px/1,2, peso regular; 25 px no celular), título de diálogo e de gaveta
 (20 px), número grande e título de estado vazio (sempre
 `lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 20 · 25–29; título de
@@ -160,11 +177,31 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   iFood e Integração, Analytics. Os termos não aparecem, não mudam o
   primeiro resultado de antes e nunca criam destino: módulo sem tela não
   vira resultado.
-- **Barra superior** 64 px, na cor da superfície, borda inferior, sem blur.
+- **Barra superior** 64 px, borda inferior, no **material translúcido**
+  (decisão 530): a superfície a 92 % com borrão (`saturate(180%) blur(20px)`),
+  num `::before` por trás do conteúdo (no próprio elemento, o borrão tiraria
+  do lugar os popovers fixos da barra). 92 % é o mínimo para o texto
+  secundário da barra ficar com 4,5:1 mesmo com conteúdo preto ou branco
+  rolando por baixo. Sem suporte ao borrão ou com a transparência reduzida no
+  aparelho (nos navegadores que informam a preferência), a barra é sólida. O
+  próprio cabeçalho nunca leva `transform`, `filter`, `will-change`, `contain`
+  nem `content-visibility`, nem com variante (`lg:`) ou valor arbitrário
+  (`[transform:…]`):
+  tiram os painéis fixos do lugar. Sob o ponteiro ou com o menu
+  aberto, o texto dos botões da barra vai para `texto`.
 - **Botão** 40 px (44 no celular), padding 16, raio 10, 14 px/600. Um
-  primário por tela. Variantes: primario (texto `sobre-acao`), secundario (na
-  cor da superfície), perigo (sob o ponteiro, `destaque`), fantasma
-  (`classeDeBotao`).
+  primário por tela. Variantes: primario (texto `sobre-acao`), secundario (o
+  cinza da Apple: `preenchimento`, borda transparente que só aparece no alto
+  contraste, texto na cor do texto), perigo (sob o ponteiro, `destaque`),
+  fantasma (`classeDeBotao`).
+- **Controle segmentado** (`Segmentos`, `FiltroEmLinks`): trilho em
+  `preenchimento` com borda transparente (borda `erro` só com erro), opção
+  marcada num polegar claro (`polegar`) com sombra, contorno fino em
+  `linha-forte` e 600; todas as opções na cor do texto; foco visível na opção.
+- **Campo de busca** (todo `input[type=search]` do ERP): `preenchimento`, sem
+  borda, raio 10, lupa à esquerda; com `aria-invalid`, a borda `erro` volta.
+  Texto de exemplo no texto a 75 %: sobre o preenchimento, o `suave` daria
+  4,22:1 no fundo creme.
 - **Campo** 42 px (44 no celular, fonte 16 px), raio 9, borda `linha-forte`,
   fundo `campo`, rótulo persistente 13 px/500, erro embaixo ligado por
   `aria-describedby`. Texto de exemplo em `suave` inteiro (a 70 % caía a 3:1).
@@ -256,6 +293,11 @@ popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | Assinatura `Marca` mantida | não há arquivo de logo oficial no repositório; a marca textual da prévia não a substitui | 2026-11-11 |
 | "Em breve" como catálogo de apresentação, só para público autorizado (hoje, o nível 1) | regra do plano de 11/11: futuro não aparece a todo perfil; o público do parceiro é decisão do proprietário, ainda em aberto | 2026-11-12 |
 | Selo sobre superfície opaca; tinta só no `cheio`, pelos pares aprovados | `ok` a 15 % dava 4,28:1 com a cor nova; o fundo opaco tira o selo da conta de onde ele pousa | 2026-11-11 |
+| Visual da Apple no ERP, em fatias (decisão 530); substitui "sem vidro" e a Libre Franklin no texto | pedido de Rodolfo e protótipo aprovado; a identidade (creme, vermelho, Gelasio) continua | 2026-11-18 |
+| Material da barra a 92 %, com o borrão num `::before` | menos opaco, o texto secundário cai abaixo de 4,5:1 com conteúdo escuro por baixo; no próprio elemento, o borrão desloca os popovers fixos | 2026-11-18 |
+| Texto de exemplo da busca no texto a 75 % | o `suave` sobre o preenchimento dava 4,22:1 no fundo creme | 2026-11-18 |
+| Na barra translúcida, sob o ponteiro, o texto vai para `texto` | o `suave` e o texto a 75 % sobre o realce caíam a 4,17:1 e 4,34:1 no pior caso | 2026-11-18 |
+| Borda transparente no secundário, no trilho do filtro e na busca da barra | some no visual normal e devolve o contorno no alto contraste (cores forçadas) | 2026-11-18 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,

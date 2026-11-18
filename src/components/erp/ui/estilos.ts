@@ -11,8 +11,10 @@ const BASE =
 
 const VARIANTES: Record<Variante, string> = {
   primario: 'bg-acao text-sobre-acao hover:bg-acao-hover',
-  // Sobre o fundo da página o botão é uma superfície (como na prévia aprovada); dentro de um painel, some na dele.
-  secundario: 'border border-linha-forte bg-painel text-texto hover:border-texto/35 hover:bg-forte',
+  // Botão cinza da Apple (decisão 530): preenchimento sem borda visível, texto na cor do texto (o vermelho fica só no principal
+  // e no perigo). O nome do botão é o que o identifica; o preenchimento aparece sobre a página e sobre o painel. A borda
+  // transparente só aparece no alto contraste do aparelho (cores forçadas), onde o botão ganha contorno.
+  secundario: 'border border-transparent bg-preenchimento text-texto hover:bg-preenchimento-forte',
   // Sob o ponteiro, a superfície de destaque (par aprovado do vermelho): a 10 % sobre o fundo da página o texto caía a 4,35:1.
   perigo: 'border border-erro/45 text-erro hover:bg-destaque',
   fantasma: 'text-suave hover:bg-texto/5 hover:text-texto',

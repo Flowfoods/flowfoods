@@ -146,7 +146,11 @@ export function CampoFoto({
             <span className="px-3 text-center" role="status">{remover ? 'A foto será removida ao salvar.' : temFotoAtual ? 'Foto salva. A visualização não está disponível neste acesso.' : 'Sem foto'}</span>
           )}
         </div>
-        <div className="min-w-0 flex-1 space-y-2">
+        {/* A coluna não encolhe abaixo de 8rem, um pouco mais que o maior texto do botão ("Escolher foto", "Enviando…",
+            "Trocar foto"): onde não cabe ao lado da miniatura, ela desce para a linha de baixo. O mínimo é fixo, e não o do
+            texto, para a coluna não pular de lugar quando o texto do botão muda. Com min-w-0, a 320 px ela ficava com 78 px e o
+            botão saía da tela. */}
+        <div className="min-w-32 flex-1 space-y-2">
           {enviada && !remover && <input type="hidden" name="fotoNova" value={enviada} />}
           <input
             ref={entrada}
@@ -161,7 +165,8 @@ export function CampoFoto({
               'secundario',
               'cursor-pointer peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-acento',
             )}>
-            {preparando ? 'Enviando a foto…' : mostrada || (temFotoAtual && !remover) ? 'Trocar foto' : 'Escolher foto'}
+            {/* Curto de propósito: cabe no mínimo da coluna (8rem) como os outros dois textos. */}
+            {preparando ? 'Enviando…' : mostrada || (temFotoAtual && !remover) ? 'Trocar foto' : 'Escolher foto'}
           </label>
           {temPontoDaFoto ? (
             <div className="mt-1.5 flex items-center gap-1">

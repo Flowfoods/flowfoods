@@ -582,7 +582,8 @@ export function TelaListaInsumos({
               <th scope="col" className="hidden h-10 px-3 text-right font-semibold xl:table-cell">
                 Outras embalagens
               </th>
-              <th scope="col" className="hidden h-10 px-3 font-semibold lg:table-cell">
+              {/* Com o menu lateral aberto, a coluna só cabe a partir de 1280 px; abaixo, a situação vai na linha do nome. */}
+              <th scope="col" className="hidden h-10 px-3 font-semibold xl:table-cell">
                 Situação
               </th>
               {comAcoes && (
@@ -610,7 +611,7 @@ export function TelaListaInsumos({
                     {' · '}
                     {conservacaoDaLinha(i)}
                     {i.marcaReferencia && ` · Marca: ${i.marcaReferencia}`}
-                    <span className="lg:hidden">{!i.ativo && ' · Desativado'}</span>
+                    <span className="xl:hidden">{!i.ativo && ' · Desativado'}</span>
                   </div>
                   <MotivosDaLinha i={i} />
                 </td>
@@ -628,7 +629,7 @@ export function TelaListaInsumos({
                   <Custo i={i} />
                 </td>
                 <td className="hidden px-3 py-2 text-right text-suave xl:table-cell">{i.variantes > 0 ? i.variantes : '—'}</td>
-                <td className="hidden px-3 py-2 lg:table-cell">
+                <td className="hidden px-3 py-2 xl:table-cell">
                   {i.ativo ? <Selo tom="ok">Ativo</Selo> : <Selo>Desativado</Selo>}
                 </td>
                 {comAcoes && (

@@ -76,7 +76,9 @@ export function PageHeader({
             {subtitulo && <p className="mt-0.5 break-words text-sm text-suave">{subtitulo}</p>}
           </div>
         </div>
-        {acao && <div className="flex shrink-0 flex-wrap items-center gap-2">{acao}</div>}
+        {/* Sozinha numa linha estreita (celular), a ação encolhe e os botões quebram em vez de vazar da tela; a quebra entre o
+            título e a ação não muda (ela se decide pela largura cheia de cada um). */}
+        {acao && <div className="flex min-w-0 flex-wrap items-center gap-2">{acao}</div>}
       </div>
       {aviso}
       <CaixaDaTela />

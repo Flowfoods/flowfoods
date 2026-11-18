@@ -48,7 +48,7 @@ export function MenuUsuario({
     <Popover
       rotulo={`Conta de ${usuario.nome}`}
       largura="w-72"
-      classeDoBotao="ff-transicao flex min-h-11 items-center gap-2.5 rounded-botao pl-1 pr-1 hover:bg-texto/5 aria-expanded:bg-texto/5 lg:pr-2.5"
+      classeDoBotao="group ff-transicao flex min-h-11 items-center gap-2.5 rounded-botao pl-1 pr-1 hover:bg-texto/5 aria-expanded:bg-texto/5 lg:pr-2.5"
       conteudoDoBotao={
         <>
           <span
@@ -61,7 +61,9 @@ export function MenuUsuario({
             <span className="block max-w-[10rem] truncate text-[13px] font-medium leading-tight text-texto">
               {usuario.nome}
             </span>
-            <span className="block max-w-[10rem] truncate text-[12px] leading-tight text-suave">{usuario.papel}</span>
+            {/* Sob o ponteiro ou com o menu aberto, o papel vai para a cor do texto: na barra translúcida (decisão 530), o `suave`
+                sobre o realce cairia abaixo de 4,5:1 com conteúdo escuro rolando por baixo. */}
+            <span className="block max-w-[10rem] truncate text-[12px] leading-tight text-suave group-hover:text-texto group-aria-expanded:text-texto">{usuario.papel}</span>
           </span>
         </>
       }
