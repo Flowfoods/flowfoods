@@ -32,7 +32,7 @@ export function Painel({
   semRespiro?: boolean;
 }) {
   return (
-    <section id={id} className={`min-w-0 rounded-cartao border border-linha bg-painel ${className}`}>
+    <section id={id} className={`ff-painel min-w-0 rounded-cartao border border-linha bg-painel ${className}`}>
       {(titulo || acessorio) && (
         <header className="flex min-h-12 items-center justify-between gap-3 border-b border-linha px-4 py-2.5 sm:px-5">
           {titulo && (

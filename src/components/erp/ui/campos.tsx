@@ -13,6 +13,8 @@ export const CAMPO =
   'ff-transicao block min-h-11 w-full rounded-campo border border-linha-forte bg-campo px-3 py-2 text-sm text-texto placeholder:text-suave hover:border-texto/30 disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-erro sm:min-h-[42px]';
 /** Caixa de seleção nativa (checkbox/radio) na cor da ação. */
 export const MARCAR = 'h-5 w-5 shrink-0 accent-[rgb(var(--ff-acao))]';
+/** Interruptor da Apple (decisão 533): `input type="checkbox" role="switch"` para o que liga e desliga (estilo em tokens.css). */
+export const INTERRUPTOR = 'ff-interruptor';
 /** Ajuda curta embaixo do campo. */
 export const AJUDA = 'mt-1.5 text-[12px] text-suave';
 

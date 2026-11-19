@@ -4572,3 +4572,30 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - Abaixo de 640 px o título grande ocupa mais altura que antes.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 533. 2026-11-19 · Visual da Apple no ERP, fatia A4: listas agrupadas no celular e o interruptor dos Ajustes
+
+**Fonte e recorte:** quarta fatia do visual da Apple aprovado por Rodolfo em 18/11/2026 (decisões 530 a 532); em 18/11 ele pediu que o plano seguisse com todas as fases sem nova pergunta. O protótipo mostrava, no iPhone, a lista de insumos como lista agrupada (linhas com o nome, o apoio e a seta, separadores recuados) e, no formulário, "onde fica" ligado e desligado por interruptores. Só aparência: sem regra, permissão, destino, nome de campo, valor enviado, schema, migration, dado ou infraestrutura.
+
+1. **Listas agrupadas no celular** (abaixo de 640 px), nas listas que viram linhas: insumos, fichas e notas de compra.
+   - O separador começa onde começa o texto (16 px), como nos Ajustes (`.ff-lista-agrupada`).
+   - A linha que abre o detalhe termina numa seta (`ff-seta-da-linha`), dentro do próprio link.
+   - O nome vai a 17 px/500 e as linhas de apoio, a 13 px (antes, o tamanho herdado e 12 px).
+   - O painel em volta dessas listas perde a borda e fica com o raio de 12 px do grupo; com cores forçadas, a borda volta. No computador, nada muda: lá elas são tabela.
+2. **Interruptor dos Ajustes** (`INTERRUPTOR`, `.ff-interruptor`) para o que liga e desliga:
+   - "Onde fica" da ficha e "prazo depois de aberto" do insumo. Antes era uma caixa de marcar à esquerda; agora, o lugar e, na ponta da linha, o interruptor. A linha inteira continua sendo o alvo do toque.
+   - Continua um `input type="checkbox"`, agora com `role="switch"`. O nome (`aceita_X`) e o valor enviado não mudam, e o servidor lê igual.
+   - 51 × 31 px como no iPhone, ligado no verde do `ok` com o polegar branco. O desligado leva um contorno no `suave` para ter 3:1 de componente; o cinza da Apple sozinho fica perto de 1,2:1.
+   - Com cores forçadas, volta a ser a caixa do sistema. Com movimento reduzido, a regra geral tira a transição.
+   - O "Principal" da ficha segue rádio.
+3. **"Principal" a 320 px:** as colunas do celular de "onde fica" passaram de 5,5 + 6,5 rem para 5 + 6 rem. O rótulo, que passava 2 px da tela (limite antigo registrado na decisão 530), agora cabe.
+
+**Verificação:**
+- **Testes:** 9 em `tests/erp-listas-agrupadas.test.ts`. Cobrem as três listas (classe, nome em 17 px, seta dentro do link), o separador, o painel no celular e no alto contraste, o interruptor (tamanho, ligado, desligado, foco, cores forçadas e movimento reduzido), o contraste nos dois temas, a marcação da ficha (quatro interruptores com os nomes de antes, o rádio do "Principal" e as colunas novas) e a do insumo. Em `erp-padrao-visual`, o painel passou a levar `ff-painel`. Com os arquivos de listas, fichas, insumos, validade, navegação e visual, 418 testes passam em 15 arquivos.
+- **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
+
+**Limites:**
+- As outras listas com divisórias (detalhes, compras, fornecedores) seguem como estavam; entram quando a tela delas for revista.
+- Não testado em Safari/iOS de verdade nem com leitor de tela real (o anúncio de "interruptor, ligado/desligado").
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.

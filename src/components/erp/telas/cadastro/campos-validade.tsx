@@ -14,7 +14,7 @@
 
 import { useState } from 'react';
 import { CONSERVACOES, ORDEM_DAS_CONSERVACOES, validadesParaCampos, type Conservacao, type EmQue, type Validades, type EntradaDeValidade } from '@/lib/erp/validade';
-import { AJUDA, CAMPO, Erro, MARCAR } from '../../ui/campos';
+import { AJUDA, CAMPO, Erro, INTERRUPTOR, MARCAR } from '../../ui/campos';
 import { IconeDaConservacao } from './validade';
 
 type Linha = { marcada: boolean; quantidade: string; em: EmQue };
@@ -73,17 +73,20 @@ export function CamposDeValidade({
           const podeSerPrincipal = para === 'insumo' || l.marcada;
           return (
             <li key={c} className="py-2.5">
-              <div className="grid grid-cols-[5.5rem_6.5rem_minmax(0,1fr)] items-center gap-x-2 gap-y-1 sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_6.5rem]">
-                <label className="col-span-3 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm sm:col-span-1 sm:min-h-[42px]">
+              {/* Celular: 5rem + 6rem (antes 5,5 + 6,5) para o "Principal" caber a 320 px; antes ele passava 2 px da tela. */}
+              <div className="grid grid-cols-[5rem_6rem_minmax(0,1fr)] items-center gap-x-2 gap-y-1 sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_6.5rem]">
+                {/* Como nos Ajustes (decisão 533): o lugar e, na ponta, o interruptor que liga e desliga; a linha toda é o alvo. */}
+                <label className="col-span-3 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm sm:col-span-1 sm:min-h-[42px] sm:pr-2">
+                  <IconeDaConservacao conservacao={c} />
+                  <span className="min-w-0 flex-1 text-texto">{nome}</span>
                   <input
                     type="checkbox"
+                    role="switch"
                     name={`aceita_${c}`}
                     checked={l.marcada}
                     onChange={(e) => mudar(c, { marcada: e.target.checked })}
-                    className={MARCAR}
+                    className={INTERRUPTOR}
                   />
-                  <IconeDaConservacao conservacao={c} />
-                  <span className="text-texto">{nome}</span>
                 </label>
                 <div>
                   <label htmlFor={`${idBase}-${chave}`} className="sr-only">
