@@ -86,7 +86,7 @@ describe('Identidade central das áreas no hub e no menu', () => {
       expect(h).toContain('aria-disabled="true"');
       expect(h).toContain('Em breve');
       expect(h).not.toMatch(/href=|<a[ >]|<button|tabindex/);
-      // A grade do menu é de destinos: módulo sem tela não entra nela (aberta nem recolhida).
+      // A lista do menu é de destinos: módulo sem tela não entra nela (aberta nem recolhida).
       expect(noMenu).not.toContain(m.nome);
       expect(menuDoNivel1(true)).not.toContain(m.nome);
     }
@@ -139,7 +139,7 @@ describe('Identidade central das áreas no hub e no menu', () => {
       expect(item).not.toMatch(/aria-disabled|role=/);
       expect(item.includes('Com cadeado.')).toBe(emBreve[n].nome === 'CRM Time' || emBreve[n].nome === 'CRM Clube');
     });
-    // Nomes inteiros: nada de corte por reticências no seletor nem na grade do menu.
+    // Nomes inteiros: nada de corte por reticências no seletor nem na lista do menu.
     expect(h).not.toMatch(/truncate|line-clamp/);
     expect(menu(emUso[2])).not.toMatch(/ff-nav-rotulo[^"]*(truncate|line-clamp)/);
   });

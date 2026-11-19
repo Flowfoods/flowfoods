@@ -7,6 +7,7 @@
  * - recolhido: só os ícones, com o nome para o leitor de tela e na dica;
  * - a linha ativa leva `aria-current` (a aparência dela é conferida em `erp-padrao-visual`).
  */
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -86,5 +87,40 @@ describe('menu lateral em lista (A2)', () => {
       expect(i.tag).toMatch(/title="[^"]+"/);
       expect(i.miolo).toMatch(/<span class="sr-only">/);
     }
+  });
+
+  it('recolhido no Início: o ícone de 18 px de antes, sem o quadrado (o quadrado é só da lista aberta)', () => {
+    const itens = linhas(menu(null, nav.inicio.href, true));
+    expect(itens).toHaveLength(emUso.length + 1);
+    for (const i of itens) {
+      expect(i.miolo).not.toContain('ff-icone-cheio');
+      expect(i.miolo).toMatch(/<svg[^>]*width="18"[^>]*class="[^"]*ff-nav-icone/);
+    }
+  });
+
+  it('a lateral do menu tem 8 px de cada lado: o anel de foco (3 px + 4 px de folga) cabe sem ser cortado pela rolagem', () => {
+    const h = menu(emUso[0], null);
+    expect(h).toMatch(/<nav aria-label="Menu" class="min-h-0 flex-1 overflow-y-auto px-2 pb-4 \[scrollbar-width:thin\]">/);
+    expect(menu(emUso[0], null, true)).toMatch(/<nav aria-label="Menu" class="[^"]*\bpx-2\b/);
+  });
+});
+
+describe('menu lateral em lista (A2) · regras de CSS que o navegador aplica', () => {
+  const css = readFileSync('src/components/erp/tokens.css', 'utf8');
+  const regras = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ seletor: m[1].trim().split('\n').pop()!.trim(), corpo: m[2] }));
+
+  it('uma coluna só: nenhuma outra regra muda as colunas da lista (uma regra posterior não pode voltar à grade)', () => {
+    const colunas = regras.filter((r) => r.seletor.includes('ff-nav-lista') && /grid-template-columns|columns:|grid-auto-flow/.test(r.corpo));
+    expect(colunas.map((r) => r.seletor)).toEqual(['.ff-app .ff-nav-lista']);
+    expect(colunas[0].corpo).toContain('grid-template-columns: minmax(0, 1fr)');
+  });
+
+  it('cores forçadas: o ícone do ativo herda a cor do link (claro sobre o fundo claro do sistema, sumia)', () => {
+    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.ff-app \.ff-nav-item\[aria-current='page'\] \.ff-nav-icone \{\s*color: inherit;\s*\}\s*\}/);
+  });
+
+  it('o quadrado do Início, na linha ativa da mesma cor, ganha um contorno claro', () => {
+    const r = regras.find((x) => x.seletor === ".ff-app .ff-nav-item[aria-current='page'] .ff-icone-cheio");
+    expect(r?.corpo).toContain('0 0 0 1.5px rgb(var(--ff-sobre-acao) / 0.85)');
   });
 });

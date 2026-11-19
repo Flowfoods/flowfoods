@@ -88,7 +88,7 @@ editoriais: h1 da página
 (20 px), número grande e título de estado vazio (sempre
 `lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 20 · 25–29; título de
 painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px; no menu lateral, desde a decisão 531, o grupo é em letra normal). Caixa
-alta só no rótulo de seção do hub e nos grupos do menu.
+alta só no rótulo de seção do hub e nos grupos do seletor de áreas.
 
 ## Espaço e raio
 
@@ -96,7 +96,7 @@ Base 4 px: 4 · 8 · 12 · 16 · 24 · 32. Conteúdo com 16/24/32 px de respiro
 (celular/tablet/desktop), a escala que as telas e as barras fixas dos
 formulários já usam; painel com 16/20. Raios nomeados (tokens `--ff-raio-*`, classes
 `rounded-cartao|modal|popover|nav|botao|campo`): cartão 16, modal e gaveta 19,
-popover 13, célula do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
+popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 (quadrado do ícone 40, segmentado).
 
 ## Padrões

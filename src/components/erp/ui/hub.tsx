@@ -100,7 +100,7 @@ export function HubDeModulos({ secoes }: { secoes: { rotulo: string; descricao?:
         .filter((s) => s.cartoes.length > 0)
         .map((s) => (
           <section key={s.rotulo} aria-label={s.rotulo}>
-            {/* avoid-ai-design-ignore: SD4 — rótulo de seção em caixa alta só no hub e nos grupos do menu (contrato do shell). */}
+            {/* avoid-ai-design-ignore: SD4 — rótulo de seção em caixa alta só no hub e no seletor de áreas (contrato do shell). */}
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-suave">{s.rotulo}</h2>
             {s.descricao && <p className="mt-1 text-[13px] text-suave">{s.descricao}</p>}
             {/* Seção com atalhos: altura natural a partir de 600 px, para abrir um card não esticar os vizinhos (pedido de 30/10).

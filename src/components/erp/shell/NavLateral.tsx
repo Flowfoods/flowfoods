@@ -78,7 +78,8 @@ export function NavLateral({
       </div>
 
       {/* Barra de rolagem fina: com a barra clássica (Windows), o nome ainda cabe na linha quando o menu rola. */}
-      <nav aria-label="Menu" className={`min-h-0 flex-1 overflow-y-auto pb-4 [scrollbar-width:thin] ${recolhido ? 'px-2' : 'px-1.5'}`}>
+      {/* 8 px de lado: o anel de foco (3 px + 4 px de folga) cabe inteiro sem ser cortado pela rolagem do menu. */}
+      <nav aria-label="Menu" className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 [scrollbar-width:thin]">
         {noHub ? (
           <ul className={`${LISTA} mt-3`} data-recolhido={recolhido}>
             {/* No Início, cada área com o quadrado de cor cheia, como nos Ajustes do iPhone. */}
@@ -184,7 +185,8 @@ function ItemDoMenu({
       className={`${ITEM} ${recolhido ? ITEM_RECOLHIDO : ITEM_ABERTO}`}
       style={{ '--cor-modulo': cor } as CSSProperties}
     >
-      {quadrado ? (
+      {/* Recolhido, o Início segue com o ícone de 18 px na tinta da área: o quadrado é só da lista aberta. */}
+      {quadrado && !recolhido ? (
         <IconeDoModulo icone={icone} cor={cor} tamanho={28} variante="cheio" />
       ) : (
         <Icone nome={icone} size={recolhido ? 18 : 20} className="ff-nav-icone shrink-0" />
@@ -291,7 +293,8 @@ export function AreasDoSeletor({ nav, atual, aoEscolher }: { nav: Navegacao; atu
       className="max-h-[max(200px,min(70vh,calc(100dvh-250px)))] overflow-y-auto overscroll-contain max-[899px]:max-h-[max(200px,min(70vh,calc(100dvh-310px)))]"
       onKeyDown={andarPelaGrade}
     >
-      {/* avoid-ai-design-ignore: SD4 — rótulo de grupo em caixa alta, como os grupos do menu (contrato do shell). */}
+      {/* avoid-ai-design-ignore: SD4 — rótulo de grupo em caixa alta no seletor de áreas (contrato do shell; os grupos do menu
+          lateral são em letra normal desde a decisão 531). */}
       <p id={idAreas} className={`${ROTULO_DO_GRUPO} pt-2`}>
         Áreas
       </p>
@@ -323,7 +326,7 @@ export function AreasDoSeletor({ nav, atual, aoEscolher }: { nav: Navegacao; atu
       </ul>
       {emBreve.length > 0 && (
         <>
-          {/* avoid-ai-design-ignore: SD4 — rótulo de grupo em caixa alta, como os grupos do menu (contrato do shell). */}
+          {/* avoid-ai-design-ignore: SD4 — rótulo de grupo em caixa alta no seletor de áreas, como "Áreas" acima. */}
           <p id={idEmBreve} className={`${ROTULO_DO_GRUPO} mt-1.5 border-t border-linha pt-3`}>
             Em breve
           </p>

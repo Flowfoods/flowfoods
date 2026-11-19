@@ -433,6 +433,19 @@ html:has(.ff-app[data-tema='escuro']) {
 .ff-app .ff-nav-item[aria-current='page'] .ff-nav-icone {
   color: rgb(var(--ff-sobre-acao));
 }
+/* O quadrado do Início tem a cor da linha ativa: um contorno claro o separa do preenchimento. */
+.ff-app .ff-nav-item[aria-current='page'] .ff-icone-cheio {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12), 0 0 0 1.5px rgb(var(--ff-sobre-acao) / 0.85);
+}
+/*
+ * Cores forçadas (alto contraste do aparelho): o fundo cheio some e o navegador mantém a cor do ícone (o `svg` preserva a cor
+ * do pai). O ícone claro do ativo cairia sobre o fundo claro do sistema; aqui ele herda a cor do link, como o nome.
+ */
+@media (forced-colors: active) {
+  .ff-app .ff-nav-item[aria-current='page'] .ff-nav-icone {
+    color: inherit;
+  }
+}
 
 /* Aba da área (UX.9): mesmo indicador de 2 px do menu, embaixo. O foco fica por dentro: o trilho rola e cortaria um anel por fora. */
 .ff-app .ff-aba[aria-current='page'] {
