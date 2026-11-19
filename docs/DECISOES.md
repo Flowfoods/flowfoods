@@ -4618,3 +4618,33 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - Nas fichas, Editar e Remover ficam no fim do item, depois do "CMV por canal": pertencem ao item certo, mas longe do nome.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 534. 2026-11-19 · Visual da Apple no ERP, fatia A5: as folhas
+
+**Fonte e recorte:** quinta e última fatia do visual da Apple aprovado por Rodolfo em 18/11/2026 (decisões 530 a 533), com o pedido de seguir todas as fases sem nova pergunta. O protótipo mostrava a folha "Novo insumo": no iPhone, presa embaixo e com os cantos arredondados; no Mac, centralizada; nos dois, a barra com o título no centro. Só o diálogo do kit (`Dialogo`) e as regras dele em `tokens.css`. Sem regra, permissão, destino, schema, migration, dado ou infraestrutura; nenhuma tela foi transformada em folha.
+
+1. **Barra das folhas** (diálogo que não é gaveta, como "Imprimir a ficha"):
+   - o título no centro, em 17 px/600, na letra do sistema;
+   - uma coluna vazia à esquerda, do tamanho do fechar, para o título ficar no meio de verdade (ele quebra em vez de cortar);
+   - substitui, nesses diálogos, o título em Gelasio 20 px à esquerda.
+2. **Fechar redondo** em todos os diálogos e gavetas: o X num círculo de 30 px no `preenchimento` (sob o ponteiro, o forte e o X na cor do texto), com o alvo de 44 px em volta. As gavetas (menu e ajuda) mantêm o título em Gelasio à esquerda.
+3. **Folha no celular** (`sheet`, abaixo de 600 px: a busca ⌘K e a ajuda):
+   - continua presa embaixo, na largura disponível, agora com cantos de 14 px (antes, os 19 px do modal);
+   - entra de baixo para cima: opacidade e 28 px, a mesma distância e os mesmos 220 ms da gaveta de lado;
+   - fechar continua imediato, sem animação de saída;
+   - com movimento reduzido, a regra geral tira a animação.
+   - Sem o puxador: a Apple só o põe em folha que muda de altura ou fecha ao arrastar, e as nossas não fazem isso.
+4. **O que não muda:** o contrato do diálogo nativo (`showModal`, Escape, clique no fundo, o foco que volta), as gavetas de lado no computador, a janela de módulo e o fundo de bloqueio.
+
+**Verificação:**
+- **Testes:**
+  - 10 em `tests/erp-folhas-apple.test.ts`: a barra, a gaveta, o fechar nos dois tipos, o título escondido, o contrato do diálogo, a folha no celular, a entrada, a ordem das regras da ajuda e o contraste do fechar nos dois temas.
+  - O contrato de movimento de `erp-padrao-visual` passou a incluir a entrada da folha (`ff-folha`).
+  - Com os dois arquivos, 47 passam.
+- **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
+
+**Limites:**
+- Não testado em Safari/iOS de verdade.
+- As telas que abrem "Novo insumo" e afins seguem como páginas: transformar formulários em folhas mudaria a navegação e o retorno (e a recuperação do Novo insumo, decisão 529), e fica fora deste plano visual.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.

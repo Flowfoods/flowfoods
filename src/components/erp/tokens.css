@@ -812,19 +812,33 @@ html:has(.ff-app dialog.ff-janela[open]) {
     opacity: 0;
   }
 }
+@keyframes ff-folha {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 
 @media (max-width: 599px) {
-  /* < 600 px o diálogo vira sheet inferior (kit). */
+  /* < 600 px o diálogo vira sheet inferior (kit). Folha da Apple (decisão 534): cantos de 14 px e entrada de baixo para cima,
+     com os mesmos 28 px e 220 ms da gaveta de lado. */
   .ff-app dialog.ff-dialogo.ff-sheet {
     margin: auto auto 0;
     width: 100%;
     max-width: 100%;
     height: auto;
     max-height: 88dvh;
-    border-radius: var(--ff-raio-modal) var(--ff-raio-modal) 0 0;
+    border-radius: 14px 14px 0 0;
     border: 1px solid var(--ff-linha);
     border-bottom: 0;
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  .ff-app dialog.ff-dialogo.ff-sheet[open] {
+    animation: ff-folha var(--ff-movimento) var(--ff-curva-entrada);
   }
   /* Campo com 16 px no celular: o iOS não dá zoom ao focar. */
   .ff-app :is(input, select, textarea) {

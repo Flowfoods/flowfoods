@@ -351,12 +351,14 @@ describe('padrão visual · movimento das camadas', () => {
         '.ff-app .ff-popover',
         '.ff-app dialog.ff-dialogo::backdrop',
         '.ff-app dialog.ff-dialogo[open]',
+        // Folha da Apple no celular (decisão 534): entra de baixo, com os 28 px da gaveta.
+        '.ff-app dialog.ff-dialogo.ff-sheet[open]',
         '.ff-app dialog.ff-gaveta.ff-gaveta-direita[open]',
         '.ff-app dialog.ff-gaveta[open]',
         '.ff-veu-ajuda',
       ].sort(),
     );
-    expect([...css.matchAll(/@keyframes ([\w-]+)/g)].map((m) => m[1]).sort()).toEqual(['ff-camada', 'ff-fundo', 'ff-gaveta', 'ff-gaveta-direita', 'ff-veu']);
+    expect([...css.matchAll(/@keyframes ([\w-]+)/g)].map((m) => m[1]).sort()).toEqual(['ff-camada', 'ff-folha', 'ff-fundo', 'ff-gaveta', 'ff-gaveta-direita', 'ff-veu']);
     expect(css).not.toMatch(/infinite|alternate|animation-delay|transition-delay|:not\(\[open\]\)|bounce|overshoot/);
     // Os componentes fecham na hora: sem esperar animação nem temporizador.
     for (const arquivo of ['src/components/erp/ui/Dialogo.tsx', 'src/components/erp/shell/Popover.tsx']) {

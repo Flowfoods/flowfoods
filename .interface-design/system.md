@@ -84,7 +84,7 @@ Texto na letra do sistema (decisão 530): a SF no iPhone, iPad e Mac; nos outros
 aparelhos, a do sistema deles (Segoe UI no Windows, Roboto no Android); a
 Libre Franklin fica de reserva (`--ff-fonte-texto`). Gelasio nos títulos
 editoriais: h1 da página, o título grande da Apple
-(34 px/1,15, peso regular, em todas as larguras; decisão 532), título de diálogo e de gaveta
+(34 px/1,15, peso regular, em todas as larguras; decisão 532), título de gaveta
 (20 px), número grande e título de estado vazio (sempre
 `lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 20 · 34; título de
 painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px; no menu lateral, desde a decisão 531, o grupo é em letra normal; nome da aba do celular, decisão 532: 10,5 px, como no iPhone). Caixa
@@ -238,6 +238,11 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   (`ff-seta-da-linha`) por último dentro do link; ações (Editar, Remover)
   numa linha própria, embaixo; o painel em volta, no celular, sem borda e
   com raio de 12 px.
+- **Folha** (decisão 534): o diálogo que não é gaveta tem a barra das folhas,
+  título no centro em 17/600 na letra do sistema; todo diálogo e gaveta tem o
+  fechar redondo (X num círculo de 30 px no `preenchimento`, alvo de 44). No
+  celular, a folha (`sheet`) fica presa embaixo com cantos de 14 px e entra de
+  baixo (opacidade + 28 px, 220 ms); sem puxador.
 - **Interruptor** (decisão 533): `INTERRUPTOR` num `input type="checkbox"
   role="switch"` para o que liga e desliga ("onde fica" da ficha, prazo
   depois de aberto do insumo), na ponta da linha; 51 × 31, ligado no `ok`,
@@ -329,6 +334,7 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | Menu lateral em lista, ativo na cor cheia da área (decisão 531); substitui a grade de duas colunas | barra lateral do iPad, do protótipo aprovado; a seleção cheia tem nome claro ≥ 4,5:1 e contorno ≥ 3:1 no escuro | 2026-11-18 |
 | Título grande (Gelasio 34 px, sem o quadrado da área) e barra de abas no celular (decisão 532) | protótipo aprovado; a aba repete entradas do menu, some com barra fixa de ações e com o teclado | 2026-11-18 |
 | Listas agrupadas no celular (insumos, fichas, notas) e interruptor para o que liga e desliga (decisão 533) | protótipo aprovado; o desligado com contorno no `suave` para 3:1; o formulário manda o mesmo de antes | 2026-11-19 |
+| Folhas: barra com título no centro (17/600), fechar redondo; no celular, entrada de baixo e cantos de 14 px (decisão 534) | protótipo aprovado; sem puxador (nossas folhas não mudam de altura nem fecham ao arrastar) | 2026-11-19 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,
