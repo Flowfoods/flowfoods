@@ -102,6 +102,8 @@ describe('menu lateral em lista (A2)', () => {
     const h = menu(emUso[0], null);
     expect(h).toMatch(/<nav aria-label="Menu" class="min-h-0 flex-1 overflow-y-auto px-2 pb-4 \[scrollbar-width:thin\]">/);
     expect(menu(emUso[0], null, true)).toMatch(/<nav aria-label="Menu" class="[^"]*\bpx-2\b/);
+    // O seletor de área, em cima, com os mesmos 8 px: alinhado com as linhas.
+    for (const recolhido of [false, true]) expect(menu(emUso[0], null, recolhido)).toMatch(/<div class="shrink-0 px-2 pt-[23]">/);
   });
 });
 

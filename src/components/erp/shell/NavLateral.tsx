@@ -73,7 +73,8 @@ export function NavLateral({
       {/* O contexto (parceiro · situação) quebra em linhas: na lateral compacta, cortar o nome do parceiro esconderia onde a pessoa está. */}
       {!recolhido && <p className="break-words px-4 pt-3 text-[12px] leading-snug text-suave">{contexto}</p>}
 
-      <div className={`shrink-0 ${recolhido ? 'px-2 pt-3' : 'px-1.5 pt-2'}`}>
+      {/* 8 px de lado, como a lista abaixo: o seletor e as linhas ficam alinhados. */}
+      <div className={`shrink-0 px-2 ${recolhido ? 'pt-3' : 'pt-2'}`}>
         <SeletorDeModulo nav={nav} atual={modulo} recolhido={recolhido} />
       </div>
 
