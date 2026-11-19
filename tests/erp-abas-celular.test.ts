@@ -100,9 +100,9 @@ describe('abas do celular · marcação', () => {
 
   it('nav "Áreas" no material, com links para as áreas e o botão Mais ligado à gaveta', () => {
     const h = marcar('/erp');
-    expect(h).toMatch(/^<nav aria-label="Áreas" data-barra-de-abas="true" class="ff-abas ff-material">/);
+    expect(h).toMatch(/^<nav aria-label="Áreas" data-barra-de-abas="true" class="ff-abas-celular ff-material">/);
     expect([...h.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1])).toEqual(abasDoCelular(NAV_DONO, '/erp').abas.map((a) => a.href));
-    expect(h).toMatch(/<button type="button" aria-controls="ff-gaveta" aria-expanded="false" class="ff-aba">.*<span class="ff-aba-rotulo">Mais<\/span><\/button>/);
+    expect(h).toMatch(/<button type="button" aria-controls="ff-gaveta" aria-expanded="false" class="ff-aba-celular">.*<span class="ff-aba-celular-rotulo">Mais<\/span><\/button>/);
     expect(marcar('/erp', true)).toContain('aria-expanded="true"');
     // Sem `data-barra-fixa`: ela não é barra de ações e não pode esconder a si mesma.
     expect(h).not.toContain('data-barra-fixa');
@@ -128,21 +128,23 @@ describe('abas do celular · marcação', () => {
   });
 });
 
+const marcarBarra = (caminho: string) => renderToStaticMarkup(createElement(BarraDeAbas, { nav: NAV_DONO, caminho, gavetaAberta: false, aoAbrirMais: () => {} }));
+
 describe('abas do celular · onde aparece', () => {
-  const bloco = css.slice(css.indexOf('@supports selector(:has(*)) {'), css.indexOf('.ff-app .ff-abas-lista {'));
+  const bloco = css.slice(css.indexOf('@supports selector(:has(*)) {'), css.indexOf('.ff-app .ff-abas-celular-lista {'));
 
   it('escondida por padrão; só com `:has()` e abaixo de 640 px, fixa no pé, acima do conteúdo e com a área segura', () => {
-    expect(regra('.ff-app .ff-abas')).toContain('display: none');
+    expect(regra('.ff-app .ff-abas-celular')).toContain('display: none');
     expect(bloco).toContain('@media (max-width: 639px) {');
-    const visivel = bloco.slice(bloco.indexOf('.ff-app .ff-abas {'));
+    const visivel = bloco.slice(bloco.indexOf('.ff-app .ff-abas-celular {'));
     for (const d of ['position: fixed', 'bottom: 0', 'z-index: 30', 'display: block', 'padding-bottom: env(safe-area-inset-bottom)']) expect(visivel).toContain(d);
   });
 
   it('some com uma barra fixa de ações na tela e com um campo de texto em foco (teclado); o fim da página fica acima dela', () => {
-    expect(bloco).toMatch(/\.ff-app:has\(\[data-barra-fixa\]\) \.ff-abas,\s*\.ff-app:has\(:is\(input:not\([^)]*\), textarea, select, \[contenteditable='true'\]\):focus\) \.ff-abas \{\s*display: none;/);
+    expect(bloco).toMatch(/\.ff-app:has\(\[data-barra-fixa\]\) \.ff-abas-celular,\s*\.ff-app:has\(:is\(input:not\([^)]*\), textarea, select, \[contenteditable='true'\]\):focus\) \.ff-abas-celular \{\s*display: none;/);
     for (const t of ['checkbox', 'radio', 'button', 'submit', 'file', 'hidden']) expect(bloco).toContain(`[type='${t}']`);
-    expect(bloco).toMatch(/\.ff-app:has\(\.ff-abas\):not\(:has\(\[data-barra-fixa\]\)\) #conteudo \{\s*padding-bottom: calc\(49px \+ env\(safe-area-inset-bottom\) \+ 3rem\);/);
-    expect(bloco).toMatch(/html:has\(\.ff-app \.ff-abas\):not\(:has\(\[data-barra-fixa\]\)\) \{/);
+    expect(bloco).toMatch(/\.ff-app:has\(\.ff-abas-celular\):not\(:has\(\[data-barra-fixa\]\)\) #conteudo \{\s*padding-bottom: calc\(49px \+ env\(safe-area-inset-bottom\) \+ 3rem\);/);
+    expect(bloco).toMatch(/html:has\(\.ff-app \.ff-abas-celular\):not\(:has\(\[data-barra-fixa\]\)\) \{/);
     expect(bloco).toMatch(/scroll-padding-bottom: calc\(49px \+ env\(safe-area-inset-bottom\)\);/);
   });
 
@@ -170,20 +172,28 @@ describe('abas do celular · onde aparece', () => {
     expect(readFileSync('src/components/erp/ui/aviso-periodo-fechado.tsx', 'utf8')).toContain("document.querySelectorAll('[data-barra-fixa], [data-barra-de-abas]')");
   });
 
+  it('as classes da barra do celular não se confundem com as das abas da área (`ff-aba`, "Seções de…")', () => {
+    // As abas da área usam `ff-aba` desde a UX.9; uma regra solta em `.ff-aba` desmontaria a faixa delas.
+    const seletores = [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim().split('\n').pop()!.trim());
+    const daAba = seletores.filter((x) => /\.ff-aba(?![\w-])/.test(x));
+    expect(daAba.sort()).toEqual([".ff-app .ff-aba[aria-current='page']", '.ff-app a.ff-aba:focus-visible'].sort());
+    expect(marcarBarra('/erp')).not.toMatch(/class="ff-aba[ "]/);
+  });
+
   it('não sai no papel', () => {
     const impressao = css.slice(css.indexOf('@media print {'));
-    expect(impressao).toMatch(/\.ff-app \.ff-abas,\s*\.ff-app \.ff-nao-imprime \{\s*display: none !important;/);
+    expect(impressao).toMatch(/\.ff-app \.ff-abas-celular,\s*\.ff-app \.ff-nao-imprime \{\s*display: none !important;/);
   });
 
   it('aba: alvo de toque da altura da barra (49 px), nome numa linha; a atual em 600 na cor do texto, com o ícone na tinta da área', () => {
-    expect(regra('.ff-app .ff-abas-lista')).toContain('height: 49px');
-    const aba = regra('.ff-app .ff-aba');
+    expect(regra('.ff-app .ff-abas-celular-lista')).toContain('height: 49px');
+    const aba = regra('.ff-app .ff-aba-celular');
     for (const d of ['height: 100%', 'width: 100%', 'color: rgb(var(--ff-suave))']) expect(aba).toContain(d);
-    expect(regra('.ff-app .ff-aba-rotulo')).toContain('white-space: nowrap');
-    const atual = css.slice(css.indexOf(".ff-app .ff-aba[aria-current],"));
-    expect(atual).toMatch(/^\.ff-app \.ff-aba\[aria-current\],\s*\.ff-app \.ff-aba\[data-ativa\] \{\s*color: rgb\(var\(--ff-texto\)\);\s*font-weight: 600;/);
-    expect(regra('.ff-app .ff-aba[aria-current] .ff-aba-icone')).toContain('color: var(--ff-modulo-tinta)');
-    expect(regra('.ff-app .ff-aba:focus-visible')).toContain('outline: 3px solid rgb(var(--ff-acento))');
+    expect(regra('.ff-app .ff-aba-celular-rotulo')).toContain('white-space: nowrap');
+    const atual = css.slice(css.indexOf(".ff-app .ff-aba-celular[aria-current],"));
+    expect(atual).toMatch(/^\.ff-app \.ff-aba-celular\[aria-current\],\s*\.ff-app \.ff-aba-celular\[data-ativa\] \{\s*color: rgb\(var\(--ff-texto\)\);\s*font-weight: 600;/);
+    expect(regra('.ff-app .ff-aba-celular[aria-current] .ff-aba-celular-icone')).toContain('color: var(--ff-modulo-tinta)');
+    expect(regra('.ff-app .ff-aba-celular:focus-visible')).toContain('outline: 3px solid rgb(var(--ff-acento))');
   });
 });
 

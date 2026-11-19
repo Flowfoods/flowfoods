@@ -28,19 +28,19 @@ export function BarraDeAbas({
 }) {
   const { abas, maisAtiva } = abasDoCelular(nav, caminho);
   return (
-    <nav aria-label="Áreas" data-barra-de-abas className="ff-abas ff-material">
-      <ul className="ff-abas-lista">
+    <nav aria-label="Áreas" data-barra-de-abas className="ff-abas-celular ff-material">
+      <ul className="ff-abas-celular-lista">
         {abas.map((a) => (
           <li key={a.href}>
             {/* "page" só na própria tela de entrada; dentro da área, "true" (a aba é a da área atual, não a página). */}
             <Link
               href={a.href}
               aria-current={a.ativa ? (a.href === caminho ? 'page' : 'true') : undefined}
-              className="ff-aba ff-identidade-modulo"
+              className="ff-aba-celular ff-identidade-modulo"
               style={{ '--cor-modulo': a.cor } as CSSProperties}
             >
-              <Icone nome={a.icone} size={24} className="ff-aba-icone" />
-              <span className="ff-aba-rotulo">{a.rotulo}</span>
+              <Icone nome={a.icone} size={24} className="ff-aba-celular-icone" />
+              <span className="ff-aba-celular-rotulo">{a.rotulo}</span>
             </Link>
           </li>
         ))}
@@ -51,10 +51,10 @@ export function BarraDeAbas({
             aria-controls="ff-gaveta"
             aria-expanded={gavetaAberta}
             data-ativa={maisAtiva ? '' : undefined}
-            className="ff-aba"
+            className="ff-aba-celular"
           >
-            <Ellipsis size={24} strokeWidth={1.75} aria-hidden className="ff-aba-icone" />
-            <span className="ff-aba-rotulo">Mais</span>
+            <Ellipsis size={24} strokeWidth={1.75} aria-hidden className="ff-aba-celular-icone" />
+            <span className="ff-aba-celular-rotulo">Mais</span>
           </button>
         </li>
       </ul>

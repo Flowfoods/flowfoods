@@ -291,12 +291,12 @@ html:has(.ff-app[data-tema='escuro']) {
  * `:has()` no navegador, não aparece: fica o menu (≡) de antes. A aba ativa leva o ícone na tinta da área e o nome na cor do
  * texto, em 600 (o nome na cor da área não daria 4,5:1 em toda a paleta); as outras ficam em `suave`.
  */
-.ff-app .ff-abas {
+.ff-app .ff-abas-celular {
   display: none;
 }
 @supports selector(:has(*)) {
   @media (max-width: 639px) {
-    .ff-app .ff-abas {
+    .ff-app .ff-abas-celular {
       position: fixed;
       inset-inline: 0;
       bottom: 0;
@@ -305,26 +305,26 @@ html:has(.ff-app[data-tema='escuro']) {
       border-top: 1px solid var(--ff-linha);
       padding-bottom: env(safe-area-inset-bottom);
     }
-    .ff-app:has([data-barra-fixa]) .ff-abas,
-    .ff-app:has(:is(input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='file'], [type='range'], [type='color'], [type='hidden']), textarea, select, [contenteditable='true']):focus) .ff-abas {
+    .ff-app:has([data-barra-fixa]) .ff-abas-celular,
+    .ff-app:has(:is(input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='file'], [type='range'], [type='color'], [type='hidden']), textarea, select, [contenteditable='true']):focus) .ff-abas-celular {
       display: none;
     }
     /* O fim da página e o que rola até um campo ficam acima da barra (só onde ela existe: o nível 1 não tem). */
-    .ff-app:has(.ff-abas):not(:has([data-barra-fixa])) #conteudo {
+    .ff-app:has(.ff-abas-celular):not(:has([data-barra-fixa])) #conteudo {
       padding-bottom: calc(49px + env(safe-area-inset-bottom) + 3rem);
     }
-    html:has(.ff-app .ff-abas):not(:has([data-barra-fixa])) {
+    html:has(.ff-app .ff-abas-celular):not(:has([data-barra-fixa])) {
       scroll-padding-bottom: calc(49px + env(safe-area-inset-bottom));
     }
   }
 }
-.ff-app .ff-abas-lista {
+.ff-app .ff-abas-celular-lista {
   display: grid;
   grid-auto-columns: minmax(0, 1fr);
   grid-auto-flow: column;
   height: 49px;
 }
-.ff-app .ff-aba {
+.ff-app .ff-aba-celular {
   display: flex;
   height: 100%;
   width: 100%;
@@ -338,21 +338,21 @@ html:has(.ff-app[data-tema='escuro']) {
   line-height: 1.15;
   -webkit-tap-highlight-color: transparent;
 }
-.ff-app .ff-aba-rotulo {
+.ff-app .ff-aba-celular-rotulo {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ff-app .ff-aba[aria-current],
-.ff-app .ff-aba[data-ativa] {
+.ff-app .ff-aba-celular[aria-current],
+.ff-app .ff-aba-celular[data-ativa] {
   color: rgb(var(--ff-texto));
   font-weight: 600;
 }
-.ff-app .ff-aba[aria-current] .ff-aba-icone {
+.ff-app .ff-aba-celular[aria-current] .ff-aba-celular-icone {
   color: var(--ff-modulo-tinta);
 }
-.ff-app .ff-aba:focus-visible {
+.ff-app .ff-aba-celular:focus-visible {
   outline: 3px solid rgb(var(--ff-acento));
   outline-offset: -3px;
   border-radius: 10px;
@@ -824,7 +824,7 @@ html:has(.ff-app dialog.ff-janela[open]) {
   .ff-app .fixed,
   .ff-app [role='dialog'],
   .ff-app nav[aria-label^='Seções de'],
-  .ff-app .ff-abas,
+  .ff-app .ff-abas-celular,
   .ff-app .ff-nao-imprime {
     display: none !important;
   }
