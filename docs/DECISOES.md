@@ -4463,7 +4463,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
     - a coluna da direita do Acesso, sem `min-w-0`;
     - a coluna "Situação" da lista de insumos, que agora aparece a partir de 1280 px; abaixo disso, a situação vai na linha do nome.
   - O quarto é antigo e também foi corrigido: na Nova ficha em 320 px, a coluna ao lado da foto encolhia até 78 px e o botão "Escolher foto" saía da tela.
-    - Agora ela não encolhe abaixo de 8rem, um pouco mais que o maior texto do botão (123 px). Onde não cabe ao lado da miniatura, desce para a linha de baixo: abaixo de 375 px; dali para cima, o layout é o de antes.
+    - Agora ela não encolhe abaixo de 8rem, um pouco mais que o maior texto do botão (123 px). Onde não cabe ao lado da miniatura, desce para a linha de baixo: abaixo de uns 370 px pela conta da largura (medido: embaixo a 320 e 360 px, ao lado a 375 px); dali para cima, o layout é o de antes.
     - O mínimo é fixo, e não o do texto, para a coluna não pular de lugar quando o botão muda de texto.
     - Pelo mesmo motivo, o texto durante o envio virou "Enviando…": "Enviando a foto…" tinha 152 px e fazia a coluna descer e voltar a 360–390 px.
   - Contra o master, nenhuma tela passou a rolar de lado. O Acesso em 320 px deixou de rolar (22 px → 0), e a Nova ficha em 320 px caiu de 11 para 2 px. Os 2 px vêm do rótulo "Principal" da validade e aparecem igual com a Libre Franklin. Compras em 1024 px rola 154 px, contra 155 com a Libre Franklin.
@@ -4496,5 +4496,40 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
   - No detalhe, depende do nome: "Cebola roxa" corta 1 px só com a letra nova, nomes curtos não cortam e os longos cortam com as duas. Por isso a contagem varia com os dados.
 - O polegar marcado do segmentado tem pouco contraste com o trilho (1,17:1 no claro, 1,28:1 no escuro), como no da Apple. A marcação vem também do contorno fino, do negrito, da sombra e, para o leitor de tela, do rádio marcado ou do `aria-current`.
 - Antigos, fora do escopo: Compras rola 154 px a 1024 px; a Nova ficha rola 2 px a 320 px, pelo rótulo "Principal" da validade, que fica para a fatia dos formulários (A4); no hub do nível 1, a 1024 px, o "…" da trilha fica recortado sob o seletor de parceiro.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 531. 2026-11-18 · Visual da Apple no ERP, fatia A2: o menu lateral em lista, como a barra lateral do iPad
+
+**Fonte e recorte:** segunda fatia do visual da Apple aprovado por Rodolfo em 18/11/2026 (decisão 530), sobre o protótipo que mostrava a barra lateral em lista. Só o menu lateral do ERP (`NavLateral`, `tokens.css`): sem regra, permissão, destino, schema, migration, dado ou infraestrutura.
+
+1. **Lista no lugar da grade** (`.ff-nav-lista`): uma linha por tela, com o ícone (20 px, na tinta da área) à esquerda e o nome (14 px) alinhado à esquerda, 44 px de altura mínima. O nome quebra em linhas e nunca é cortado. Substitui a grade de duas colunas aprovada em 09/11.
+2. **Ativo:**
+   - a linha preenchida na cor da área, com o nome e o ícone claros, em 600 e com `aria-current`;
+   - o nome claro tem ≥ 4,5:1 sobre toda a paleta das áreas;
+   - no escuro, o contorno na tinta da área (≥ 3:1 sobre a lateral, o mesmo de antes) separa a linha da lateral;
+   - sob o ponteiro, a linha ativa não muda;
+   - com cores forçadas (alto contraste do aparelho), o fundo cheio some; o ícone herda a cor do link, como o nome. Sem isso, o ícone claro caía sobre o fundo claro do sistema e sumia (achado da revisão).
+3. **Início:** na lista aberta, cada área com o quadrado de cor cheia (28 px, desenho claro), como nos Ajustes do iPhone. Os destinos são os mesmos. O quadrado do próprio Início tem a cor da linha ativa; ali ele ganha um contorno claro.
+4. **Grupos:** o nome em 13 px/600, em letra normal (sem a caixa alta de antes), com a seta de abrir e fechar e `aria-expanded`. O ícone que vinha antes do nome do grupo saiu da lista aberta (na barra lateral da Apple o grupo é só o nome); no recolhido, ele segue como âncora.
+5. **Também muda:** o nome das linhas que não estão ativas passa do `suave` para a cor do texto, como na barra lateral da Apple; o nome perde o equilíbrio de quebra (`text-wrap: balance`) da grade e quebra normal, alinhado à esquerda. A lateral do menu ganhou 8 px de cada lado (antes, 6 px aberto), para o anel de foco caber sem ser cortado pela rolagem.
+6. **O que não muda:** o seletor de área e a grade de módulos (referência de 12/11), o recolhido (só ícones de 18 px, inclusive no Início, com o nome na dica e para o leitor de tela) e a gaveta do celular, que mostra a mesma lista.
+
+**Verificação:**
+- **Testes:** a lista, o ativo e o contraste em `erp-padrao-visual`; a marcação do menu em `erp-menu-lista-apple` (10 novos). Eles cobrem uma coluna (e nenhuma outra regra que mude as colunas), nome que não corta, ativo único, quadrados no Início (e o contorno do quadrado ativo), grupo sem caixa alta, recolhido (inclusive no Início), a lateral de 8 px e as cores forçadas. Com `erp-identidade-modulos` e `erp-visual-apple`, 83 passam nos 4 arquivos.
+- **Mutantes, só numa cópia exportada:** os 5 das correções da revisão morrem: o ícone sem herdar a cor com cores forçadas, uma regra posterior com duas colunas, a lateral de 6 px, o quadrado no recolhido e o quadrado ativo sem contorno.
+- **Navegador** (app local, dados sintéticos): 38 de 38 conferências em 1280 px claro e escuro, 390 px claro e escuro (na gaveta) e 1024 px. Elas cobrem: uma coluna; nenhum nome cortado; altura de 44 px ou mais; ativo na cor cheia com nome e ícone claros; grupos sem caixa alta; quadrados no Início; recolhido com dica; nenhuma rolagem lateral.
+- **Revisão independente** (subagente só de leitura) em 01de69a: **aprovado com ressalvas**.
+  - O importante foi o ícone do ativo, que sumia com cores forçadas.
+  - Os menores: o recolhido do Início e mudanças sem registro, textos que ainda falavam em caixa alta e grade no menu, o anel de foco cortado 1 px pela rolagem, o quadrado do Início sumindo na linha ativa e limites dos testes.
+  - Todos tratados no commit seguinte.
+- **Portão completo local e CI:** ficam no PR e na página de evidências.
+
+**Limites:**
+- Não testado em Safari/iOS, com leitor de tela real nem no alto contraste real do Windows (só a emulação do Chromium).
+- Com cores forçadas, a linha ativa se distingue pelo peso 600 e pelo `aria-current`; o fundo cheio não aparece nesse modo (antigo).
+- O anel de foco da linha vizinha passa por cima do preenchimento da linha ativa, onde o vermelho sobre a cor da área tem pouco contraste. O resto do anel continua visível.
+- A grade de módulos do seletor de área segue a referência de 12/11; trocá-la por todas as áreas no menu, como no protótipo, mudaria a navegação e fica para decisão de Rodolfo.
+- Antigo, fora do escopo (achado da revisão): a 900 px exatos, quando a lateral aparece, a tabela de insumos rola 9 px de lado (7 com a Libre Franklin forçada); a 899 e a 960 px, nada.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.

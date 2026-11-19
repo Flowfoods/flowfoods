@@ -345,20 +345,14 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 
 /*
- * Grade lateral compacta (padrão aprovado): duas colunas quando o nome cabe. A coluna mínima é medida em `em`, então
- * acompanha o tamanho do texto; sem espaço, a grade cai para uma coluna sozinha. O nome nunca é cortado: quebra em
- * linhas e a célula cresce (nada de quadrado rígido). Recolhido: uma coluna só de ícones.
+ * Menu lateral em lista (decisão 531, visual da Apple): uma linha por tela, com o ícone à esquerda e o nome alinhado, como a
+ * barra lateral do iPad. O nome nunca é cortado: quebra em linhas e a linha cresce. Recolhido: a mesma coluna, só de ícones.
  */
-.ff-app .ff-nav-grade {
+.ff-app .ff-nav-lista {
   display: grid;
-  /* 8,1em = o maior nome sem quebra no meio da palavra ("Movimentações", 12 px/600) mais a borda e a folga da célula;
-     50% − meia folga = no máximo duas colunas. Cabe também com a barra de rolagem clássica (17 px) na lateral de 232 px. */
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(8.1em, calc(50% - 3px))), 1fr));
-  gap: 6px;
-  font-size: 12px;
-}
-.ff-app .ff-nav-grade[data-recolhido='true'] {
   grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  font-size: 14px;
 }
 .ff-app .ff-nav-item {
   border: 1px solid transparent;
@@ -366,7 +360,6 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 .ff-app .ff-nav-rotulo {
   overflow-wrap: anywhere;
-  text-wrap: balance;
 }
 /*
  * Grade de módulos do seletor de áreas (referência de 12/11/2026): um bloco por área, sem cartão nem borda, com ícone,
@@ -423,12 +416,35 @@ html:has(.ff-app[data-tema='escuro']) {
   color: rgb(var(--ff-suave));
 }
 
-/* Ativo reconhecível por forma (célula preenchida com contorno na tinta da área, ≥ 3:1), peso e aria-current, além da cor. */
+/*
+ * Ativo como na barra lateral da Apple (decisão 531): a linha preenchida na cor da área, com o nome e o ícone claros (≥ 4,5:1
+ * em toda a paleta das áreas), em 600 e com aria-current. No claro, a cor cheia já se separa da lateral; no escuro, o
+ * contorno na tinta da área (≥ 3:1 sobre a lateral) faz isso. Sob o ponteiro, a linha ativa não muda.
+ */
 .ff-app .ff-nav-item[aria-current='page'] {
-  background-color: var(--ff-modulo-realce);
+  background-color: var(--ff-modulo-cor);
   border-color: var(--ff-modulo-tinta);
-  color: rgb(var(--ff-texto));
+  color: rgb(var(--ff-sobre-acao));
   font-weight: 600;
+}
+.ff-app .ff-nav-item[aria-current='page']:hover {
+  background-color: var(--ff-modulo-cor);
+}
+.ff-app .ff-nav-item[aria-current='page'] .ff-nav-icone {
+  color: rgb(var(--ff-sobre-acao));
+}
+/* O quadrado do Início tem a cor da linha ativa: um contorno claro o separa do preenchimento. */
+.ff-app .ff-nav-item[aria-current='page'] .ff-icone-cheio {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12), 0 0 0 1.5px rgb(var(--ff-sobre-acao) / 0.85);
+}
+/*
+ * Cores forçadas (alto contraste do aparelho): o fundo cheio some e o navegador mantém a cor do ícone (o `svg` preserva a cor
+ * do pai). O ícone claro do ativo cairia sobre o fundo claro do sistema; aqui ele herda a cor do link, como o nome.
+ */
+@media (forced-colors: active) {
+  .ff-app .ff-nav-item[aria-current='page'] .ff-nav-icone {
+    color: inherit;
+  }
 }
 
 /* Aba da área (UX.9): mesmo indicador de 2 px do menu, embaixo. O foco fica por dentro: o trilho rola e cortaria um anel por fora. */

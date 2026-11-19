@@ -284,23 +284,29 @@ describe('padrão visual · geometria', () => {
     expect(renderToStaticMarkup(createElement(Selo, { tom: 'erro', cheio: true, children: 'Texto' }))).toContain('bg-destaque border-erro');
   });
 
-  it('grade lateral: no máximo duas colunas, coluna mínima em `em` (acompanha o texto) e nome que quebra em vez de cortar', () => {
-    const grade = regra('.ff-app .ff-nav-grade');
-    expect(grade).toContain('display: grid');
-    expect(grade).toMatch(/grid-template-columns: repeat\(auto-fill, minmax\(min\(100%, max\(8\.1em, calc\(50% - 3px\)\)\), 1fr\)\);/);
-    expect(regra(".ff-app .ff-nav-grade[data-recolhido='true']")).toContain('grid-template-columns: minmax(0, 1fr)');
+  it('menu lateral em lista (decisão 531): uma coluna, nome que quebra em vez de cortar, ativo preenchido na cor da área', () => {
+    const lista = regra('.ff-app .ff-nav-lista');
+    expect(lista).toContain('display: grid');
+    expect(lista).toContain('grid-template-columns: minmax(0, 1fr)');
+    expect(css).not.toContain('.ff-nav-grade');
     expect(regra('.ff-app .ff-nav-rotulo')).toContain('overflow-wrap: anywhere');
-    // Ativo por forma (preenchido + contorno na tinta da área) e peso, além da cor.
+    // Ativo como na barra lateral da Apple: a linha preenchida na cor da área, o nome e o ícone claros, em 600.
     const ativo = regra(".ff-app .ff-nav-item[aria-current='page']");
-    expect(ativo).toContain('background-color: var(--ff-modulo-realce)');
+    expect(ativo).toContain('background-color: var(--ff-modulo-cor)');
     expect(ativo).toContain('border-color: var(--ff-modulo-tinta)');
+    expect(ativo).toContain('color: rgb(var(--ff-sobre-acao))');
     expect(ativo).toContain('font-weight: 600');
-    // O contorno é elemento essencial da seleção: ≥ 3:1 sobre a superfície da lateral, em toda área e nos dois temas.
+    expect(regra(".ff-app .ff-nav-item[aria-current='page'] .ff-nav-icone")).toContain('color: rgb(var(--ff-sobre-acao))');
+    // Sob o ponteiro, a linha ativa não clareia (a regra dela vence a do ponteiro).
+    expect(regra(".ff-app .ff-nav-item[aria-current='page']:hover")).toContain('background-color: var(--ff-modulo-cor)');
     for (const [tema, t] of [['claro', CLARO], ['escuro', ESCURO]] as const) {
       const tinta = parseFloat(t['icone-tinta']) / 100;
       for (const [nome, cor] of Object.entries(COR)) {
+        // O nome e o ícone claros sobre a cor cheia da área: ≥ 4,5:1 em toda a paleta.
+        expect(contraste(canais(t['sobre-acao']), hex(cor.toLowerCase())), `nome ${tema}/${nome}`).toBeGreaterThanOrEqual(4.5);
+        // O contorno separa a linha da lateral: ≥ 3:1 em toda área e nos dois temas (no claro, a tinta é a própria cor).
         const contorno = hex(cor.toLowerCase()).map((n, i) => n * tinta + canais(t.texto)[i] * (1 - tinta)) as RGB;
-        expect(contraste(contorno, canais(t.lateral)), `${tema}/${nome}`).toBeGreaterThanOrEqual(3);
+        expect(contraste(contorno, canais(t.lateral)), `contorno ${tema}/${nome}`).toBeGreaterThanOrEqual(3);
       }
     }
   });
@@ -554,7 +560,7 @@ describe('padrão visual · escopo: site e Portal não mudam', () => {
   });
 
   it('toda regra nova de tokens.css mora dentro de `.ff-app` (ou é keyframes, véu da ajuda, html do tema ou impressão)', () => {
-    for (const seletor of ['.ff-popover', '.ff-nav-grade', '.ff-nav-item', '.ff-nav-rotulo', 'dialog.ff-dialogo']) {
+    for (const seletor of ['.ff-popover', '.ff-nav-lista', '.ff-nav-item', '.ff-nav-rotulo', 'dialog.ff-dialogo']) {
       for (const m of css.matchAll(new RegExp(`^(.*${seletor.replace(/[.[\]]/g, '\\$&')}[^{]*)\\{`, 'gm'))) expect(m[1].trim(), m[1]).toMatch(/^\.ff-app /);
     }
   });
