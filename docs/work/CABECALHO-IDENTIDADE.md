@@ -6,6 +6,7 @@ Entrega autorizada em 20/11/2026 sobre a base `fa7d7401506786a010e93a9931e18684c
 
 - Cabeçalho compartilhado do parceiro e da gestão FlowFoods, em superfície escura: imagem original FlowFoods com 96 px de largura; assinatura BARNEY OS com intervalo vertical de 18 px. Sem ERP na composição da marca. Correção de 20/11 durante a implementação: FlowFoods menor e à esquerda substitui a referência anterior centralizada de 145 px.
 - FlowFoods fica à esquerda, independentemente da lateral aberta ou recolhida. A marca cliente fica no centro geométrico do cabeçalho; até 540 px, ocupa uma segunda linha centralizada. Conta pessoal à direita.
+- A logo cliente tem área de 128 × 64 px, preservando proporção e nome legível. Faixa com 12 px de respiro vertical, reduzindo a altura sem perder alvos de toque; rótulo redundante da seleção é apenas acessível.
 - A seleção da marca é uma preferência visual validada no servidor, com escopo de usuário e parceiro. Não altera a visão de lojas nem filtros de negócio. Respostas de contextos anteriores não substituem a marca atual.
 - Lojas e marcas contém Identidade visual. A logo pertence à Marca canônica, compartilhada pela rede conforme o modelo existente. Escrita exige `lojas.gerir` e parceiro liberado para escrita.
 - Meu perfil permite enviar, substituir e remover a foto da própria pessoa. UsuarioErp e User mantêm fotos distintas; a foto pessoal não muda com a marca ou parceiro. Sem foto/imagem indisponível, aparecem iniciais.

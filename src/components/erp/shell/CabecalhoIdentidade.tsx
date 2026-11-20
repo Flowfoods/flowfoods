@@ -72,7 +72,7 @@ export function CabecalhoIdentidade({ props, slug, inicio }: { props: PropsDoShe
             alinhar="esquerda"
             conteudoDoBotao={<>
               <span className="ff-marca-imagem" aria-hidden><ImagemDeIdentidade key={marca?.logoUrl ?? marca?.id} url={marca?.logoUrl} nome={marca?.nome ?? dados.nomeParceiro} /></span>
-              <span className="text-[11px] text-suave">Marca selecionada</span>
+              <span className="sr-only">Marca selecionada</span>
               <span className="ff-marca-nome">{marca?.nome ?? dados.nomeParceiro}</span>
               <ChevronDown size={15} className="ff-marca-seta" aria-hidden />
             </>}
