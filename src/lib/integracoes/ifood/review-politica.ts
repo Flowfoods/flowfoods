@@ -51,18 +51,21 @@ export async function versionarReviewPolitica(cliente: ClienteDoParceiro, sessao
 
 /** Um único snapshot SQL repetível: exceção completa prevalece; ausência retorna null. */
 export async function resolverReviewPolitica(cliente: ClienteDoParceiro, lojaId: string) {
+  return cliente.transacao(tx => resolverReviewPoliticaNaTransacao(tx, lojaId), { repetivel: true });
+}
+
+/** Uso interno em transação repetível já aberta; não aceitar snapshot do cliente. */
+export async function resolverReviewPoliticaNaTransacao(tx: ClienteDoParceiro, lojaId: string) {
   if (!lojaId.trim()) throw new Error('Loja obrigatória.');
-  return cliente.transacao(async (tx) => {
-    if (!await tx.loja.findFirst({ where: { id: lojaId }, select: { id: true } })) throw new Error('Loja não pertence ao parceiro.');
-    const candidatas = await tx.reviewPolitica.findMany({ where: { alvo: { in: ['PARCEIRO', alvoReviewPolitica(lojaId)] } } });
-    const politica = candidatas.find((p) => p.lojaId === lojaId) ?? candidatas.find((p) => p.lojaId === null);
-    if (!politica) return null;
-    const versao = await tx.reviewPoliticaVersao.findFirst({ where: { politicaId: politica.id, numero: politica.versaoAtual } });
-    if (!versao) throw new Error('Política sem versão íntegra.');
-    return congelarReviewPolitica({ capacidade: 'INATIVA', parceiroId: tx.parceiroId, lojaConsultadaId: lojaId,
-      origem: politica.lojaId === null ? 'PARCEIRO' : 'LOJA', lojaDaPoliticaId: politica.lojaId,
-      politicaId: politica.id, versaoId: versao.id, numero: versao.numero,
-      conteudo: { tom: versao.tom, assinatura: versao.assinatura, exemplos: versao.exemplos, restricoes: versao.restricoes, limiteEditorial: versao.limiteEditorial },
-    });
-  }, { repetivel: true });
+  if (!await tx.loja.findFirst({ where: { id: lojaId }, select: { id: true } })) throw new Error('Loja não pertence ao parceiro.');
+  const candidatas = await tx.reviewPolitica.findMany({ where: { alvo: { in: ['PARCEIRO', alvoReviewPolitica(lojaId)] } } });
+  const politica = candidatas.find((p) => p.lojaId === lojaId) ?? candidatas.find((p) => p.lojaId === null);
+  if (!politica) return null;
+  const versao = await tx.reviewPoliticaVersao.findFirst({ where: { politicaId: politica.id, numero: politica.versaoAtual } });
+  if (!versao) throw new Error('Política sem versão íntegra.');
+  return congelarReviewPolitica({ capacidade: 'INATIVA', parceiroId: tx.parceiroId, lojaConsultadaId: lojaId,
+    origem: politica.lojaId === null ? 'PARCEIRO' : 'LOJA', lojaDaPoliticaId: politica.lojaId,
+    politicaId: politica.id, versaoId: versao.id, numero: versao.numero,
+    conteudo: { tom: versao.tom, assinatura: versao.assinatura, exemplos: versao.exemplos, restricoes: versao.restricoes, limiteEditorial: versao.limiteEditorial },
+  });
 }
