@@ -65,7 +65,7 @@ import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { EVENTO_FINANCEIRO_INCLUIDO, incluirFinanceiroNoAppDeTeste, registrarApp } from '@/lib/integracoes/core/apps';
 import { registrarParecerApp, historicoDoParecer, EVENTO_PARECER } from '@/lib/integracoes/core/homologacao';
-import { mudarModulo } from '@/lib/integracoes/core/conexoes';
+import { ligarConexao, mudarModulo, prepararModulo } from '@/lib/integracoes/core/conexoes';
 import { lerRegistroDaLeitura, marcarParceiroDeHomologacao, MENSAGEM_TROCA_COM_LOJA_LIGADA } from '@/lib/integracoes/core/central';
 import type { EstadoForm } from '@/components/erp/ui/campos';
 import * as acoes from '@/app/rodolfo/(painel)/integracoes/actions';
@@ -168,11 +168,16 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     await prisma.$disconnect();
   });
 
-  it('parecer de produção tem registro atômico, histórico e trava de concorrência', async () => {
-    const r = await registrarApp({ provedor: 'IFOOD', ambiente: 'PRODUCAO', nome: 'BI parecer', categoria: 'BI', clientId: `parecer-${sufixo}`, nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET', modulos: ['ANALYTICS'] }, 'teste');
+  it.each([
+    { caso: 'bi', categoria: 'BI', modulos: ['ANALYTICS'], contexto: 'BI · Analytics' },
+    { caso: 'financial', categoria: 'FINANCAS', modulos: ['FINANCIAL'], contexto: 'Finanças · Financeiro' },
+    { caso: 'financial-merchant', categoria: 'FINANCAS', modulos: ['FINANCIAL', 'MERCHANT'], contexto: 'Finanças · Financeiro e Loja' },
+    { caso: 'merchant-financial', categoria: 'FINANCAS', modulos: ['MERCHANT', 'FINANCIAL'], contexto: 'Finanças · Loja e Financeiro' },
+  ])('parecer de produção $caso tem registro atômico, histórico e trava de concorrência', async ({ caso, categoria, modulos, contexto }) => {
+    const r = await registrarApp({ provedor: 'IFOOD', ambiente: 'PRODUCAO', nome: `${caso} parecer`, categoria, clientId: `parecer-${caso}-${sufixo}`, nomeDoSegredo: 'IFOOD_PARECER_CLIENT_SECRET', modulos }, 'teste');
     if (!r.ok) throw new Error('app não criado');
     apps.push(r.id);
-    const entrada = { estado: 'EM_ANDAMENTO', validacaoEm: '2026-11-07', liberacaoEm: '', referencia: 'https://developer.ifood.com.br/pt-BR/developer/applications/app-bi/details', conferido: 'sim' };
+    const entrada = { estado: 'EM_ANDAMENTO', validacaoEm: '2026-11-07', liberacaoEm: '', referencia: `https://developer.ifood.com.br/pt-BR/developer/applications/app-${caso}/details`, conferido: 'sim' };
     const autor = { userId: atual.userId, autorNome: 'Responsável sintético' };
     const agora = new Date('2026-11-08T12:00:00Z');
     const versao = async () => (await db.integracaoApp.findUniqueOrThrow({ where: { id: r.id } })).atualizadoEm.toISOString();
@@ -204,7 +209,9 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     expect(pagina).toContain('Consultar página usada no registro');
     expect(pagina).toContain(entrada.referencia);
     expect(pagina).toContain('Histórico de pareceres');
-    expect(pagina).not.toContain('IFOOD_BI_CLIENT_SECRET');
+    expect(pagina).toContain(`App de produção · ${contexto}`);
+    expect(pagina).not.toContain('IFOOD_PARECER_CLIENT_SECRET');
+    expect(await html(CentralPage())).toContain(`href="/rodolfo/integracoes/apps/${r.id}"`);
     // Dois envios após navegação usam versões novas; o formulário antigo não sobrescreve.
     const v3 = await versao();
     const salvo = await rodar(acoes.acaoRegistrarParecer(r.id, v3, null, form(entrada)));
@@ -217,6 +224,58 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
       await expect(ParecerAppPage({ params: Promise.resolve({ id: r.id }), searchParams: Promise.resolve({}) })).rejects.toThrow('SEM_SESSAO_N1');
     } finally { atual.semSessao = false; }
     expect(await historicoDoParecer(r.id)).toHaveLength(4);
+    expect((await db.integracaoApp.findUniqueOrThrow({ where: { id: r.id } })).modulos).toEqual(modulos);
+  });
+
+  it.each([
+    { caso: 'merchant-isolado', categoria: 'FINANCAS', modulos: ['MERCHANT'] },
+    { caso: 'avaliacoes', categoria: 'AVALIACOES', modulos: ['MERCHANT', 'REVIEW'] },
+  ])('parecer recusa $caso na página e na action sem gravar estado ou auditoria', async ({ caso, categoria, modulos }) => {
+    const r = await registrarApp({ provedor: 'IFOOD', ambiente: 'PRODUCAO', nome: caso, categoria, clientId: `fora-parecer-${caso}-${sufixo}`, nomeDoSegredo: 'IFOOD_PARECER_CLIENT_SECRET', modulos }, 'teste');
+    if (!r.ok) throw new Error('app negativo não criado');
+    apps.push(r.id);
+    const antes = await db.integracaoApp.findUniqueOrThrow({ where: { id: r.id } });
+    const entrada = { estado: 'HOMOLOGADO', validacaoEm: '2026-11-07', liberacaoEm: '2026-11-08', referencia: 'https://developer.ifood.com.br/pt-BR/developer/applications/app-fora/details', conferido: 'sim' };
+    const resposta = await rodar(acoes.acaoRegistrarParecer(r.id, antes.atualizadoEm.toISOString(), null, form(entrada)));
+    expect(resposta.estado?.ok).toBe(false);
+    expect(resposta.feito).toBeNull();
+    expect(await db.integracaoApp.findUniqueOrThrow({ where: { id: r.id } })).toEqual(antes);
+    expect(await historicoDoParecer(r.id)).toHaveLength(0);
+    await expect(ParecerAppPage({ params: Promise.resolve({ id: r.id }), searchParams: Promise.resolve({}) })).rejects.toThrow('NOT_FOUND');
+    expect(await html(CentralPage())).not.toContain(`href="/rodolfo/integracoes/apps/${r.id}"`);
+  });
+
+  it('homologar Finanças não concede acesso, ativa módulos, muda conexões ou cria token', async () => {
+    const parceiro = await db.parceiroFlow.create({ data: { nome: `Parecer isolado ${sufixo}`, slug: `parecer-isolado-${sufixo}`, status: 'ATIVO' } });
+    ids.push(parceiro.id);
+    const cliente = doParceiro(parceiro.id, db);
+    const lojaId = await loja(cliente, 'Loja do parecer sintético');
+    const app = await registrarApp({ provedor: 'IFOOD', ambiente: 'PRODUCAO', nome: 'Finanças isolado', categoria: 'FINANCAS', clientId: `parecer-isolado-${sufixo}`, nomeDoSegredo: 'IFOOD_PARECER_CLIENT_SECRET', modulos: ['MERCHANT', 'FINANCIAL'] }, 'teste');
+    if (!app.ok) throw new Error('app isolado não criado');
+    apps.push(app.id);
+    const conexao = await ligarConexao(cliente, { lojaId, provedor: 'IFOOD', ambiente: 'PRODUCAO', idExterno: uuid(), nomeExterno: 'Loja sintética no iFood' }, { nome: 'teste' });
+    if (!conexao.ok) throw new Error('conexão sintética não criada');
+    const financial = await prepararModulo(cliente, conexao.id, app.id, 'FINANCIAL', 'teste');
+    const merchant = await prepararModulo(cliente, conexao.id, app.id, 'MERCHANT', 'teste');
+    if (!financial.ok || !merchant.ok) throw new Error('módulos sintéticos não preparados');
+    // Um módulo já tem autorização sintética; o outro ainda não recebeu pedido.
+    expect((await mudarModulo(cliente, financial.id, 'solicitar', 'teste')).ok).toBe(true);
+    expect((await mudarModulo(cliente, financial.id, 'autorizar', 'teste')).ok).toBe(true);
+    const fotografia = async () => ({
+      conexoes: await cliente.integracaoConexao.findMany({ orderBy: { id: 'asc' } }),
+      modulos: await cliente.integracaoConexaoModulo.findMany({ orderBy: { id: 'asc' } }),
+      historicos: await cliente.historicoAlteracao.findMany({ orderBy: { id: 'asc' } }),
+      tokens: await db.integracaoToken.findMany({ where: { appId: app.id } }),
+    });
+    const antes = await fotografia();
+    const cadastrado = await db.integracaoApp.findUniqueOrThrow({ where: { id: app.id } });
+    const resposta = await rodar(acoes.acaoRegistrarParecer(app.id, cadastrado.atualizadoEm.toISOString(), null, form({ estado: 'HOMOLOGADO', validacaoEm: '2026-11-07', liberacaoEm: '2026-11-08', referencia: 'https://developer.ifood.com.br/pt-BR/developer/applications/app-financas/details', conferido: 'sim' })));
+    expect(resposta.feito).toBe('parecer');
+    expect((await db.integracaoApp.findUniqueOrThrow({ where: { id: app.id } })).estadoHomologacao).toBe('HOMOLOGADO');
+    expect(await fotografia()).toEqual(antes);
+    expect(await historicoDoParecer(app.id)).toHaveLength(1);
+    expect((await cliente.integracaoConexaoModulo.findUniqueOrThrow({ where: { id: financial.id } })).estado).toBe('AUTORIZADO');
+    expect((await cliente.integracaoConexaoModulo.findUniqueOrThrow({ where: { id: merchant.id } })).estado).toBe('NAO_SOLICITADO');
   });
 
   it('a Central mostra apps (Client ID, NOME da variável do cofre e validade do acesso), leituras de teste e parceiros; nunca o token nem o segredo', async () => {
