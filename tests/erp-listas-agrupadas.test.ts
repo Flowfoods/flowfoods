@@ -7,7 +7,9 @@
  * - "onde fica" (ficha) e "prazo depois de aberto" (insumo) ligam e desligam com um interruptor (`role="switch"`), sem mudar
  *   o nome nem o valor que o formulário manda;
  * - contraste do interruptor ligado e desligado, nos dois temas;
- * - "Principal" cabe a 320 px.
+ * - "Principal" cabe a 320 px;
+ * - ajustes da confirmação da A4: hifenização do nome dos insumos só abaixo de 360 px com a caixa de marcar, o fornecedor das notas
+ *   cortado e as mensagens dos lugares em "ligue" e "desligue".
  */
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
@@ -17,7 +19,8 @@ import { Painel } from '@/components/erp/ui/superficies';
 import { INTERRUPTOR, MARCAR } from '@/components/erp/ui/campos';
 import { CamposDeValidade } from '@/components/erp/telas/cadastro/campos-validade';
 import { CamposDeConservacao } from '@/components/erp/telas/insumos/campos-conservacao';
-import { ROTULO_DA_OPCAO } from '@/lib/erp/validade';
+import { MENSAGEM_CONSUMO_COM_VALIDADE } from '@/lib/erp/ficha-campos';
+import { lerValidades, ROTULO_DA_OPCAO } from '@/lib/erp/validade';
 
 const css = readFileSync('src/components/erp/tokens.css', 'utf8');
 function regra(seletor: string): string {
@@ -58,6 +61,16 @@ describe('listas agrupadas no celular', () => {
     const lista = s.slice(s.indexOf('<ul className="ff-lista-agrupada'), s.indexOf('</ul>', s.indexOf('<ul className="ff-lista-agrupada')));
     expect(lista).toContain("style={selecionar ? ({ '--ff-recuo-da-lista': '52px' } as CSSProperties) : undefined}");
     expect(lista).toMatch(/<span className=\{`block break-words text-\[17px\] font-medium leading-snug \[overflow-wrap:anywhere\] /);
+    // Com a caixa de marcar e abaixo de 360 px (coluna de uns 93 px), hifenização em vez de partir a palavra a uma letra do
+    // fim; sem a caixa, ou mais largo, não (o hífen só atrapalharia a leitura). É o único lugar com hifenização.
+    expect(lista).toContain("[overflow-wrap:anywhere] ${selecionar ? 'max-[359px]:hyphens-auto' : ''} ${i.ativo");
+    expect(s.match(/hyphens/g)).toHaveLength(1);
+  });
+
+  it('notas: o fornecedor continua cortado com reticências (o número e a data vêm logo embaixo)', () => {
+    const s = readFileSync('src/components/erp/telas/compras/lista-notas.tsx', 'utf8');
+    const lista = s.slice(s.indexOf('<ul className="ff-lista-agrupada'), s.indexOf('</ul>', s.indexOf('<ul className="ff-lista-agrupada')));
+    expect(lista).toMatch(/<span className=\{`block truncate text-\[17px\] font-medium leading-snug [^`]*`\}>\{n\.fornecedor\}<\/span>/);
   });
 
   it('separador recuado como nos Ajustes (16 px), entre as linhas, sem pegar o toque', () => {
@@ -151,8 +164,27 @@ describe('interruptor dos Ajustes', () => {
     expect(fonte).toMatch(/role="switch"\s*name=\{`aceita_\$\{c\}`\}\s*checked=\{l\.marcada\}\s*onChange=\{\(e\) => mudar\(c, \{ marcada: e\.target\.checked \}\)\}\s*className=\{INTERRUPTOR\}/);
   });
 
-  it('a ajuda fala em ligar (é um interruptor, não uma caixa de marcar)', () => {
+  it('a ajuda e as mensagens falam em ligar e desligar (é um interruptor, não uma caixa de marcar)', () => {
     expect(readFileSync('src/components/erp/telas/cadastro/campos-validade.tsx', 'utf8')).toContain("'Ligue onde pode ficar e quanto dura em cada lugar.");
-    expect(readFileSync('src/components/erp/telas/insumos/campos-conservacao.tsx', 'utf8')).toContain('Ligue só onde o insumo pode ficar.');
+    const conservacao = readFileSync('src/components/erp/telas/insumos/campos-conservacao.tsx', 'utf8');
+    expect(conservacao).toContain('Ligue só onde o insumo pode ficar.');
+    expect(conservacao).toContain('a conservação principal, ou desligue as outras.');
+    // As mensagens do servidor sobre esses lugares: sem número, principal sem prazo, prazo só em outra, principal desligada.
+    const linha = (quantidade: string) => ({ marcada: true, quantidade, em: 'dias' as const });
+    const mensagens = [
+      lerValidades({ principal: 'SECO', linhas: { SECO: linha('') } }, 'ficha'),
+      lerValidades({ principal: 'SECO', linhas: {} }, 'ficha'),
+      lerValidades({ principal: 'SECO', linhas: { REFRIGERADO: linha('3') } }, 'insumo'),
+      lerValidades({ principal: 'SECO', linhas: { REFRIGERADO: linha('3'), CONGELADO: linha('30') } }, 'ficha'),
+    ].flatMap((r) => (r.ok ? [] : Object.values(r.erros)));
+    expect(mensagens).toEqual([
+      'Diga quanto dura em seco (ex.: 3 dias) ou desligue.',
+      expect.stringContaining('Ligue seco e diga quanto dura, ou deixe sem principal.'),
+      expect.stringContaining('(a conservação principal) ou desligue as outras.'),
+      'A principal (seco) precisa estar ligada, com a validade.',
+    ]);
+    for (const m of mensagens) expect(m).not.toMatch(/marc/i);
+    // O "Consumo imediato" segue caixa de marcar; os lugares de guarda, interruptor.
+    expect(MENSAGEM_CONSUMO_COM_VALIDADE).toBe('Consumo imediato não fica guardado: desligue os lugares de guarda ou desmarque o consumo imediato.');
   });
 });

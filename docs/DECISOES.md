@@ -4580,7 +4580,8 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 1. **Listas agrupadas no celular** (abaixo de 640 px), nas listas que viram linhas: insumos, fichas e notas de compra.
    - O separador começa onde começa o texto, como nos Ajustes (`.ff-lista-agrupada`, recuo em `--ff-recuo-da-lista`): 16 px; nas fichas, depois da miniatura (72 px); nos insumos com a caixa de marcar, depois dela (52 px).
    - A linha que abre o detalhe termina numa seta (`ff-seta-da-linha`), dentro do próprio link; com cores forçadas, a seta herda a cor do link.
-   - O nome vai a 17 px/500 e quebra em vez de cortar (nos insumos, antes cortado com reticências); as linhas de apoio vão a 13 px (antes, 12 px).
+   - O nome vai a 17 px/500; nos insumos e nas fichas, quebra em vez de cortar (nos insumos, antes cortado com reticências). Nas notas, o fornecedor continua cortado com reticências, como o remetente numa lista de e-mails: o número e a data vêm logo embaixo (ajuste do texto na confirmação da A4). As linhas de apoio vão a 13 px (antes, 12 px).
+   - Nos insumos com a caixa de marcar, abaixo de 360 px, o nome usa hifenização (`hyphens: auto`; a página é `lang="pt-BR"`). Ali a coluna tem uns 93 px, e palavra comum partia a uma letra do fim ("hambúrgue / r", achado da confirmação da A4). Mais largo, a quebra entre palavras basta, e o hífen só atrapalharia a leitura.
    - Nas fichas, Editar e Remover saem do lado do nome para uma linha própria, embaixo, como nos insumos: ao lado da seta, apertavam o nome a 8 ou 9 linhas a 320 px (achado da revisão).
    - O painel em volta dessas listas perde a borda e fica com o raio de 12 px do grupo; com cores forçadas, a borda volta. No computador, nada muda: lá elas são tabela.
 2. **Interruptor dos Ajustes** (`INTERRUPTOR`, `.ff-interruptor`) para o que liga e desliga:
@@ -4590,7 +4591,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
    - Com cores forçadas, volta a ser a caixa do sistema. Com movimento reduzido, a regra geral tira a transição.
    - O foco é o anel neutro dos campos (2 px na cor do texto a 70 %, folga de 1 px), como em todo campo: vermelho no campo quer dizer erro.
    - No insumo, o nome que o leitor de tela lê tem o espaço entre o lugar e "conservação principal" (estava colado, achado da revisão).
-   - A ajuda das duas telas passa a dizer "Ligue" em vez de "Marque".
+   - A ajuda das duas telas passa a dizer "Ligue" em vez de "Marque". Na confirmação da A4, as mensagens também: "ou desligue", "Ligue seco…", "desligue as outras" e "precisa estar ligada". No "Consumo imediato", que segue caixa de marcar, continua "desmarque".
    - O "Principal" da ficha segue rádio.
 3. **"Principal" a 320 px:** as colunas do celular de "onde fica" passaram de 5,5 + 6,5 rem para 4,75 + 6 rem, com 6 px entre elas (antes, 8). O rótulo, que passava 2 px da tela e da borda do painel (limite antigo registrado na decisão 530), agora fica dentro do painel; ainda passa alguns pixels da própria coluna, para o espaço interno do painel.
 
@@ -4607,10 +4608,13 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
   - Duas regressões importantes: o nome do interruptor do insumo colado para o leitor de tela e as fichas com ações espremidas abaixo de 360 px.
   - Menores: a regra de foco do interruptor que nunca valia, o "Principal" sobre a borda do painel, o separador fora do começo do texto, a seta antes dos botões, o nome dos insumos mais cortado, a seta com cores forçadas, lacunas de teste e a ajuda que dizia "Marque".
   - Todos tratados no commit seguinte.
+- **Confirmação** (o mesmo revisor) em 61b2299: **aprovado com ressalvas**, sem bloqueante. Os 10 itens conferem no navegador, e os mutantes que sobreviviam agora falham nos testes. Três menores ficaram para o primeiro commit da fatia seguinte: a palavra partida nos insumos a 320 px com a caixa de marcar, o texto sobre o nome que quebra (não valia para as notas) e as mensagens que ainda falavam em desmarcar.
 - **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
 
 **Limites:**
 - As outras listas com divisórias (detalhes, compras, fornecedores) seguem como estavam; entram quando a tela delas for revista.
 - Não testado em Safari/iOS de verdade nem com leitor de tela real (o anúncio de "interruptor, ligado/desligado").
+- Nas fichas a 320 px, os nomes longos (38 letras) ocupam 4 linhas.
+- Nas fichas, Editar e Remover ficam no fim do item, depois do "CMV por canal": pertencem ao item certo, mas longe do nome.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.

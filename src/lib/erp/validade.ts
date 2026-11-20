@@ -134,7 +134,7 @@ export function lerValidades(
     if (!l?.marcada) continue;
     const nome = CONSERVACOES[c];
     if (!l.quantidade.trim()) {
-      erros[chaveDaValidade(c)] = `Diga ${oQue} em ${nome.toLowerCase()} (ex.: ${l.em === 'horas' ? '6 horas' : '3 dias'}) ou desmarque.`;
+      erros[chaveDaValidade(c)] = `Diga ${oQue} em ${nome.toLowerCase()} (ex.: ${l.em === 'horas' ? '6 horas' : '3 dias'}) ou desligue.`;
       continue;
     }
     const m = paraMinutos(l.quantidade, l.em);
@@ -156,15 +156,15 @@ export function lerValidades(
       principal = escolhida;
     } else if (escolhida) {
       // Herança c da 1.4: principal escolhida sem nenhuma validade não some em silêncio.
-      erros.conservacao = `A principal (${CONSERVACOES[escolhida].toLowerCase()}) foi escolhida, mas nenhuma conservação tem validade. Marque ${CONSERVACOES[escolhida].toLowerCase()} e diga quanto dura, ou deixe sem principal.`;
+      erros.conservacao = `A principal (${CONSERVACOES[escolhida].toLowerCase()}) foi escolhida, mas nenhuma conservação tem validade. Ligue ${CONSERVACOES[escolhida].toLowerCase()} e diga quanto dura, ou deixe sem principal.`;
     }
   } else if (para === 'insumo') {
     // O banco exige que, havendo algum prazo, a conservação principal tenha o seu (CHECK Insumo_validade_principal).
     if (escolhida && marcadas.includes(escolhida)) principal = escolhida;
-    else if (escolhida) erros.conservacao ??= `Você informou prazo em outra conservação. Informe também o prazo em ${CONSERVACOES[escolhida].toLowerCase()} (a conservação principal) ou desmarque as outras.`;
+    else if (escolhida) erros.conservacao ??= `Você informou prazo em outra conservação. Informe também o prazo em ${CONSERVACOES[escolhida].toLowerCase()} (a conservação principal) ou desligue as outras.`;
   } else if (escolhida && marcadas.includes(escolhida)) principal = escolhida;
   else if (marcadas.length === 1 && !escolhida) principal = marcadas[0];
-  else if (escolhida) erros.conservacao ??= `A principal (${CONSERVACOES[escolhida].toLowerCase()}) precisa estar marcada, com a validade.`;
+  else if (escolhida) erros.conservacao ??= `A principal (${CONSERVACOES[escolhida].toLowerCase()}) precisa estar ligada, com a validade.`;
   else erros.conservacao ??= 'Diga qual é a conservação principal (onde o item fica normalmente).';
 
   if (Object.keys(erros).length > 0) return { ok: false, erros };
