@@ -375,12 +375,14 @@ html:has(.ff-app[data-tema='escuro']) {
 .ff-app .ff-lista-agrupada > li {
   position: relative;
 }
+/* O recuo do separador acompanha o começo do texto: 16 px por padrão; a lista que tem miniatura ou caixa de marcar à esquerda
+   diz o seu em `--ff-recuo-da-lista`. */
 .ff-app .ff-lista-agrupada > li + li::before {
   content: '';
   position: absolute;
   top: 0;
   right: 0;
-  left: 16px;
+  left: var(--ff-recuo-da-lista, 16px);
   border-top: 1px solid var(--ff-linha);
   pointer-events: none;
 }
@@ -388,6 +390,12 @@ html:has(.ff-app[data-tema='escuro']) {
   flex-shrink: 0;
   margin-left: -4px;
   color: rgb(var(--ff-suave));
+}
+/* Cores forçadas: a seta herda a cor do link (o `suave` cairia a 2,17:1 com o tema cruzado). */
+@media (forced-colors: active) {
+  .ff-app .ff-seta-da-linha {
+    color: inherit;
+  }
 }
 @media (max-width: 639px) {
   .ff-app .ff-painel:has(.ff-lista-agrupada) {
@@ -405,6 +413,7 @@ html:has(.ff-app[data-tema='escuro']) {
  * Interruptor da Apple (A4, decisão 533) para o que liga e desliga ("onde fica": seco, refrigerado, congelado, pista fria):
  * um `input type="checkbox"` com `role="switch"`, 51 × 31 px como no iPhone, ligado no verde do `ok` e com o polegar branco.
  * O alvo de toque é a linha inteira (o rótulo envolve o campo). Com cores forçadas, volta a ser a caixa de marcar do sistema.
+ * O foco é o anel neutro dos campos (2 px na cor do texto a 70 %, folga de 1 px): vermelho no campo quer dizer erro.
  * Com movimento reduzido, a regra geral (`.ff-app *::after`) já tira a transição do trilho e do polegar.
  */
 .ff-app .ff-interruptor {
@@ -440,10 +449,6 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 .ff-app .ff-interruptor:checked::after {
   transform: translateX(20px);
-}
-.ff-app .ff-interruptor:focus-visible {
-  outline: 3px solid rgb(var(--ff-acento));
-  outline-offset: 2px;
 }
 .ff-app .ff-interruptor:disabled {
   cursor: not-allowed;

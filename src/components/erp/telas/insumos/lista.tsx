@@ -8,6 +8,7 @@
  * moram na URL e o detalhe volta para eles.
  */
 
+import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { formatarData } from '@/lib/erp/compra-campos';
@@ -508,7 +509,7 @@ export function TelaListaInsumos({
         )}
         {/* Celular: lista agrupada da Apple (decisão 533) com linhas que abrem o detalhe; as ações ficam numa linha própria (nada
             de link dentro de link). */}
-        <ul className="ff-lista-agrupada sm:hidden">
+        <ul className="ff-lista-agrupada sm:hidden" style={selecionar ? ({ '--ff-recuo-da-lista': '52px' } as CSSProperties) : undefined}>
           {linhas.map((i) => (
             <li key={i.id}>
               <div className="flex items-center">
@@ -518,7 +519,8 @@ export function TelaListaInsumos({
                 className={`ff-transicao flex min-h-14 min-w-0 flex-1 items-center justify-between gap-3 py-3 pr-3 hover:bg-texto/[0.03] ${selecionar ? 'pl-1' : 'pl-4'}`}
               >
                 <span className="min-w-0 flex-1">
-                  <span className={`block truncate text-[17px] font-medium leading-snug ${i.ativo ? 'text-texto' : 'text-suave'}`}>{i.nome}</span>
+                  {/* O nome quebra em vez de cortar: o fim dele (tamanho, marca) costuma importar. */}
+                  <span className={`block break-words text-[17px] font-medium leading-snug [overflow-wrap:anywhere] ${i.ativo ? 'text-texto' : 'text-suave'}`}>{i.nome}</span>
                   <span className="block truncate text-[13px] text-suave">
                     {i.preparo ? 'Pré-preparo · custo da ficha' : `${TIPOS[i.tipo]} · ${formatarQuantidade(i.conteudoMilesimos, i.unidade)}`}
                     {!i.ativo && ' · Desativado'}

@@ -145,7 +145,8 @@ export function CamposDeConservacao({
                     <IconeDaConservacao conservacao={c} />
                     <span className="min-w-0 flex-1">
                       <span className="text-texto">{ROTULO_DA_OPCAO[c]}</span>
-                      {principal === c && <span className="ml-2 text-[12px] text-suave">conservação principal</span>}
+                      {/* O espaço vai no texto (e não só na margem): o leitor de tela lê "Refrigerado conservação principal". */}
+                      {principal === c && <>{' '}<span className="ml-1 text-[12px] text-suave">conservação principal</span></>}
                     </span>
                     <input
                       type="checkbox"
@@ -200,7 +201,7 @@ export function CamposDeConservacao({
         </ul>
         {!temPonto.prazo && (
           <p className={AJUDA}>
-            Marque só onde o insumo pode ficar. A data de vencimento do lote e a de abertura entram no recebimento da compra e nas etiquetas.
+            Ligue só onde o insumo pode ficar. A data de vencimento do lote e a de abertura entram no recebimento da compra e nas etiquetas.
           </p>
         )}
       </fieldset>

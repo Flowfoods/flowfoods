@@ -8,7 +8,7 @@
  */
 
 import Link from 'next/link';
-import { Fragment } from 'react';
+import { Fragment, type CSSProperties } from 'react';
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { validadesEmTexto } from '@/lib/erp/validade';
 import type { LinhaDeFicha } from '@/lib/erp/fichas';
@@ -175,8 +175,9 @@ export function TelaListaFichas({
 
   return (
     <Painel semRespiro>
-      {/* Celular: lista agrupada da Apple (decisão 533). */}
-      <ul className="ff-lista-agrupada sm:hidden">
+      {/* Celular: lista agrupada da Apple (decisão 533). O separador começa onde começa o nome, depois da miniatura (16 + 44 + 12 px).
+          Editar e Remover ficam numa linha própria, embaixo, como nos insumos: ao lado, apertavam o nome (8 a 9 linhas a 320 px). */}
+      <ul className="ff-lista-agrupada sm:hidden" style={{ '--ff-recuo-da-lista': '72px' } as CSSProperties}>
         {linhas.map((l) => (
           <li key={l.id}>
             <div className="flex items-center">
@@ -198,17 +199,17 @@ export function TelaListaFichas({
               )}
               <ChevronRight size={16} aria-hidden className="ff-seta-da-linha" />
             </Link>
-            {acoes && (
-              <span className="shrink-0 py-2 pr-4">
-                <AcoesDaFicha l={l} base={base} f={f} empilhado />
-              </span>
-            )}
             </div>
             {(l.classificacao.secao || l.classificacao.subsecao || precos?.has(l.id) || correspondenciasCmv?.get(l.id)?.length || correspondenciasFaixasCmv?.get(l.id)?.length) ? <div className="min-w-0 space-y-2 px-4 pb-3">
               <TextoClassificacao classificacao={l.classificacao} />
               <Correspondencias pares={correspondenciasCmv?.get(l.id)} faixas={correspondenciasFaixasCmv?.get(l.id)} />
               {precos?.get(l.id) && <CmvPorCanalCompacto contas={precos.get(l.id)!} href={hrefDoDetalhe(base, l.id, f)} nome={l.nome} />}
             </div> : null}
+            {acoes && (
+              <div className="-mt-1 flex justify-end px-3 pb-1.5">
+                <AcoesDaFicha l={l} base={base} f={f} />
+              </div>
+            )}
           </li>
         ))}
       </ul>

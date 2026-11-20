@@ -231,13 +231,16 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   da área fica no menu, nos cards e na aba do celular.
 - **Lista agrupada no celular** (decisão 533): nas listas que viram linhas
   abaixo de 640 px (insumos, fichas, notas), `ff-lista-agrupada` com o
-  separador recuado de 16 px, nome 17/500, apoio 13 e a seta de abrir
-  (`ff-seta-da-linha`) dentro do link; o painel em volta, no celular, sem
-  borda e com raio de 12 px.
+  separador onde começa o texto (`--ff-recuo-da-lista`: 16 px; 72 depois da
+  miniatura; 52 depois da caixa de marcar), nome 17/500 que quebra, apoio 13
+  e a seta de abrir (`ff-seta-da-linha`) por último dentro do link; ações
+  (Editar, Remover) numa linha própria, embaixo; o painel em volta, no
+  celular, sem borda e com raio de 12 px.
 - **Interruptor** (decisão 533): `INTERRUPTOR` num `input type="checkbox"
   role="switch"` para o que liga e desliga ("onde fica" da ficha, prazo
   depois de aberto do insumo), na ponta da linha; 51 × 31, ligado no `ok`,
-  desligado com contorno no `suave`; cores forçadas voltam à caixa do sistema.
+  desligado com contorno no `suave`; foco é o anel neutro dos campos; cores
+  forçadas voltam à caixa do sistema.
 - **Barra de abas do celular** (decisão 532), abaixo de 640 px: Início, as
   três primeiras áreas da pessoa (na ordem do menu; o nome é a primeira
   palavra da área) e Mais, que abre a gaveta do menu. Fixa no pé, 49 px mais

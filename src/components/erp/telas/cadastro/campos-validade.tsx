@@ -73,8 +73,9 @@ export function CamposDeValidade({
           const podeSerPrincipal = para === 'insumo' || l.marcada;
           return (
             <li key={c} className="py-2.5">
-              {/* Celular: 5rem + 6rem (antes 5,5 + 6,5) para o "Principal" caber a 320 px; antes ele passava 2 px da tela. */}
-              <div className="grid grid-cols-[5rem_6rem_minmax(0,1fr)] items-center gap-x-2 gap-y-1 sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_6.5rem]">
+              {/* Celular: 4,75 + 6 rem e 6 px entre as colunas (antes 5,5 + 6,5 rem e 8 px), para o "Principal" ficar dentro do
+                  painel a 320 px; antes ele passava 2 px da tela. */}
+              <div className="grid grid-cols-[4.75rem_6rem_minmax(0,1fr)] items-center gap-x-1.5 gap-y-1 sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_6.5rem] sm:gap-x-2">
                 {/* Como nos Ajustes (decisão 533): o lugar e, na ponta, o interruptor que liga e desliga; a linha toda é o alvo. */}
                 <label className="col-span-3 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm sm:col-span-1 sm:min-h-[42px] sm:pr-2">
                   <IconeDaConservacao conservacao={c} />
@@ -147,7 +148,7 @@ export function CamposDeValidade({
       <Erro id={`${idBase}-conservacao-erro`} texto={erroGeral} />
       <p className={AJUDA}>
         {para === 'ficha'
-          ? 'Marque onde pode ficar e quanto dura em cada lugar. Principal é onde fica normalmente. Pista fria costuma ser em horas.'
+          ? 'Ligue onde pode ficar e quanto dura em cada lugar. Principal é onde fica normalmente. Pista fria costuma ser em horas.'
           : 'Principal é onde se guarda. Validade depois de aberto (opcional); a do fabricante vem no lote.'}
       </p>
     </fieldset>
