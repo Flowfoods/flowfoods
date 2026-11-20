@@ -11,6 +11,7 @@ Entrega autorizada em 20/11/2026 sobre a base `fa7d7401506786a010e93a9931e18684c
 - A seleção da marca é uma preferência visual validada no servidor, com escopo de usuário e parceiro. Não altera a visão de lojas nem filtros de negócio. Respostas de contextos anteriores não substituem a marca atual.
 - Lojas e marcas contém Identidade visual. A logo pertence à Marca canônica, compartilhada pela rede conforme o modelo existente. Escrita exige `lojas.gerir` e parceiro liberado para escrita.
 - Meu perfil permite enviar, substituir e remover a foto da própria pessoa. UsuarioErp e User mantêm fotos distintas; a foto pessoal não muda com a marca ou parceiro. Sem foto/imagem indisponível, aparecem iniciais.
+- A assinatura FlowFoods usa PNGs com transparência real, extraídos tecnicamente dos JPEGs originais. O fundo e os espaços internos das letras não devem formar um retângulo, sombra ou halo sobre o material do cabeçalho. O recorte preserva o canvas de 1080 × 1080, a composição, o enquadramento e as cores opacas; remove a contaminação do fundo nas bordas suavizadas. Os JPEGs de origem permanecem preservados. Tamanho, alinhamento e distância até BARNEY OS não mudam.
 
 ## Persistência e proteção
 
