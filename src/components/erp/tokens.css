@@ -222,6 +222,17 @@ html:has(.ff-app[data-tema='escuro']) {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Divisórias aprovadas: acento nas fronteiras dos conjuntos, sem recolorir cards,
+   alertas ou linhas de dados. Apenas tela; a impressão mantém seu contrato. */
+@media screen {
+  .ff-app { --ff-divisoria: rgb(var(--ff-acao) / 0.4); }
+  .ff-app .ff-divisoria-coluna { border-right-color: var(--ff-divisoria); }
+  .ff-app .ff-divisoria-barra { border-bottom-color: var(--ff-divisoria); }
+  .ff-app .ff-divisoria-filtros { border-bottom: 1px solid var(--ff-divisoria); padding-bottom: 20px; }
+  .ff-app .ff-divisoria-secao { border-top: 1px solid var(--ff-divisoria); padding-top: 20px; }
+  .ff-app .ff-faturamento-mes.space-y-6 > header + * { margin-top: 20px; }
+}
+
 /* Gelasio tem algarismo de texto ("0" vira "o"): número em Gelasio é sempre de
    linha e tabular. Especificidade acima do utilitário tabular-nums. */
 .ff-app .font-display {

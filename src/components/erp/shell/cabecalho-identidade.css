@@ -7,6 +7,9 @@
   z-index: 31;
   container-type: inline-size;
 }
+@media screen {
+  .ff-cabecalho-identidade { border-bottom: 2px solid rgb(var(--ff-acao)); }
+}
 .ff-cabecalho-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 250px) minmax(0, 1fr); align-items: center; gap: 22px; padding: 12px 26px; }
 .ff-assinatura-central { display: flex; flex-direction: column; align-items: center; justify-self: start; gap: 18px; border-radius: 5px; }
 @media (min-width: 900px) {

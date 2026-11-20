@@ -13,6 +13,12 @@ Entrega autorizada em 20/11/2026 sobre a base `fa7d7401506786a010e93a9931e18684c
 - Meu perfil permite enviar, substituir e remover a foto da própria pessoa. UsuarioErp e User mantêm fotos distintas; a foto pessoal não muda com a marca ou parceiro. Sem foto/imagem indisponível, aparecem iniciais.
 - A assinatura FlowFoods usa PNGs com transparência real, extraídos tecnicamente dos JPEGs originais. O fundo e os espaços internos das letras não devem formar um retângulo, sombra ou halo sobre o material do cabeçalho. O recorte preserva o canvas de 1080 × 1080, a composição, o enquadramento e as cores opacas; remove a contaminação do fundo nas bordas suavizadas. Os JPEGs de origem permanecem preservados. Tamanho, alinhamento e distância até BARNEY OS não mudam.
 
+## Divisórias visuais
+
+Amostra aprovada em 20/11/2026: filete de 2 px no vermelho de ação sob o cabeçalho; divisórias secundárias de 1 px com 40% dessa cor na lateral direita do menu desktop e abaixo da barra de navegação. O shell compartilhado aplica o padrão nos dois níveis de acesso e nos temas claro, escuro e sistema.
+
+Em Faturamento, a divisão após os filtros e a que precede o gráfico diário usam o mesmo traço secundário, com 20 px de respiro. A linha do gráfico só existe quando há gráfico. Alertas, indicadores, dados, campos e painéis mantêm suas bordas e cores semânticas. As novas divisórias são decorativas de tela e não mudam a impressão. Logo, assinatura, marca selecionada, foto e fluxo de navegação permanecem com o contrato acima.
+
 ## Persistência e proteção
 
 Migration aditiva com campos opcionais `Marca.logoArquivo`, `UsuarioErp.fotoArquivo` e `User.fotoArquivo`. Conteúdo no volume privado já existente (`ERP_ARQUIVOS_DIR`, padrão `/data/erp`), em namespaces separados por dono. Upload JPG/PNG/WebP estático, até 8 MiB, 4096 px por lado e 16 megapixels. Validação por bytes, limpeza de metadados, nomes aleatórios e gravação condicional à versão anterior. Sem URL externa.

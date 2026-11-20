@@ -239,7 +239,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
             (z-40), que continuam cobrindo a lateral. */}
         <aside
           aria-label="Navegação"
-          className="sticky top-0 z-30 hidden h-dvh border-r border-linha bg-lateral min-[900px]:block"
+          className="sticky top-0 z-30 hidden h-dvh border-r border-linha bg-lateral min-[900px]:block ff-divisoria-coluna"
         >
           <NavLateral
             nav={nav}
@@ -254,7 +254,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
         <div className="min-w-0">
           {/* Material translúcido da Apple (decisão 530): o borrão fica no `::before` de `.ff-material` (tokens.css), para os
               popovers fixos da barra continuarem presos à tela. */}
-          <header className="ff-material sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-linha px-2 sm:px-4 lg:px-6">
+          <header className="ff-material sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-linha px-2 sm:px-4 lg:px-6 ff-divisoria-barra">
             <div className="flex min-w-0 items-center gap-1 sm:gap-2">
               <button
                 ref={botaoMenu}
