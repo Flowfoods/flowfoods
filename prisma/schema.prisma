@@ -569,6 +569,9 @@ model ParceiroFlow {
   erpLojas                    Loja[]
   erpReviewPoliticas          ReviewPolitica[]
   erpReviewPoliticaVersoes     ReviewPoliticaVersao[]
+  erpReviewSugestoes ReviewSugestao[]
+  erpReviewSugestaoRevisoes ReviewSugestaoRevisao[]
+  erpReviewSugestaoAprovacoes ReviewSugestaoAprovacao[]
   erpMarcas                   Marca[]
   erpColaboradores            Colaborador[]
   erpFornecedores             Fornecedor[]
@@ -735,6 +738,7 @@ model Loja {
   // INT-1.1: as lojas de um provedor (iFood) ligadas a esta loja.
   conexoesDeIntegracao IntegracaoConexao[]
   reviewPoliticas     ReviewPolitica[]
+  reviewSugestoes ReviewSugestao[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, slug])
@@ -2542,6 +2546,7 @@ model ReviewPolitica {
 
 // Conteúdo completo de cada versão, sem herança parcial nem edição destrutiva.
 model ReviewPoliticaVersao {
+  sugestaoRevisoes ReviewSugestaoRevisao[]
   id              String         @id @default(cuid())
   parceiroId      String
   parceiro        ParceiroFlow   @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
@@ -2562,7 +2567,79 @@ model ReviewPoliticaVersao {
   @@unique([parceiroId, politicaId, numero])
 }
 
+// Preparação editorial LOCAL_SIMULATION / INATIVA, sem transporte.
+model ReviewSugestao {
+  id String @id @default(cuid())
+  parceiroId String
+  parceiro ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId String
+  loja Loja @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  avaliacaoLocalId String
+  origem String
+  capacidade String
+  estado String
+  revisaoAtual Int
+  criadoEm DateTime @default(now())
+  revisoes ReviewSugestaoRevisao[]
+  aprovacoes ReviewSugestaoAprovacao[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, lojaId, avaliacaoLocalId])
+  @@index([parceiroId, lojaId, estado, id])
+}
+
+model ReviewSugestaoRevisao {
+  id String @id @default(cuid())
+  parceiroId String
+  parceiro ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  sugestaoId String
+  sugestao ReviewSugestao @relation(fields: [parceiroId, sugestaoId], references: [parceiroId, id], onDelete: Restrict)
+  numero Int
+  fatosVersao String
+  fatosComentario String
+  texto String
+  visibilidade String
+  politicaVersaoId String
+  politicaVersao ReviewPoliticaVersao @relation(fields: [parceiroId, politicaVersaoId], references: [parceiroId, id], onDelete: Restrict)
+  politicaSnapshot Json
+  editorUserId String
+  editorNome String
+  aprovacoes ReviewSugestaoAprovacao[]
+  motivo String
+  criadoEm DateTime @default(now())
+  historicoId String
+  historico HistoricoAlteracao @relation("ReviewRevisaoAuditoria", fields: [parceiroId, historicoId], references: [parceiroId, id], onDelete: Restrict)
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, historicoId])
+  @@unique([parceiroId, sugestaoId, numero])
+  @@index([parceiroId, sugestaoId, fatosVersao])
+}
+
+model ReviewSugestaoAprovacao {
+  id String @id @default(cuid())
+  parceiroId String
+  parceiro ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  sugestaoId String
+  sugestao ReviewSugestao @relation(fields: [parceiroId, sugestaoId], references: [parceiroId, id], onDelete: Restrict)
+  revisao Int
+  revisaoAprovada ReviewSugestaoRevisao @relation(fields: [parceiroId, sugestaoId, revisao], references: [parceiroId, sugestaoId, numero], onDelete: Restrict)
+  aprovadorUserId String
+  aprovadorNome String
+  motivo String
+  criadoEm DateTime @default(now())
+  historicoId String
+  historico HistoricoAlteracao @relation("ReviewAprovacaoAuditoria", fields: [parceiroId, historicoId], references: [parceiroId, id], onDelete: Restrict)
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, historicoId])
+  @@unique([parceiroId, sugestaoId, revisao])
+}
+
 model HistoricoAlteracao {
+  reviewRevisoes ReviewSugestaoRevisao[] @relation("ReviewRevisaoAuditoria")
+  reviewAprovacoes ReviewSugestaoAprovacao[] @relation("ReviewAprovacaoAuditoria")
+  @@unique([parceiroId, id])
   id            String       @id @default(cuid())
   parceiroId    String
   parceiro      ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
