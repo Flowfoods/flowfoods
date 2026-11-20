@@ -6,7 +6,7 @@
  * pode fazer ("Novo insumo", "Lançar nota"), os parceiros (nível 1) e os
  * insumos do parceiro atual por nome — estes pelo servidor, que confere
  * "ver insumos" antes de responder. Setas escolhem, Enter abre, Escape fecha.
- * Sem animação ao abrir: é atalho de uso diário.
+ * Abre com a entrada dos diálogos (no celular, a folha sobe de baixo; decisão 534) e fecha na hora.
  */
 
 import { useRouter } from 'next/navigation';

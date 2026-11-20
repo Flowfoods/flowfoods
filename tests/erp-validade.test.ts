@@ -130,7 +130,7 @@ describe('ERP 1.4 · validação das conservações e validades', () => {
 
   it('a principal precisa estar marcada; com várias marcadas, precisa ser dita; valor forjado é recusado', () => {
     const naoMarcada = lerValidades(form({ ...cheddar, conservacao: 'SECO' }), 'ficha');
-    expect(!naoMarcada.ok && naoMarcada.erros.conservacao).toMatch(/principal \(seco\) precisa estar marcada/);
+    expect(!naoMarcada.ok && naoMarcada.erros.conservacao).toMatch(/principal \(seco\) precisa estar ligada/);
     const semPrincipal = lerValidades(form({ ...cheddar, conservacao: '' }), 'ficha');
     expect(!semPrincipal.ok && semPrincipal.erros.conservacao).toMatch(/Diga qual é a conservação principal/);
     const forjada = lerValidades(form({ ...cheddar, conservacao: 'FORNO' }), 'ficha');

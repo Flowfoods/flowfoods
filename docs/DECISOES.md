@@ -4580,7 +4580,11 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 1. **Listas agrupadas no celular** (abaixo de 640 px), nas listas que viram linhas: insumos, fichas e notas de compra.
    - O separador começa onde começa o texto, como nos Ajustes (`.ff-lista-agrupada`, recuo em `--ff-recuo-da-lista`): 16 px; nas fichas, depois da miniatura (72 px); nos insumos com a caixa de marcar, depois dela (52 px).
    - A linha que abre o detalhe termina numa seta (`ff-seta-da-linha`), dentro do próprio link; com cores forçadas, a seta herda a cor do link.
-   - O nome vai a 17 px/500 e quebra em vez de cortar (nos insumos, antes cortado com reticências); as linhas de apoio vão a 13 px (antes, 12 px).
+   - O nome vai a 17 px/500; nos insumos e nas fichas, quebra em vez de cortar (nos insumos, antes cortado com reticências). Nas notas, o fornecedor continua cortado com reticências, como o remetente numa lista de e-mails: o número e a data vêm logo embaixo (ajuste do texto na confirmação da A4). As linhas de apoio vão a 13 px (antes, 12 px).
+   - Nos insumos com a caixa de marcar, abaixo de 340 px, o nome usa hifenização (`hyphens: auto`; a página é `lang="pt-BR"`), só em palavra de 10 letras ou mais (`hyphenate-limit-chars: 10`). Ali a coluna tem de 93 a 112 px, e palavra longa partia a uma letra do fim ("hambúrgue / r", achado da confirmação da A4).
+     - Sem o limite de 10 letras, e até 359 px, o hífen partia palavras que caberiam inteiras na linha seguinte ("bo-vino", "espe-cial", "sinté-tico"; achado da revisão da A5). Com o limite, no Chromium, nenhuma quebra a mais entre 320 e 359 px.
+     - Hipótese não conferida: o Safari pode não ler o limite; ali vale a hifenização comum, só abaixo de 340 px.
+     - Limite: um nome com palavra curta que não cabe na coluna ("Picles" num item de preço largo) ainda parte no meio, como antes.
    - Nas fichas, Editar e Remover saem do lado do nome para uma linha própria, embaixo, como nos insumos: ao lado da seta, apertavam o nome a 8 ou 9 linhas a 320 px (achado da revisão).
    - O painel em volta dessas listas perde a borda e fica com o raio de 12 px do grupo; com cores forçadas, a borda volta. No computador, nada muda: lá elas são tabela.
 2. **Interruptor dos Ajustes** (`INTERRUPTOR`, `.ff-interruptor`) para o que liga e desliga:
@@ -4590,7 +4594,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
    - Com cores forçadas, volta a ser a caixa do sistema. Com movimento reduzido, a regra geral tira a transição.
    - O foco é o anel neutro dos campos (2 px na cor do texto a 70 %, folga de 1 px), como em todo campo: vermelho no campo quer dizer erro.
    - No insumo, o nome que o leitor de tela lê tem o espaço entre o lugar e "conservação principal" (estava colado, achado da revisão).
-   - A ajuda das duas telas passa a dizer "Ligue" em vez de "Marque".
+   - A ajuda das duas telas passa a dizer "Ligue" em vez de "Marque". Na confirmação da A4, as mensagens também: "ou desligue", "Ligue seco…", "desligue as outras" e "precisa estar ligada". No "Consumo imediato", que segue caixa de marcar, continua "desmarque".
    - O "Principal" da ficha segue rádio.
 3. **"Principal" a 320 px:** as colunas do celular de "onde fica" passaram de 5,5 + 6,5 rem para 4,75 + 6 rem, com 6 px entre elas (antes, 8). O rótulo, que passava 2 px da tela e da borda do painel (limite antigo registrado na decisão 530), agora fica dentro do painel; ainda passa alguns pixels da própria coluna, para o espaço interno do painel.
 
@@ -4607,10 +4611,52 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
   - Duas regressões importantes: o nome do interruptor do insumo colado para o leitor de tela e as fichas com ações espremidas abaixo de 360 px.
   - Menores: a regra de foco do interruptor que nunca valia, o "Principal" sobre a borda do painel, o separador fora do começo do texto, a seta antes dos botões, o nome dos insumos mais cortado, a seta com cores forçadas, lacunas de teste e a ajuda que dizia "Marque".
   - Todos tratados no commit seguinte.
+- **Confirmação** (o mesmo revisor) em 61b2299: **aprovado com ressalvas**, sem bloqueante. Os 10 itens conferem no navegador, e os mutantes que sobreviviam agora falham nos testes. Três menores ficaram para o primeiro commit da fatia seguinte: a palavra partida nos insumos a 320 px com a caixa de marcar, o texto sobre o nome que quebra (não valia para as notas) e as mensagens que ainda falavam em desmarcar.
 - **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
 
 **Limites:**
 - As outras listas com divisórias (detalhes, compras, fornecedores) seguem como estavam; entram quando a tela delas for revista.
 - Não testado em Safari/iOS de verdade nem com leitor de tela real (o anúncio de "interruptor, ligado/desligado").
+- Nas fichas a 320 px, os nomes longos (38 letras) ocupam 4 linhas.
+- Na importação de fichas por planilha, as mensagens de validade vêm do mesmo leitor do formulário e falam em "desligue" (antes, "desmarque"); nenhum dos dois verbos cabe numa planilha. Não é regressão; fica para quando a importação for revista.
+- Nas fichas, Editar e Remover ficam no fim do item, depois do "CMV por canal": pertencem ao item certo, mas longe do nome.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 534. 2026-11-19 · Visual da Apple no ERP, fatia A5: as folhas
+
+**Fonte e recorte:** quinta e última fatia do visual da Apple aprovado por Rodolfo em 18/11/2026 (decisões 530 a 533), com o pedido de seguir todas as fases sem nova pergunta. O protótipo mostrava a folha "Novo insumo": no iPhone, presa embaixo e com os cantos arredondados; no Mac, centralizada; nos dois, a barra com o título no centro. Só o diálogo do kit (`Dialogo`) e as regras dele em `tokens.css`. Sem regra, permissão, destino, schema, migration, dado ou infraestrutura; nenhuma tela foi transformada em folha.
+
+1. **Barra das folhas** (diálogo que não é gaveta, como "Imprimir a ficha"):
+   - o título no centro, em 17 px/600, na letra do sistema;
+   - uma coluna vazia à esquerda, do tamanho do fechar, para o título ficar no meio de verdade (ele quebra em vez de cortar);
+   - substitui, nesses diálogos, o título em Gelasio 20 px à esquerda.
+2. **Fechar redondo** em todos os diálogos e gavetas: o X num círculo de 30 px no `preenchimento` (sob o ponteiro, o forte e o X na cor do texto), com o alvo de 44 px em volta. As gavetas (menu e ajuda) mantêm o título em Gelasio à esquerda.
+3. **Folha no celular** (`sheet`, abaixo de 600 px: a busca ⌘K e a ajuda):
+   - continua presa embaixo, na largura disponível, agora com cantos de 14 px (antes, os 19 px do modal);
+   - entra de baixo para cima: opacidade e 28 px, a mesma distância e os mesmos 220 ms da gaveta de lado;
+   - fechar continua imediato, sem animação de saída;
+   - com movimento reduzido, a regra geral tira a animação.
+   - Sem o puxador: a Apple só o põe em folha que muda de altura ou fecha ao arrastar, e as nossas não fazem isso.
+4. **Busca ⌘K, o diálogo de título escondido:** fica só o título, para o leitor de tela, sem a barra e sem o fechar. Antes, a barra escondida levava junto um X invisível que recebia o foco: Shift+Tab a partir do campo caía nele. A busca tem o próprio fechar ("Fechar a busca"), e o Escape fecha, como em todo diálogo.
+5. **Achados da revisão independente** (em ab4918e), tratados no commit seguinte:
+   - a barra centrada voltou a `py-2`: com `py-1.5`, o anel de foco do fechar perdia 1 px em cima, cortado pela borda do diálogo;
+   - os títulos (folha e gaveta) usam `focus:outline-none`: o `outline-none` do Tailwind é um contorno transparente que as cores forçadas pintam; sem foco, desenhava uma caixa em volta do título, como se fosse um campo;
+   - o cartão de ajuda do prazo do insumo dizia "Marque"; agora diz "Ligue" (o texto dos pontos de ajuda não entra na versão da caixa, então ela não volta com "MUDOU");
+   - a hifenização dos insumos ficou abaixo de 340 px e só em palavra de 10 letras ou mais (decisão 533);
+   - o teste da folha passou a recortar o bloco do celular pelas chaves e a conferir que fora dele não há a entrada de baixo;
+   - o comentário da busca dizia "sem animação ao abrir", e a escala de letras do `system.md` não tinha os 17 px.
+6. **O que não muda:** o contrato do diálogo nativo (`showModal`, Escape, clique no fundo, o foco que volta), as gavetas de lado no computador, a janela de módulo e o fundo de bloqueio.
+
+**Verificação:**
+- **Testes:**
+  - 12 em `tests/erp-folhas-apple.test.ts`: a barra, o título sem contorno fora do foco, a gaveta, o fechar nos dois tipos, o título escondido (sem barra e sem fechar), o contrato do diálogo, a folha só no bloco do celular, os cantos e a entrada, a ordem das regras da ajuda e o contraste do fechar nos dois temas.
+  - O contrato de movimento de `erp-padrao-visual` passou a incluir a entrada da folha (`ff-folha`).
+  - Com os dois arquivos, 49 passam.
+- **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
+
+**Limites:**
+- Não testado em Safari/iOS de verdade.
+- As telas que abrem "Novo insumo" e afins seguem como páginas: transformar formulários em folhas mudaria a navegação e o retorno (e a recuperação do Novo insumo, decisão 529), e fica fora deste plano visual.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.

@@ -171,7 +171,7 @@ export interface DadosFicha {
 }
 
 /** F4: a frase quando a ficha marca consumo imediato e também diz onde guarda. */
-export const MENSAGEM_CONSUMO_COM_VALIDADE = 'Consumo imediato não fica guardado: desmarque os lugares de guarda ou desmarque o consumo imediato.';
+export const MENSAGEM_CONSUMO_COM_VALIDADE = 'Consumo imediato não fica guardado: desligue os lugares de guarda ou desmarque o consumo imediato.';
 
 export interface ItemDaFicha {
   insumoId: string | null;

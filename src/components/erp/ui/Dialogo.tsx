@@ -12,6 +12,11 @@
  * opacidade + 7 px + escala 0,98; gaveta, com 28 px de deslocamento lateral;
  * o fundo de bloqueio, só com opacidade; tudo em 220 ms. Fechar é imediato,
  * sem animação de saída. Abrir, animar e fechar não gravam nem enviam nada.
+ *
+ * Folha da Apple (decisão 534): o diálogo que não é gaveta tem a barra das
+ * folhas, com o título no centro em 17 px/600 e o fechar redondo na ponta; no
+ * celular, a folha (`sheet`) entra de baixo, com cantos de 14 px. As gavetas
+ * seguem com o título em Gelasio à esquerda e ganham o mesmo fechar redondo.
  */
 
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
@@ -38,7 +43,7 @@ export function Dialogo({
   gaveta?: boolean;
   sheet?: boolean;
   className?: string;
-  /** O título fica só para leitor de tela (a busca tem o campo como cabeça). */
+  /** O título fica só para leitor de tela, sem a barra nem o fechar (a busca tem o campo como cabeça e o próprio fechar). */
   esconderTitulo?: boolean;
   id?: string;
   /** Só com `gaveta`: de que lado ela entra. */
@@ -87,24 +92,45 @@ export function Dialogo({
     >
       {aberto && (
         <div className="flex h-full flex-col">
-          <header
-            className={`flex items-center justify-between gap-3 border-b border-linha py-2 pl-5 pr-3 ${esconderTitulo ? 'sr-only' : ''}`}
-          >
-            <h2 data-ff-titulo tabIndex={-1} className="min-w-0 break-words font-display text-[20px] font-normal leading-tight tracking-[-0.01em] outline-none">
+          {esconderTitulo ? (
+            // Quem esconde a barra (a busca ⌘K) traz o próprio fechar: fica só o título, para o leitor de tela. Um X escondido
+            // seria uma parada de Tab invisível.
+            <h2 data-ff-titulo tabIndex={-1} className="sr-only">
               {titulo}
             </h2>
-            <button
-              type="button"
-              onClick={() => fechar.current()}
-              aria-label="Fechar"
-              className="ff-transicao inline-grid h-11 w-11 shrink-0 place-items-center rounded-botao text-suave hover:bg-texto/5 hover:text-texto"
-            >
-              <X size={18} aria-hidden />
-            </button>
-          </header>
+          ) : gaveta ? (
+            <header className="flex items-center justify-between gap-3 border-b border-linha py-2 pl-5 pr-3">
+              <h2 data-ff-titulo tabIndex={-1} className="min-w-0 break-words font-display text-[20px] font-normal leading-tight tracking-[-0.01em] focus:outline-none">
+                {titulo}
+              </h2>
+              <BotaoFechar aoFechar={() => fechar.current()} />
+            </header>
+          ) : (
+            // A coluna vazia à esquerda tem a largura do fechar: o título fica no meio de verdade e quebra em vez de cortar. O
+            // `py-2` deixa folga para o anel de foco do fechar. Nos títulos, `focus:outline-none`: o contorno transparente do
+            // Tailwind aparece nas cores forçadas; sem foco, desenhava uma caixa em volta do título, como se fosse um campo.
+            <header className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 border-b border-linha px-2 py-2">
+              <span aria-hidden />
+              <h2 data-ff-titulo tabIndex={-1} className="min-w-0 break-words text-center text-[17px] font-semibold leading-snug focus:outline-none">
+                {titulo}
+              </h2>
+              <BotaoFechar aoFechar={() => fechar.current()} />
+            </header>
+          )}
           {children}
         </div>
       )}
     </dialog>
+  );
+}
+
+/** O fechar das folhas da Apple: o X num círculo cinza de 30 px, com o alvo de toque de 44 px em volta. */
+function BotaoFechar({ aoFechar }: { aoFechar: () => void }) {
+  return (
+    <button type="button" onClick={aoFechar} aria-label="Fechar" className="group inline-grid h-11 w-11 shrink-0 place-items-center rounded-full">
+      <span className="ff-transicao grid h-[30px] w-[30px] place-items-center rounded-full bg-preenchimento text-suave group-hover:bg-preenchimento-forte group-hover:text-texto">
+        <X size={16} strokeWidth={2.25} aria-hidden />
+      </span>
+    </button>
   );
 }

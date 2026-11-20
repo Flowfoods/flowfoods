@@ -192,7 +192,7 @@ export function CamposDeConservacao({
                 <Erro id={`${idBase}-${chave}-erro`} texto={erro} />
                 {faltaDaPrincipal && principal === c && (
                   <p role="status" className="mt-1.5 text-[13px] text-atencao">
-                    Informe também o prazo em {nome.toLowerCase()}, a conservação principal, ou desmarque as outras.
+                    Informe também o prazo em {nome.toLowerCase()}, a conservação principal, ou desligue as outras.
                   </p>
                 )}
               </li>
