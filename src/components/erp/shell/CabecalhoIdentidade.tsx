@@ -56,6 +56,14 @@ export function CabecalhoIdentidade({ props, slug, inicio }: { props: PropsDoShe
   return (
     <header className="ff-cabecalho-identidade" aria-label="Identidade do sistema">
       <div className="ff-cabecalho-grade">
+        <Link href={inicio} className="ff-assinatura-central" aria-label="FlowFoods — início. BARNEY OS">
+          <span className="ff-logo-janela" aria-hidden>
+            {/* Ativo original da marca, com enquadramento que preserva sua proporção. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/identidade/flowfoods-escuro.jpeg" alt="" width={1080} height={1080} />
+          </span>
+          <span className="ff-barney-os">BARNEY <span>OS</span></span>
+        </Link>
         <div className="ff-cabecalho-marca" aria-busy={pendente}>
           {dados ? <Popover
             rotulo={`Marca no cabeçalho: ${marca?.nome ?? 'nenhuma cadastrada'}`}
@@ -78,14 +86,6 @@ export function CabecalhoIdentidade({ props, slug, inicio }: { props: PropsDoShe
           </div>}</Popover> : <p className="text-center text-[12px] text-suave">{slug && carregar ? 'Carregando marca…' : 'FlowFoods'}</p>}
           {falha && <p role="alert" className="mt-2 text-center text-[12px] text-erro">{falha}</p>}
         </div>
-        <Link href={inicio} className="ff-assinatura-central" aria-label="FlowFoods — início. BARNEY OS">
-          <span className="ff-logo-janela" aria-hidden>
-            {/* Ativo original da marca; enquadramento igual à prévia aprovada. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/identidade/flowfoods-escuro.jpeg" alt="" width={1080} height={1080} />
-          </span>
-          <span className="ff-barney-os">BARNEY <span>OS</span></span>
-        </Link>
         <div className="ff-cabecalho-conta"><MenuUsuario usuario={props.usuario} tema={props.tema} links={props.links} sair={props.sair} /></div>
       </div>
     </header>
