@@ -19,6 +19,7 @@ import { Painel } from '@/components/erp/ui/superficies';
 import { INTERRUPTOR, MARCAR } from '@/components/erp/ui/campos';
 import { CamposDeValidade } from '@/components/erp/telas/cadastro/campos-validade';
 import { CamposDeConservacao } from '@/components/erp/telas/insumos/campos-conservacao';
+import { ENTRADAS } from '@/lib/erp/ajuda-textos';
 import { MENSAGEM_CONSUMO_COM_VALIDADE } from '@/lib/erp/ficha-campos';
 import { lerValidades, ROTULO_DA_OPCAO } from '@/lib/erp/validade';
 
@@ -61,9 +62,10 @@ describe('listas agrupadas no celular', () => {
     const lista = s.slice(s.indexOf('<ul className="ff-lista-agrupada'), s.indexOf('</ul>', s.indexOf('<ul className="ff-lista-agrupada')));
     expect(lista).toContain("style={selecionar ? ({ '--ff-recuo-da-lista': '52px' } as CSSProperties) : undefined}");
     expect(lista).toMatch(/<span className=\{`block break-words text-\[17px\] font-medium leading-snug \[overflow-wrap:anywhere\] /);
-    // Com a caixa de marcar e abaixo de 360 px (coluna de uns 93 px), hifenização em vez de partir a palavra a uma letra do
-    // fim; sem a caixa, ou mais largo, não (o hífen só atrapalharia a leitura). É o único lugar com hifenização.
-    expect(lista).toContain("[overflow-wrap:anywhere] ${selecionar ? 'max-[359px]:hyphens-auto' : ''} ${i.ativo");
+    // Com a caixa de marcar e abaixo de 340 px (coluna de 93 a 112 px), hifenização em vez de partir a palavra a uma letra do
+    // fim, só em palavra de 10 letras ou mais (sem o limite, partia "bo-vino", que caberia inteira na linha seguinte); sem a
+    // caixa, ou mais largo, não. É o único lugar com hifenização.
+    expect(lista).toContain("[overflow-wrap:anywhere] ${selecionar ? 'max-[339px]:hyphens-auto [hyphenate-limit-chars:10]' : ''} ${i.ativo");
     expect(s.match(/hyphens/g)).toHaveLength(1);
   });
 
@@ -168,6 +170,10 @@ describe('interruptor dos Ajustes', () => {
     expect(readFileSync('src/components/erp/telas/cadastro/campos-validade.tsx', 'utf8')).toContain("'Ligue onde pode ficar e quanto dura em cada lugar.");
     const conservacao = readFileSync('src/components/erp/telas/insumos/campos-conservacao.tsx', 'utf8');
     expect(conservacao).toContain('Ligue só onde o insumo pode ficar.');
+    // Com o ponto de ajuda, o texto da tela some e quem explica é o cartão do "?": ele também diz "Ligue".
+    const prazo = ENTRADAS.find((e) => e.chave === 'insumo-novo')!.pontos!.find((p) => p.id === 'prazo-abertura')!;
+    expect(prazo.blocos.map((b) => b.texto).join(' ')).toContain('Ligue só onde o insumo pode ficar;');
+    expect(prazo.blocos.map((b) => b.texto).join(' ')).not.toMatch(/marc/i);
     expect(conservacao).toContain('a conservação principal, ou desligue as outras.');
     // As mensagens do servidor sobre esses lugares: sem número, principal sem prazo, prazo só em outra, principal desligada.
     const linha = (quantidade: string) => ({ marcada: true, quantidade, em: 'dias' as const });

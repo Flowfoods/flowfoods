@@ -86,8 +86,9 @@ Libre Franklin fica de reserva (`--ff-fonte-texto`). Gelasio nos títulos
 editoriais: h1 da página, o título grande da Apple
 (34 px/1,15, peso regular, em todas as larguras; decisão 532), título de gaveta
 (20 px), número grande e título de estado vazio (sempre
-`lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 20 · 34; título de
-painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px; no menu lateral, desde a decisão 531, o grupo é em letra normal; nome da aba do celular, decisão 532: 10,5 px, como no iPhone). Caixa
+`lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 17 · 20 · 34 (17:
+nome das listas agrupadas, 500, decisão 533; título da barra das folhas,
+600, decisão 534); título de painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px; no menu lateral, desde a decisão 531, o grupo é em letra normal; nome da aba do celular, decisão 532: 10,5 px, como no iPhone). Caixa
 alta só no rótulo de seção do hub e nos grupos do seletor de áreas.
 
 ## Espaço e raio
@@ -234,10 +235,10 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   separador onde começa o texto (`--ff-recuo-da-lista`: 16 px; 72 depois da
   miniatura; 52 depois da caixa de marcar), nome 17/500 que quebra (nas
   notas, o fornecedor corta com reticências; nos insumos com a caixa de
-  marcar, abaixo de 360 px, com hífen), apoio 13 e a seta de abrir
-  (`ff-seta-da-linha`) por último dentro do link; ações (Editar, Remover)
-  numa linha própria, embaixo; o painel em volta, no celular, sem borda e
-  com raio de 12 px.
+  marcar, abaixo de 340 px, com hífen só em palavra de 10 letras ou mais),
+  apoio 13 e a seta de abrir (`ff-seta-da-linha`) por último dentro do
+  link; ações (Editar, Remover) numa linha própria, embaixo; o painel em
+  volta, no celular, sem borda e com raio de 12 px.
 - **Folha** (decisão 534): o diálogo que não é gaveta tem a barra das folhas,
   título no centro em 17/600 na letra do sistema; todo diálogo e gaveta tem o
   fechar redondo (X num círculo de 30 px no `preenchimento`, alvo de 44). No

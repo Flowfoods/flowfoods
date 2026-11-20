@@ -199,7 +199,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'prazo-abertura',
         titulo: 'Prazo de uso após abertura',
         blocos: [
-          { texto: 'Prazo para consumir depois de abrir a embalagem, conforme o fabricante e o procedimento validado da operação. Marque só onde o insumo pode ficar; em branco, fica “não informado”. O vencimento do lote entra no recebimento da compra e nas etiquetas.' },
+          { texto: 'Prazo para consumir depois de abrir a embalagem, conforme o fabricante e o procedimento validado da operação. Ligue só onde o insumo pode ficar; em branco, fica “não informado”. O vencimento do lote entra no recebimento da compra e nas etiquetas.' },
         ],
         secao: 'campos',
       },

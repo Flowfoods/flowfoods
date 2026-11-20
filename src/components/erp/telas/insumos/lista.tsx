@@ -520,9 +520,10 @@ export function TelaListaInsumos({
               >
                 <span className="min-w-0 flex-1">
                   {/* O nome quebra em vez de cortar: o fim dele (tamanho, marca) costuma importar. Com a caixa de marcar e abaixo
-                      de 360 px, a coluna fica com uns 93 px e palavra comum partia a uma letra do fim ("hambúrgue / r"); ali vale a
-                      hifenização (a página é pt-BR). Mais largo, a quebra entre palavras basta e o hífen só atrapalharia a leitura. */}
-                  <span className={`block break-words text-[17px] font-medium leading-snug [overflow-wrap:anywhere] ${selecionar ? 'max-[359px]:hyphens-auto' : ''} ${i.ativo ? 'text-texto' : 'text-suave'}`}>{i.nome}</span>
+                      de 340 px, a coluna fica com 93 a 112 px e palavra longa partia a uma letra do fim ("hambúrgue / r"); ali vale
+                      a hifenização (a página é pt-BR), só em palavra de 10 letras ou mais: sem esse limite, o hífen partia palavras
+                      que caberiam inteiras na linha seguinte ("bo-vino"). Mais largo, a quebra entre palavras basta. */}
+                  <span className={`block break-words text-[17px] font-medium leading-snug [overflow-wrap:anywhere] ${selecionar ? 'max-[339px]:hyphens-auto [hyphenate-limit-chars:10]' : ''} ${i.ativo ? 'text-texto' : 'text-suave'}`}>{i.nome}</span>
                   <span className="block truncate text-[13px] text-suave">
                     {i.preparo ? 'Pré-preparo · custo da ficha' : `${TIPOS[i.tipo]} · ${formatarQuantidade(i.conteudoMilesimos, i.unidade)}`}
                     {!i.ativo && ' · Desativado'}

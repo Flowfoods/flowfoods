@@ -18,8 +18,17 @@ const marcar = (props: Record<string, unknown>) => renderToStaticMarkup(createEl
 describe('folhas da Apple · barra', () => {
   it('diálogo: título no centro em 17 px/600 (letra do sistema), com uma coluna vazia do tamanho do fechar à esquerda', () => {
     const h = marcar({});
-    expect(h).toMatch(/<header class="grid grid-cols-\[2\.75rem_minmax\(0,1fr\)_2\.75rem\] items-center gap-2 border-b border-linha px-2 py-1\.5"><span aria-hidden="true"><\/span><h2 data-ff-titulo="true" tabindex="-1" class="min-w-0 break-words text-center text-\[17px\] font-semibold leading-snug outline-none">Imprimir a ficha<\/h2>/);
+    // py-2: folga para o anel de foco do fechar (com py-1.5 ele perdia 1 px em cima, cortado pela borda do diálogo).
+    expect(h).toMatch(/<header class="grid grid-cols-\[2\.75rem_minmax\(0,1fr\)_2\.75rem\] items-center gap-2 border-b border-linha px-2 py-2"><span aria-hidden="true"><\/span><h2 data-ff-titulo="true" tabindex="-1" class="min-w-0 break-words text-center text-\[17px\] font-semibold leading-snug focus:outline-none">Imprimir a ficha<\/h2>/);
     expect(h).not.toContain('font-display');
+  });
+
+  it('título sem contorno só no foco: com cores forçadas, o contorno transparente do Tailwind não vira uma caixa em volta dele', () => {
+    for (const props of [{}, { gaveta: true }]) {
+      const h2 = /<h2 data-ff-titulo="true"[^>]*class="([^"]*)"/.exec(marcar(props))![1].split(' ');
+      expect(h2).toContain('focus:outline-none');
+      expect(h2).not.toContain('outline-none');
+    }
   });
 
   it('gaveta: o título segue em Gelasio à esquerda', () => {
@@ -55,7 +64,22 @@ describe('folhas da Apple · barra', () => {
 });
 
 describe('folhas da Apple · no celular', () => {
-  const celular = css.slice(css.indexOf('@media (max-width: 599px) {'));
+  // O bloco `@media (max-width: 599px)` inteiro, pelas chaves: recortar até o fim do arquivo deixaria passar uma regra da
+  // folha fora dele (e a busca e a ajuda no computador entrariam de baixo).
+  const inicio = css.indexOf('@media (max-width: 599px) {');
+  let fim = css.indexOf('{', inicio);
+  for (let n = 0; fim < css.length; fim++) {
+    if (css[fim] === '{') n++;
+    else if (css[fim] === '}' && --n === 0) break;
+  }
+  const celular = css.slice(inicio, fim + 1);
+  const fora = css.slice(0, inicio) + css.slice(fim + 1);
+
+  it('a entrada de baixo e os cantos de 14 px ficam só no celular', () => {
+    expect(celular.endsWith('}\n}')).toBe(true);
+    expect(celular).toContain('.ff-app dialog.ff-dialogo.ff-sheet[open] {');
+    expect(fora).not.toMatch(/ff-sheet\[open\]|ff-folha var|border-radius: 14px 14px 0 0/);
+  });
 
   it('abaixo de 600 px: presa embaixo, cantos de 14 px, e entra de baixo para cima', () => {
     const folha = celular.slice(celular.indexOf('.ff-app dialog.ff-dialogo.ff-sheet {'));
