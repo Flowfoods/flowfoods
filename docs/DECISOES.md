@@ -4512,24 +4512,62 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
    - com cores forçadas (alto contraste do aparelho), o fundo cheio some; o ícone herda a cor do link, como o nome. Sem isso, o ícone claro caía sobre o fundo claro do sistema e sumia (achado da revisão).
 3. **Início:** na lista aberta, cada área com o quadrado de cor cheia (28 px, desenho claro), como nos Ajustes do iPhone. Os destinos são os mesmos. O quadrado do próprio Início tem a cor da linha ativa; ali ele ganha um contorno claro.
 4. **Grupos:** o nome em 13 px/600, em letra normal (sem a caixa alta de antes), com a seta de abrir e fechar e `aria-expanded`. O ícone que vinha antes do nome do grupo saiu da lista aberta (na barra lateral da Apple o grupo é só o nome); no recolhido, ele segue como âncora.
-5. **Também muda:** o nome das linhas que não estão ativas passa do `suave` para a cor do texto, como na barra lateral da Apple; o nome perde o equilíbrio de quebra (`text-wrap: balance`) da grade e quebra normal, alinhado à esquerda. A lateral do menu ganhou 8 px de cada lado (antes, 6 px aberto), para o anel de foco caber sem ser cortado pela rolagem.
+5. **Também muda:** o nome das linhas que não estão ativas passa do `suave` para a cor do texto, como na barra lateral da Apple; o nome perde o equilíbrio de quebra (`text-wrap: balance`) da grade e quebra normal, alinhado à esquerda. A lateral do menu passou a ter 8 px de cada lado (antes, 6 px aberto), para o anel de foco caber sem ser cortado pela rolagem; o seletor de área, em cima, também, para ficar alinhado com as linhas.
 6. **O que não muda:** o seletor de área e a grade de módulos (referência de 12/11), o recolhido (só ícones de 18 px, inclusive no Início, com o nome na dica e para o leitor de tela) e a gaveta do celular, que mostra a mesma lista.
 
 **Verificação:**
-- **Testes:** a lista, o ativo e o contraste em `erp-padrao-visual`; a marcação do menu em `erp-menu-lista-apple` (10 novos). Eles cobrem uma coluna (e nenhuma outra regra que mude as colunas), nome que não corta, ativo único, quadrados no Início (e o contorno do quadrado ativo), grupo sem caixa alta, recolhido (inclusive no Início), a lateral de 8 px e as cores forçadas. Com `erp-identidade-modulos` e `erp-visual-apple`, 83 passam nos 4 arquivos.
+- **Testes:** a lista, o ativo e o contraste em `erp-padrao-visual`; a marcação do menu em `erp-menu-lista-apple` (10 novos). Eles cobrem uma coluna (e nenhuma outra regra da `.ff-nav-lista` que mude as colunas), nome que não corta, ativo único, quadrados no Início (e o contorno do quadrado ativo), grupo sem caixa alta, recolhido (inclusive no Início), a lateral de 8 px e as cores forçadas. Com `erp-identidade-modulos` e `erp-visual-apple`, 83 passam nos 4 arquivos.
 - **Mutantes, só numa cópia exportada:** os 5 das correções da revisão morrem: o ícone sem herdar a cor com cores forçadas, uma regra posterior com duas colunas, a lateral de 6 px, o quadrado no recolhido e o quadrado ativo sem contorno.
-- **Navegador** (app local, dados sintéticos): 38 de 38 conferências em 1280 px claro e escuro, 390 px claro e escuro (na gaveta) e 1024 px. Elas cobrem: uma coluna; nenhum nome cortado; altura de 44 px ou mais; ativo na cor cheia com nome e ícone claros; grupos sem caixa alta; quadrados no Início; recolhido com dica; nenhuma rolagem lateral.
+- **Navegador** (app local, dados sintéticos): 38 de 38 conferências em 01de69a, sobre a master com a A1, em 1280 px claro e escuro, 390 px claro e escuro (na gaveta) e 1024 px. Elas cobrem: uma coluna; nenhum nome cortado; altura de 44 px ou mais; ativo na cor cheia com nome e ícone claros; grupos sem caixa alta; quadrados no Início; recolhido com dica; nenhuma rolagem lateral.
 - **Revisão independente** (subagente só de leitura) em 01de69a: **aprovado com ressalvas**.
   - O importante foi o ícone do ativo, que sumia com cores forçadas.
   - Os menores: o recolhido do Início e mudanças sem registro, textos que ainda falavam em caixa alta e grade no menu, o anel de foco cortado 1 px pela rolagem, o quadrado do Início sumindo na linha ativa e limites dos testes.
-  - Todos tratados no commit seguinte.
+  - Todos tratados em 71f6f90.
+- **71f6f90: aprovado com ressalvas**, sem bloqueante. O ícone do ativo aparece com cores forçadas, no aberto e no recolhido (13,99:1 na paleta clara). O Início recolhido tem os ícones de 18 px, e o contorno do quadrado ativo mede 5,98:1. O anel de foco não é cortado em nenhuma parada de Tab. Os 5 mutantes das correções morrem.
+  - Ressalvas menores, tratadas no PR seguinte: três imprecisões neste texto e o seletor de área 2 px desalinhado das linhas.
 - **Portão completo local e CI:** ficam no PR e na página de evidências.
 
 **Limites:**
 - Não testado em Safari/iOS, com leitor de tela real nem no alto contraste real do Windows (só a emulação do Chromium).
-- Com cores forçadas, a linha ativa se distingue pelo peso 600 e pelo `aria-current`; o fundo cheio não aparece nesse modo (antigo).
+- Com cores forçadas, o fundo cheio não aparece. No aberto, a linha ativa se distingue só pelo peso 600; no recolhido, sem nome visível, só pelo `aria-current` (antigo).
 - O anel de foco da linha vizinha passa por cima do preenchimento da linha ativa, onde o vermelho sobre a cor da área tem pouco contraste. O resto do anel continua visível.
 - A grade de módulos do seletor de área segue a referência de 12/11; trocá-la por todas as áreas no menu, como no protótipo, mudaria a navegação e fica para decisão de Rodolfo.
-- Antigo, fora do escopo (achado da revisão): a 900 px exatos, quando a lateral aparece, a tabela de insumos rola 9 px de lado (7 com a Libre Franklin forçada); a 899 e a 960 px, nada.
+- Antigo, fora do escopo (achado da revisão): de 900 a 908 px, logo que a lateral aparece, a tabela de insumos rola de lado (9 px a 900, 7 com a Libre Franklin forçada; 1 px a 908). A 899 px e a partir de 909 px, nada.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 532. 2026-11-18 · Visual da Apple no ERP, fatia A3: título grande e barra de abas no celular
+
+**Fonte e recorte:** terceira fatia do visual da Apple aprovado por Rodolfo em 18/11/2026 (decisões 530 e 531). O protótipo mostrava, no computador e no iPhone, o título grande em Gelasio sem o quadrado da área e, no iPhone, a barra de abas "Início · Cadastros · Compras · Estoque · Mais". Só o shell do ERP e o cabeçalho de página: sem regra, permissão, destino novo, schema, migration, dado ou infraestrutura.
+
+1. **Título grande** (`PageHeader`, todas as larguras): h1 em Gelasio 34 px/1,15, peso regular, sem o quadrado da área ao lado. Substitui o padrão de 09/11 (29 px, 25 no celular, com o quadrado de 40 px). O subtítulo fica logo abaixo, 13 px no celular e 14 a partir de 640 px. As telas seguem passando `icone` e `cor`: a identidade da área continua no menu (decisão 531), nos cards e na aba do celular.
+2. **Barra de abas do celular** (`BarraDeAbas`, abaixo de 640 px):
+   - **Quais abas** (`abasDoCelular`): Início, as três primeiras áreas da pessoa que têm tela, na ordem do menu (já filtradas por permissão e liberação: o "Em breve" não entra), e Mais, que abre a mesma gaveta do botão de menu. O nome na aba é a primeira palavra da área ("Cadastros e Cardápio" → "Cadastros"). Não cria destino: só repete entradas do menu.
+   - **Qual acende:** a da área da tela atual, em qualquer tela dela (`aria-current="page"` na própria entrada, `"true"` dentro da área); se a área ficou fora das abas, o Mais, que diz isso também ao leitor de tela ("Mais (área atual)"). A atual fica em 600 na cor do texto, com o ícone na tinta da área; o nome na cor da área não daria 4,5:1 em toda a paleta. Com cores forçadas, o ícone da atual herda a cor do nome. O nome da aba vai a 10,5 px, um pouco mais justo (-0,01 em), como no iPhone.
+   - **Onde:** fixa no pé, 50 px (49 da lista e 1 da borda) mais a área segura, no material translúcido da barra do topo (o borrão no `::before`). Some nas telas com barra fixa de ações, que já ocupa o pé, e enquanto um campo de texto ou uma lista de escolha está em foco (o teclado aberto). O conteúdo reserva o espaço dela no fim da página e, ao rolar até um campo, mais 8 px para o anel de foco aparecer. Sem `:has()` no navegador, ela não aparece, e fica o menu de antes.
+   - **Gaveta pelo Mais:** fechar com Escape, com o X ou tocando fora devolve o foco a quem abriu (o Mais ou o menu do topo); escolher um destino leva o foco ao menu do topo, e não ao Mais, que seria a última parada do Tab da página nova.
+   - **Barras fixas:** toda barra fixa de ações no pé das telas leva `data-barra-fixa` (faltava em Planejar produção, Pedido e Entrega de requisição; teste). O aviso de período fechado passa a rolar o aviso para cima da barra de abas também.
+   - O botão de menu do topo continua: nas telas sem abas, ele é a navegação.
+   - **Só no ERP do parceiro (`/erp`).** No nível 1 (`/rodolfo`), o menu é o dos fluxos comerciais internos, fora deste plano: lá a barra não aparece e nada muda.
+
+**Verificação:**
+- **Testes:** 20 em `tests/erp-abas-celular.test.ts`. Cobrem:
+  - quais abas: dono, pessoa com menos áreas, alcance FlowFoods com o "Em breve" e um módulo sem tela no meio das áreas;
+  - qual acende, nome curto, marcação (inclusive o Mais aceso para o leitor de tela), ordem no shell e só no `/erp`, e o foco ao fechar a gaveta;
+  - regras de CSS: escondida por padrão, só com `:has()` e abaixo de 640 px, some com barra fixa e com foco, espaço reservado, cores forçadas e impressão;
+  - classes separadas das abas da área, toda barra fixa marcada, o aviso de período fechado e o contraste sobre o material com preto e branco por baixo nos dois temas;
+  - o título grande.
+  - O título de `erp-padrao-visual` passou a 34 px.
+- **Revisão independente** (subagente só de leitura) em fb56e1a: **aprovado com ressalvas**, sem bloqueante nem importante. Conferiu o título nas 51 rotas fixas a 320 px e a barra a 390 e 320 px nos dois temas, em 10 telas. Conferiu também as larguras de 639 a 1280 px, o foco, a gaveta, o Tab com a rolagem suave, as cores forçadas, a impressão e as abas da área. Rodou 14 mutantes, 13 mortos.
+  - Os 8 achados menores foram o anel de foco coberto pela barra ao rolar, o ícone da aba atual com cores forçadas, o foco que voltava ao Mais depois de escolher um destino, o Mais aceso sem aviso ao leitor de tela, "Faturamento" justo a 320 px, textos, a área segura e o aviso de período fechado da nota.
+  - Os seis primeiros foram tratados no commit seguinte; os dois últimos estão nos limites.
+- **Navegador, portão completo local e CI:** ficam no PR e na página de evidências.
+
+**Limites:**
+- Não testado em Safari/iOS de verdade: teclado e o borrão no iPhone ficam para a validação no aparelho (UX-MOD-3).
+- A área segura (`env(safe-area-inset-bottom)`) só vale com `viewport-fit=cover`, que o `/erp` não usa: hoje ela é 0. Hipótese, a conferir no aparelho: o próprio iOS mantém o conteúdo fora da faixa do indicador, e a barra fica logo acima dela.
+- Nota de compra: o aviso de período fechado nasce enquanto a pessoa digita a data, com a barra escondida pelo foco; ao sair do campo, a barra volta e pode cobrir o fim do aviso ("Ver os períodos"). Só por leitura de código, porque os dados de teste não têm período fechado.
+- Com o teclado aberto, a barra some pelo foco do campo; um teclado que abre sem foco num campo (raro) não a esconde.
+- Abaixo de 640 px o título grande ocupa mais altura que antes.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.

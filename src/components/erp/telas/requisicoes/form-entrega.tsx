@@ -150,7 +150,7 @@ export function FormEntrega({ acao, versao, itens, recarregar }: { acao: AcaoDeE
         </p>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
+      <div data-barra-fixa className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <span className="text-[13px] tabular-nums text-suave">{saem === 0 ? (encerrar ? 'só encerrar' : 'nada saindo') : `${saem} de ${itens.length} saindo`}</span>
           <BotaoEnviar pendente="Dando baixa…" className="min-w-[180px]">

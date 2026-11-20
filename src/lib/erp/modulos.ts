@@ -909,6 +909,40 @@ export function itemAtivo(nav: Navegacao, caminho: string): { modulo: ModuloNav;
   return melhor;
 }
 
+/** Uma aba da barra do celular (decisão 532). */
+export interface AbaDoCelular {
+  href: string;
+  rotulo: string;
+  icone: ChaveIcone;
+  cor: string;
+  /** A tela atual está nesta área (ou é o Início). */
+  ativa: boolean;
+}
+
+/** Quantas áreas entram na barra do celular, além do Início e do Mais: cinco abas ao todo, como no iPhone. */
+export const AREAS_NA_BARRA_DO_CELULAR = 3;
+
+/** O nome da área na aba: a primeira palavra ("Cadastros e Cardápio" → "Cadastros"), que cabe a 320 px. */
+export function rotuloDaAba(nome: string): string {
+  return nome.trim().split(/\s+/)[0] ?? nome;
+}
+
+/**
+ * A3 (decisão 532): a barra de abas do celular, como no protótipo aprovado (Início · Cadastros · Compras · Estoque · Mais).
+ * Início, as primeiras áreas da pessoa que têm tela, na ordem do menu (já filtradas por permissão e liberação em
+ * `modulosDoParceiro`: o "Em breve" não entra), e Mais, que abre a gaveta com o menu inteiro. Não cria destino nem libera
+ * nada: só repete entradas que o menu já tem. `maisAtiva`: a tela atual é de uma área que ficou fora da barra.
+ */
+export function abasDoCelular(nav: Navegacao, caminho: string): { abas: AbaDoCelular[]; maisAtiva: boolean } {
+  const ativo = itemAtivo(nav, caminho);
+  const areas = nav.modulos.filter((m) => m.href !== null).slice(0, AREAS_NA_BARRA_DO_CELULAR);
+  const abas: AbaDoCelular[] = [
+    { href: nav.inicio.href, rotulo: 'Início', icone: 'inicio', cor: COR.inicio, ativa: caminho === nav.inicio.href },
+    ...areas.map((m) => ({ href: m.href!, rotulo: rotuloDaAba(m.nome), icone: m.icone, cor: m.cor, ativa: ativo?.modulo.chave === m.chave })),
+  ];
+  return { abas, maisAtiva: !!ativo && !areas.some((m) => m.chave === ativo.modulo.chave) };
+}
+
 /** Um passo da trilha do topo (o "Início" vem de fora). */
 export interface PassoDaTrilha {
   rotulo: string;

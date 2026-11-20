@@ -23,6 +23,7 @@ import { assinaturaDaPreferencia, CaixaDeAula, GavetaDeAjuda, PerguntaDasDicas, 
 import { ProvedorDosPontos, type TelaNoCard } from './pontos';
 import { IndicadorDeNavegacao } from './indicador-navegacao';
 import { acaoGuardarMenu } from './acoes';
+import { BarraDeAbas } from './BarraDeAbas';
 import { BuscaGlobal } from './BuscaGlobal';
 import { MenuUsuario } from './MenuUsuario';
 import { NavLateral, type EstadoDaNav } from './NavLateral';
@@ -59,6 +60,13 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
   const [recolhido, setRecolhido] = useState(props.menuRecolhido);
   const [gaveta, setGaveta] = useState(false);
   const botaoMenu = useRef<HTMLButtonElement>(null);
+  // Para onde vai o foco quando a gaveta fecha: vazio = quem a abriu (Escape, clique no fundo, X). Ao fechar porque a pessoa
+  // escolheu um destino, o botão de menu do topo: o Mais da barra de abas é a última parada do Tab da página nova.
+  const retornoDaGaveta = useRef<HTMLElement | null>(null);
+  const abrirGaveta = useCallback(() => {
+    retornoDaGaveta.current = null;
+    setGaveta(true);
+  }, []);
   const [ajudaAberta, setAjudaAberta] = useState(false);
   const [secaoDaAjuda, setSecaoDaAjuda] = useState<string | null>(null);
   const [otimista, setOtimista] = useState<Otimista | null>(null);
@@ -79,6 +87,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
 
   // Trocar de tela fecha a gaveta (inclusive ao abrir a janela de módulo, que muda o endereço e não a página de trás).
   useEffect(() => {
+    retornoDaGaveta.current = botaoMenu.current;
     setGaveta(false);
     setAjudaAberta(false);
   }, [endereco]);
@@ -248,7 +257,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
               <button
                 ref={botaoMenu}
                 type="button"
-                onClick={() => setGaveta(true)}
+                onClick={abrirGaveta}
                 aria-label="Abrir o menu"
                 aria-expanded={gaveta}
                 aria-controls="ff-gaveta"
@@ -371,6 +380,10 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           </main>
         </div>
 
+        {/* Abas do celular (A3, decisão 532): depois do conteúdo na ordem do Tab; só abaixo de 640 px (regras em tokens.css). Só no
+            ERP do parceiro: no nível 1 (/rodolfo) o menu é o dos fluxos comerciais internos, fora deste plano. */}
+        {nav.rotuloDaArea === 'ERP' && <BarraDeAbas nav={nav} caminho={caminho} gavetaAberta={gaveta} aoAbrirMais={abrirGaveta} />}
+
         {entradaDaTela && ajuda && (
           <GavetaDeAjuda
             aberta={ajudaAberta}
@@ -386,7 +399,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           />
         )}
 
-        <Dialogo id="ff-gaveta" aberto={gaveta} aoFechar={() => setGaveta(false)} titulo="Menu" gaveta>
+        <Dialogo id="ff-gaveta" aberto={gaveta} aoFechar={() => setGaveta(false)} titulo="Menu" gaveta voltarPara={retornoDaGaveta}>
           <div className="min-h-0 flex-1">
             <NavLateral nav={nav} estado={estado} contexto={props.contexto} versao={props.versao} />
           </div>

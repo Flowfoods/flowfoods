@@ -83,11 +83,11 @@ palavras e controles próprios; "Em breve" é neutro (`COR.futuro`), sem cor de
 Texto na letra do sistema (decisão 530): a SF no iPhone, iPad e Mac; nos outros
 aparelhos, a do sistema deles (Segoe UI no Windows, Roboto no Android); a
 Libre Franklin fica de reserva (`--ff-fonte-texto`). Gelasio nos títulos
-editoriais: h1 da página
-(29 px/1,2, peso regular; 25 px no celular), título de diálogo e de gaveta
+editoriais: h1 da página, o título grande da Apple
+(34 px/1,15, peso regular, em todas as larguras; decisão 532), título de diálogo e de gaveta
 (20 px), número grande e título de estado vazio (sempre
-`lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 20 · 25–29; título de
-painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px; no menu lateral, desde a decisão 531, o grupo é em letra normal). Caixa
+`lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 20 · 34; título de
+painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px; no menu lateral, desde a decisão 531, o grupo é em letra normal; nome da aba do celular, decisão 532: 10,5 px, como no iPhone). Caixa
 alta só no rótulo de seção do hub e nos grupos do seletor de áreas.
 
 ## Espaço e raio
@@ -225,8 +225,19 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 - **Tabela** linha 44 px, cabeçalho em `forte` 12 px/600, números tabulares à
   direita, sem card em volta de número; no celular, colunas viram linha de
   apoio.
-- **Cabeçalho de página** quadrado do ícone 40 + h1 Gelasio 26/30 +
-  subtítulo com contexto e contagem + ação à direita + busca/filtros abaixo.
+- **Cabeçalho de página** (título grande, decisão 532): h1 Gelasio 34/1,15,
+  sem o quadrado da área + subtítulo com contexto e contagem (13 px no
+  celular, 14 a partir de 640) + ação à direita + busca/filtros abaixo. A cor
+  da área fica no menu, nos cards e na aba do celular.
+- **Barra de abas do celular** (decisão 532), abaixo de 640 px: Início, as
+  três primeiras áreas da pessoa (na ordem do menu; o nome é a primeira
+  palavra da área) e Mais, que abre a gaveta do menu. Fixa no pé, 49 px mais
+  a área segura, no material translúcido; ícone 24 e nome 10,5/500 em
+  `suave`; a atual em 600 na cor do texto, com o ícone na tinta da área.
+  Some nas telas com barra fixa de ações (`data-barra-fixa`, obrigatório em
+  toda barra fixa no pé) e com um campo de texto em foco; sem `:has()`, não
+  aparece. O conteúdo reserva o espaço dela (padding e `scroll-padding`).
+  Só no ERP do parceiro (`/erp`); no nível 1 (`/rodolfo`), não.
 - **Hub** grade 4 (≥ 1280) e 2 no tablet e no celular; card com ícone, nome
   15/600, subtítulo 13; no celular, compacto (nome 14, descrição em até 3
   linhas, sem os links das abas). O catálogo **"Em breve"** (só para quem o
@@ -301,6 +312,7 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | Na barra translúcida, sob o ponteiro, o texto vai para `texto` | o `suave` e o texto a 75 % sobre o realce caíam a 4,17:1 e 4,34:1 no pior caso | 2026-11-18 |
 | Borda transparente no secundário, no trilho do filtro e na busca da barra | some no visual normal e devolve o contorno no alto contraste (cores forçadas) | 2026-11-18 |
 | Menu lateral em lista, ativo na cor cheia da área (decisão 531); substitui a grade de duas colunas | barra lateral do iPad, do protótipo aprovado; a seleção cheia tem nome claro ≥ 4,5:1 e contorno ≥ 3:1 no escuro | 2026-11-18 |
+| Título grande (Gelasio 34 px, sem o quadrado da área) e barra de abas no celular (decisão 532) | protótipo aprovado; a aba repete entradas do menu, some com barra fixa de ações e com o teclado | 2026-11-18 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,
