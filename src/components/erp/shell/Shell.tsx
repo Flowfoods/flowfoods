@@ -25,7 +25,8 @@ import { IndicadorDeNavegacao } from './indicador-navegacao';
 import { acaoGuardarMenu } from './acoes';
 import { BarraDeAbas } from './BarraDeAbas';
 import { BuscaGlobal } from './BuscaGlobal';
-import { MenuUsuario } from './MenuUsuario';
+import { CabecalhoIdentidade } from './CabecalhoIdentidade';
+import { ContaNaBarra } from './ContaNaBarra';
 import { NavLateral, type EstadoDaNav } from './NavLateral';
 import { Notificacoes } from './Notificacoes';
 import { BOTAO_ICONE, Popover } from './Popover';
@@ -225,6 +226,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
         podeAbrirSozinho={!ajudaAberta}
         aoVerPassoAPasso={(secao, origem) => abrirAjuda(secao ?? undefined, origem)}
       >
+      <CabecalhoIdentidade props={props} slug={slug} inicio={nav.inicio.href} />
       <div
         className={`grid min-h-dvh grid-cols-[minmax(0,1fr)] ${
           recolhido ? 'min-[900px]:grid-cols-[68px_minmax(0,1fr)]' : 'min-[900px]:grid-cols-[232px_minmax(0,1fr)]'
@@ -363,7 +365,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
                 </button>
               )}
               <Notificacoes itens={props.notificacoes} />
-              <MenuUsuario usuario={props.usuario} tema={props.tema} links={props.links} sair={props.sair} />
+              <ContaNaBarra props={props} />
             </div>
           </header>
 

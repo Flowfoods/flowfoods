@@ -23,6 +23,8 @@ import { ALCANCE_FLOWFOODS } from '@/lib/erp/permissoes';
 import { navegacaoDoNivel1 } from '@/lib/rodolfo/modulos';
 import { contarRespostasSemClassificar } from '@/lib/rodolfo/notificacoes';
 import { AppShell } from '@/components/erp/shell/AppShell';
+import { escolherMarcaDoParceiro, identidadeDoParceiro } from '@/components/erp/shell/identidade-acoes';
+import { obterFotoPessoalNivel1 } from '@/lib/erp/identidade';
 import { EscopoDoRascunho } from '@/components/erp/telas/cadastro/rascunho';
 import type { Notificacao } from '@/components/erp/shell/tipos';
 import { acaoBuscarNoParceiro, acaoEscolherVisaoDoParceiro, acaoVisaoDoParceiro } from './acoes-do-shell';
@@ -35,10 +37,11 @@ const parceirosDoShell = cache(() =>
 
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
   const sessao = await exigirNivel1();
-  const [parceiros, semClassificar, pedidos] = await Promise.all([
+  const [parceiros, semClassificar, pedidos, fotoArquivo] = await Promise.all([
     parceirosDoShell(),
     contarRespostasSemClassificar(),
     contarPedidosAbertos(),
+    obterFotoPessoalNivel1(sessao),
   ]);
   const c = await cookies();
 
@@ -63,7 +66,8 @@ export default async function PainelLayout({ children }: { children: React.React
       chaveDoContexto={'n1:' + sessao.userId}
       navegacao={navegacaoDoNivel1()}
       contexto="Nível 1 · FlowFoods"
-      usuario={{ nome: sessao.autorNome, papel: 'Nível 1 · FlowFoods' }}
+      usuario={{ nome: sessao.autorNome, papel: 'Nível 1 · FlowFoods', fotoUrl: fotoArquivo ? `/rodolfo/perfil/foto?v=${encodeURIComponent(fotoArquivo)}` : null }}
+      identidade={{ modo: 'nivel1', revisao: Date.now(), carregar: identidadeDoParceiro, escolher: escolherMarcaDoParceiro }}
       tema={lerTema(c.get(COOKIE_TEMA)?.value)}
       menuRecolhido={lerMenuRecolhido(c.get(COOKIE_MENU)?.value)}
       versao={VERSAO_DO_ERP}
@@ -78,7 +82,7 @@ export default async function PainelLayout({ children }: { children: React.React
         escolher: acaoEscolherVisaoDoParceiro,
       }}
       notificacoes={notificacoes}
-      links={[{ rotulo: 'Regras de envio', href: '/rodolfo/config' }]}
+      links={[{ rotulo: 'Meu perfil', href: '/rodolfo/perfil' }, { rotulo: 'Regras de envio', href: '/rodolfo/config' }]}
       sair={null}
       buscarInsumosDoParceiro={acaoBuscarNoParceiro}
       // Nível 1: só o botão "?" dentro do parceiro (a ajuda lê o mesmo registro). Sem caixa, sem pergunta e sem preferência.

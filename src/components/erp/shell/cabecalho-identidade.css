@@ -1,0 +1,40 @@
+/* Cabeçalho aprovado: superfície escura, imagem original com 145 px e 18 px até BARNEY OS.
+   Escopo local: os controles e o restante do ERP continuam respeitando o tema escolhido. */
+.ff-cabecalho-identidade {
+  --ff-texto: 245 240 236;
+  --ff-suave: 177 168 162;
+  --ff-painel: 25 22 21;
+  --ff-forte: 40 35 33;
+  --ff-linha: #302a27;
+  --ff-linha-forte: #5d534e;
+  --ff-erro: 255 153 149;
+  color-scheme: dark;
+  color: rgb(var(--ff-texto));
+  background: #0a0a0a;
+  border-bottom: 1px solid var(--ff-linha);
+  position: relative;
+  z-index: 31;
+  container-type: inline-size;
+}
+.ff-cabecalho-grade { display: grid; grid-template-columns: minmax(0, 1fr) 145px minmax(0, 1fr); align-items: center; gap: 22px; padding: 25px 26px 22px; }
+.ff-assinatura-central { display: flex; flex-direction: column; align-items: center; justify-self: center; gap: 18px; border-radius: 5px; }
+.ff-logo-janela { position: relative; display: block; width: 145px; aspect-ratio: 780 / 500; overflow: hidden; }
+.ff-logo-janela img { position: absolute; width: 138.46154%; max-width: none; height: auto; left: -19.23077%; top: -56%; }
+.ff-barney-os { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; font-weight: 650; letter-spacing: .17em; line-height: 1.4; }
+.ff-barney-os span { font-size: 10px; line-height: 1; letter-spacing: .08em; padding: 4px 5px; background: #ef172b; color: #fff; border-radius: 4px; }
+.ff-cabecalho-marca { width: 100%; max-width: 250px; min-width: 0; justify-self: center; }
+.ff-marca-selecionada { display: flex; position: relative; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 100%; min-height: 104px; padding: 8px 24px; border: 1px solid transparent; border-radius: 12px; text-align: center; }
+.ff-marca-selecionada:hover, .ff-marca-selecionada[aria-expanded='true'] { background: rgb(var(--ff-painel)); border-color: var(--ff-linha); }
+.ff-marca-imagem { display: grid; place-items: center; width: 58px; height: 46px; overflow: hidden; border-radius: 8px; background: rgb(var(--ff-forte)); font-size: 18px; }
+.ff-marca-nome { overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.3; }
+.ff-marca-seta { position: absolute; right: 6px; top: calc(50% - 7px); }
+.ff-cabecalho-conta { justify-self: end; min-width: 0; }
+.ff-cabecalho-conta .ff-conta-foto { width: 42px; height: 42px; }
+.ff-conta-barra .ff-conta-nome { display: none; }
+@container (max-width: 540px) {
+  .ff-cabecalho-grade { gap: 12px; padding: 22px 18px 16px; }
+  .ff-assinatura-central { grid-column: 2; grid-row: 1; }
+  .ff-cabecalho-conta { grid-column: 3; grid-row: 1; }
+  .ff-cabecalho-marca { grid-column: 1 / -1; grid-row: 2; }
+  .ff-marca-selecionada { min-height: 90px; }
+}

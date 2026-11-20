@@ -74,6 +74,7 @@ import {
   tokenTemFormato,
 } from './acesso';
 import { fechamentoValido, normalizarFechadas, pontoValido } from './ajuda';
+import { NOME_DA_FOTO } from './foto';
 import { diaDe, itemDoPonto, normalizarPontos, type PreferenciaDeAjuda } from './ajuda-rota';
 import { ERRO_DONO_JA_TEM_ACESSO, fraseJaDecidido, FRASE_PEDIDO_MEXIDO, lerAtivacao, type EtapaDoPedido } from './pedido-campos';
 import {
@@ -1663,7 +1664,7 @@ export interface SessaoValida {
   sessaoId: string;
   metodo: 'SENHA' | 'ROSTO';
   criadaEm: Date;
-  usuario: { id: string; nome: string; email: string };
+  usuario: { id: string; nome: string; email: string; fotoArquivo?: string | null };
   /** Parceiro da sessão; null = a pessoa tem mais de um e ainda vai escolher. */
   parceiro: ParceiroFlow | null;
   /** Vínculo com o parceiro da sessão (para o histórico). */
@@ -1712,7 +1713,7 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
     sessaoId: s.id,
     metodo: s.metodo,
     criadaEm: s.criadoEm,
-    usuario: { id: s.usuario.id, nome: s.usuario.nome, email: s.usuario.email },
+    usuario: { id: s.usuario.id, nome: s.usuario.nome, email: s.usuario.email, fotoArquivo: s.usuario.fotoArquivo },
     parceiro: atual?.parceiro ?? null,
     acessoId: atual?.id ?? null,
     parceiros: vinculos
@@ -1723,6 +1724,31 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
     setores: atual ? normalizarSetores(atual.setores ?? []) : [],
     ajuda: preferenciaDe(s.usuario.preferencia),
   };
+}
+
+/** Foto da própria pessoa. A identidade vem da sessão, nunca de parâmetro do navegador. */
+export async function trocarFotoPessoalDaSessao(
+  sessao: SessaoValida,
+  esperada: string | null,
+  nova: string | null,
+  o?: Opcoes,
+): Promise<'ok' | 'sessao' | 'conflito'> {
+  if (nova !== null && !NOME_DA_FOTO.test(nova)) throw new Error('Nome de foto inválido.');
+  const { db, agora } = abrir(o);
+  return db.$transaction(async (tx) => {
+    await travar(tx, `erp-usuario:${sessao.usuario.id}`);
+    // Reconfere revogação/expiração depois de receber o arquivo, sob a mesma trava da credencial.
+    const s = await tx.sessaoErp.findFirst({
+      where: { id: sessao.sessaoId, usuarioId: sessao.usuario.id, encerradaEm: null, expiraEm: { gt: agora } },
+      include: { usuario: { include: { acessos: { where: { status: 'ATIVO', parceiro: { status: { not: 'RASCUNHO' } } }, select: { parceiroId: true } } } } },
+    });
+    if (!s || s.versaoCredencial !== s.usuario.versaoCredencial || !s.usuario.acessos.length
+      || (s.parceiroId && !s.usuario.acessos.some((a) => a.parceiroId === s.parceiroId))) return 'sessao';
+    const r = await tx.usuarioErp.updateMany({
+      where: { id: s.usuarioId, fotoArquivo: esperada }, data: { fotoArquivo: nova },
+    });
+    return r.count === 1 ? 'ok' : 'conflito';
+  });
 }
 
 // ==================================================== ajuda contextual (0.6)

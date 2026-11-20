@@ -115,7 +115,7 @@ export async function listarEstrutura(cliente: ClienteDoParceiro, alcance: Pick<
     }),
     cliente.marca.findMany({
       orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
-      select: { id: true, nome: true, ativa: true, criadoEm: true },
+      select: { id: true, nome: true, ativa: true, criadoEm: true, logoArquivo: true },
     }),
   ]);
   return { lojas, marcas };

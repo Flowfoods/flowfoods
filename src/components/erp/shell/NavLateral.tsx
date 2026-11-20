@@ -20,11 +20,10 @@
 
 import Link from 'next/link';
 import { useId, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { ChevronDown, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronDown, ChevronsUpDown, Home, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { COR, type ModuloNav, type Navegacao } from '@/lib/erp/modulos';
 import { IconeDoModulo } from '../ui/cabecalho';
 import { SeloEmBreve } from '../ui/em-breve';
-import { Marca } from '../ui/Marca';
 import { Icone } from './icones';
 import { Popover } from './Popover';
 
@@ -65,8 +64,8 @@ export function NavLateral({
       <div
         className={`flex h-16 shrink-0 items-center border-b border-linha ${recolhido ? 'justify-center px-2' : 'px-4'}`}
       >
-        <Link href={nav.inicio.href} aria-label={`FlowFoods ${nav.rotuloDaArea} — início`} className="rounded-[5px]">
-          <Marca rotulo={nav.rotuloDaArea} compacta={recolhido} />
+        <Link href={nav.inicio.href} aria-label="Início" className="flex min-h-11 items-center gap-3 rounded-[5px] text-[14px] font-semibold">
+          <Home size={20} aria-hidden />{!recolhido && <span>Início</span>}
         </Link>
       </div>
 

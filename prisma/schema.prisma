@@ -30,6 +30,8 @@ model User {
   role        Role       @default(ADMIN)
   criadoEm    DateTime   @default(now())
   ultimoLogin DateTime?
+  // Foto pessoal, privada e independente do parceiro selecionado.
+  fotoArquivo String?
   auditorias  AuditLog[]
 }
 
@@ -743,6 +745,7 @@ model Marca {
   parceiroId String
   parceiro   ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
   nome       String
+  logoArquivo String?
   ativa      Boolean      @default(true)
   criadoEm   DateTime     @default(now())
 
@@ -2573,6 +2576,8 @@ model UsuarioErp {
   id                       String    @id @default(cuid())
   email                    String    @unique
   nome                     String
+  // Foto própria da pessoa; não pertence ao parceiro ou à marca.
+  fotoArquivo              String?
   senhaHash                String?
   senhaDefinidaEm          DateTime?
   ultimoLogin              DateTime?
