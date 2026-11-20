@@ -80,6 +80,37 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'perfil',
+    area: 'rede',
+    rotas: ['perfil'],
+    titulo: 'Meu perfil',
+    versao: 1,
+    aula: [
+      { texto: 'Aqui você escolhe, troca ou remove sua foto pessoal, que aparece no menu do usuário.' },
+      { texto: 'Trocar de marca ou parceiro mantém a mesma foto.' },
+      { texto: 'Escolher foto mostra uma prévia; use Salvar foto para confirmar ou Cancelar para manter a anterior.' },
+    ],
+    secoes: [
+      {
+        id: 'foto',
+        titulo: 'Escolher e salvar sua foto',
+        blocos: [
+          { texto: 'Use uma imagem estática em JPG, PNG ou WebP de até 8 MB, com até 4096 pixels por lado e 16 megapixels.' },
+          { texto: 'Trocar foto permite escolher outra imagem. Remover foto volta a mostrar suas iniciais.' },
+          { texto: 'Se aparecer uma mensagem de falha, confira a foto escolhida e tente novamente. A troca só é concluída quando aparecer Foto salva.' },
+        ],
+      },
+      {
+        id: 'marca',
+        titulo: 'Foto pessoal e logo da marca',
+        blocos: [
+          { texto: 'Sua foto identifica você; a logo identifica a marca selecionada. Uma não substitui a outra.' },
+          { texto: 'A logo da marca é cadastrada em Lojas e marcas, na seção Identidade visual.', para: ['lojas.gerir'] },
+        ],
+      },
+    ],
+  },
+  {
     chave: 'acesso',
     area: 'rede',
     rotas: ['acesso'],

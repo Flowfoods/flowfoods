@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve, sep } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ContextoDoParceiro } from '@/lib/erp/contexto-base';
+import type { ContextoDoParceiro, SessaoErp } from '@/lib/erp/contexto-base';
 import type { SessaoValida } from '@/lib/erp/credenciais';
 import type { RecursoDeIdentidade } from '@/lib/erp/identidade';
 import { ALCANCE_FLOWFOODS, resolverAlcance } from '@/lib/erp/permissoes';
@@ -11,14 +11,30 @@ import { prepararImagemIdentidade } from '@/lib/erp/identidade-imagem';
 import { LIMITE_DA_FOTO } from '@/lib/erp/foto';
 import { JPG_LIMPO, PNG_LIMPO, WEBP_LIMPO, jpgComGps, temGps } from './erp-fotos-teste';
 
-const atual = vi.hoisted(() => ({ recurso: null as RecursoDeIdentidade | null }));
+const atual = vi.hoisted(() => ({
+  recurso: null as RecursoDeIdentidade | null,
+  parceiro: null as ContextoDoParceiro | null,
+  parceiroNivel1: null as ContextoDoParceiro | null,
+  pessoa: null as SessaoValida | null,
+  pessoaNivel1: null as SessaoErp | null,
+}));
+vi.mock('@/lib/erp/contexto', () => ({
+  parceiroDaSessaoOuNada: vi.fn(async () => atual.parceiro),
+  parceiroDoNivel1OuNada: vi.fn(async () => atual.parceiroNivel1),
+}));
+vi.mock('@/lib/erp/sessao', () => ({ sessaoDaRequisicao: vi.fn(async () => atual.pessoa) }));
+vi.mock('@/lib/erp/identidade-contexto', () => ({ sessaoNivel1DaIdentidade: vi.fn(async () => atual.pessoaNivel1) }));
 vi.mock('@/lib/erp/identidade', () => ({
   recursoDaLogo: vi.fn(async () => atual.recurso),
   recursoDaFotoPessoal: vi.fn(() => atual.recurso),
   recursoDaFotoNivel1: vi.fn(async () => atual.recurso),
 }));
-import { recursoDaLogo } from '@/lib/erp/identidade';
+import { recursoDaFotoNivel1, recursoDaFotoPessoal, recursoDaLogo } from '@/lib/erp/identidade';
 import { responderFotoDaPessoa, responderFotoNivel1, responderLogoDaMarca } from '@/lib/erp/identidade-http';
+import * as fotoErp from '@/app/erp/perfil/foto/route';
+import * as fotoNivel1 from '@/app/rodolfo/(painel)/perfil/foto/route';
+import * as logoErp from '@/app/erp/identidade/marcas/[id]/logo/route';
+import * as logoNivel1 from '@/app/rodolfo/(painel)/erp/[slug]/identidade/marcas/[id]/logo/route';
 
 const ORIGEM = 'https://flow.test';
 const contexto = (extra: Partial<ContextoDoParceiro> = {}): ContextoDoParceiro => ({
@@ -32,6 +48,13 @@ function pedido(bytes: Uint8Array = PNG_LIMPO, headers: Record<string, string> =
   });
 }
 const sessao = { usuario: { id: 'pessoa-a' } } as SessaoValida;
+type MetodoImagem = 'GET' | 'POST' | 'DELETE';
+const rotasDeIdentidade = [
+  (req: Request) => fotoErp[req.method as MetodoImagem](req),
+  (req: Request) => fotoNivel1[req.method as MetodoImagem](req),
+  (req: Request) => logoErp[req.method as MetodoImagem](req, { params: Promise.resolve({ id: 'marca-a' }) }),
+  (req: Request) => logoNivel1[req.method as MetodoImagem](req, { params: Promise.resolve({ slug: 'parceiro-a', id: 'marca-a' }) }),
+];
 
 describe('Identidade · imagem real e limites', () => {
   it.each([JPG_LIMPO, PNG_LIMPO, WEBP_LIMPO])('aceita imagem estática real em cada formato', (bytes) => expect(prepararImagemIdentidade(bytes).ok).toBe(true));
@@ -87,9 +110,50 @@ describe('Identidade · HTTP privado e upload com teto', () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
+    atual.parceiro = atual.parceiroNivel1 = null;
+    atual.pessoa = null;
+    atual.pessoaNivel1 = null;
     atual.recurso = { dono: { tipo: 'pessoa-erp', id: crypto.randomUUID() }, arquivo: null,
       trocar: vi.fn(async (novo: string | null) => { atual.recurso = { ...atual.recurso!, arquivo: novo }; return 'ok' as const; }),
     };
+  });
+
+  it('as quatro rotas reais exigem sua sessão em GET, POST e DELETE antes de ler o corpo', async () => {
+    for (const atender of rotasDeIdentidade) for (const method of ['GET', 'POST', 'DELETE']) {
+      const req = pedido(PNG_LIMPO, {}, method);
+      const ler = req.body ? vi.spyOn(req.body, 'getReader') : null;
+      expect((await atender(req)).status).toBe(401);
+      expect(ler?.mock.calls.length ?? 0).toBe(0);
+    }
+    expect(recursoDaLogo).not.toHaveBeenCalled();
+    expect(recursoDaFotoPessoal).not.toHaveBeenCalled();
+    expect(recursoDaFotoNivel1).not.toHaveBeenCalled();
+  });
+
+  it('as rotas de logo delegam a checagem de lojas.gerir e bloqueio antes de ler o arquivo', async () => {
+    const alcance = resolverAlcance({ perfilBase: null, perfilProprio: ['lojas.ver'], permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
+    for (const ctx of [contexto({ alcance }), contexto({ bloqueio: 'Parceiro suspenso.' })]) {
+      atual.parceiro = atual.parceiroNivel1 = ctx;
+      for (const atender of rotasDeIdentidade.slice(2)) for (const method of ['POST', 'DELETE']) {
+        const req = pedido(PNG_LIMPO, {}, method);
+        const ler = req.body ? vi.spyOn(req.body, 'getReader') : null;
+        expect((await atender(req)).status).toBe(403);
+        expect(ler?.mock.calls.length ?? 0).toBe(0);
+      }
+    }
+    expect(recursoDaLogo).not.toHaveBeenCalled();
+  });
+
+  it('foto própria usa somente a sessão da sua área, sem receber pessoa ou marca da URL', async () => {
+    atual.pessoaNivel1 = { userId: 'admin', autorNome: 'Administrador' };
+    expect((await rotasDeIdentidade[0](new Request(`${ORIGEM}/erp/perfil/foto?usuarioId=admin`))).status).toBe(401);
+    atual.pessoa = sessao;
+    atual.pessoaNivel1 = null;
+    expect((await rotasDeIdentidade[1](new Request(`${ORIGEM}/rodolfo/perfil/foto?usuarioId=pessoa-a`))).status).toBe(401);
+    expect((await rotasDeIdentidade[0](new Request(`${ORIGEM}/erp/perfil/foto?usuarioId=outra&marcaId=outra`))).status).toBe(404);
+    expect(recursoDaFotoPessoal).toHaveBeenCalledExactlyOnceWith(sessao);
+    expect(recursoDaLogo).not.toHaveBeenCalled();
+    expect(recursoDaFotoNivel1).not.toHaveBeenCalled();
   });
   afterAll(async () => {
     vi.unstubAllEnvs();

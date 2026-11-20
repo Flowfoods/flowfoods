@@ -1,4 +1,5 @@
 import { EditorImagem } from '@/components/erp/telas/identidade/editor-imagem';
+import { TrilhaDaPagina } from '@/components/erp/shell/trilha';
 import { Voltar } from '@/components/erp/telas/cadastro/partes';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { Painel } from '@/components/erp/ui/superficies';
@@ -14,6 +15,7 @@ export default async function MeuPerfilNivel1Page() {
   const url = '/rodolfo/perfil/foto';
   return (
     <div className="space-y-6">
+      <TrilhaDaPagina itens={[{ rotulo: 'Meu perfil' }]} />
       <Voltar href="/rodolfo">Voltar para o início</Voltar>
       <PageHeader icone="acesso" cor={COR.rede} titulo="Meu perfil" subtitulo={sessao.autorNome} />
       <Painel titulo="Sua foto" className="max-w-2xl">

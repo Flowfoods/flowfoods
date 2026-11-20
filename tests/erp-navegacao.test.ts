@@ -469,6 +469,7 @@ describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {
   it('o hub e a página de "Seu acesso": hub não acende aba; Seu acesso acende a dele', () => {
     expect(itemAtivo(nav, '/erp')).toBeNull();
     expect(itemAtivo(nav, '/erp/acesso')?.item.rotulo).toBe('Seu acesso');
+    expect(itemAtivo(nav, '/erp/perfil')?.item.rotulo).toBe('Seu acesso');
   });
 
   it('TODA página do /erp e do espelho do nível 1 acende uma aba (nenhuma rota fica sem lugar no menu)', () => {

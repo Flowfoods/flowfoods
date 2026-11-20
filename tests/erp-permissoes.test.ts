@@ -357,10 +357,10 @@ function arquivos(dir: string): string[] {
 
 describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', () => {
   const ERP = join('src', 'app', 'erp');
-  // "Seu acesso" é da própria pessoa (rosto, sair): não depende de permissão.
+  // "Seu acesso" e "Meu perfil" são da própria pessoa (rosto, sair, foto): não dependem de permissão de negócio.
   // O hub (/erp, 1.1) só lista o que `modulosDoParceiro(alcance)` libera e é o
   // destino de quem abre tela fora do acesso: não pode exigir permissão.
-  const PAGINAS_LIVRES = new Set([join(ERP, 'acesso', 'page.tsx'), join(ERP, 'page.tsx')]);
+  const PAGINAS_LIVRES = new Set([join(ERP, 'acesso', 'page.tsx'), join(ERP, 'perfil', 'page.tsx'), join(ERP, 'page.tsx')]);
   // Escolher a visão (Rede Completa ↔ loja) não é permissão: só filtra DENTRO do
   // alcance, e a action confere a escolha contra as lojas do alcance (visao.ts).
   const ACOES_LIVRES = new Set([
@@ -384,6 +384,13 @@ describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', 
       .filter((f) => f.endsWith('page.tsx') && !PAGINAS_LIVRES.has(f))
       .filter((f) => !/exigirPermissaoNaPagina\(ctx, '[a-z]+\.[a-z]+'/.test(readFileSync(f, 'utf8')));
     expect(faltam).toEqual([]);
+  });
+
+  it('Meu perfil exige a própria sessão e usa seu ID, sem escolher pessoa por parâmetro', () => {
+    const perfil = readFileSync(join(ERP, 'perfil', 'page.tsx'), 'utf8');
+    expect(perfil).toMatch(/const \{ usuario \} = await exigirPessoa\(\)/);
+    expect(perfil).toContain('contexto={usuario.id}');
+    expect(perfil).not.toMatch(/params|searchParams/);
   });
 
   it('cada server action exportada confere a permissão (ou é da própria pessoa)', () => {
