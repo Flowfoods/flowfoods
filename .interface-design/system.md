@@ -242,7 +242,9 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   título no centro em 17/600 na letra do sistema; todo diálogo e gaveta tem o
   fechar redondo (X num círculo de 30 px no `preenchimento`, alvo de 44). No
   celular, a folha (`sheet`) fica presa embaixo com cantos de 14 px e entra de
-  baixo (opacidade + 28 px, 220 ms); sem puxador.
+  baixo (opacidade + 28 px, 220 ms); sem puxador. Com o título escondido
+  (busca ⌘K), só o título para o leitor de tela, sem barra e sem fechar: o
+  conteúdo traz o próprio fechar.
 - **Interruptor** (decisão 533): `INTERRUPTOR` num `input type="checkbox"
   role="switch"` para o que liga e desliga ("onde fica" da ficha, prazo
   depois de aberto do insumo), na ponta da linha; 51 × 31, ligado no `ok`,

@@ -43,7 +43,7 @@ export function Dialogo({
   gaveta?: boolean;
   sheet?: boolean;
   className?: string;
-  /** O título fica só para leitor de tela (a busca tem o campo como cabeça). */
+  /** O título fica só para leitor de tela, sem a barra nem o fechar (a busca tem o campo como cabeça e o próprio fechar). */
   esconderTitulo?: boolean;
   id?: string;
   /** Só com `gaveta`: de que lado ela entra. */
@@ -92,10 +92,14 @@ export function Dialogo({
     >
       {aberto && (
         <div className="flex h-full flex-col">
-          {gaveta ? (
-            <header
-              className={`flex items-center justify-between gap-3 border-b border-linha py-2 pl-5 pr-3 ${esconderTitulo ? 'sr-only' : ''}`}
-            >
+          {esconderTitulo ? (
+            // Quem esconde a barra (a busca ⌘K) traz o próprio fechar: fica só o título, para o leitor de tela. Um X escondido
+            // seria uma parada de Tab invisível.
+            <h2 data-ff-titulo tabIndex={-1} className="sr-only">
+              {titulo}
+            </h2>
+          ) : gaveta ? (
+            <header className="flex items-center justify-between gap-3 border-b border-linha py-2 pl-5 pr-3">
               <h2 data-ff-titulo tabIndex={-1} className="min-w-0 break-words font-display text-[20px] font-normal leading-tight tracking-[-0.01em] outline-none">
                 {titulo}
               </h2>
@@ -103,9 +107,7 @@ export function Dialogo({
             </header>
           ) : (
             // A coluna vazia à esquerda tem a largura do fechar: o título fica no meio de verdade e quebra em vez de cortar.
-            <header
-              className={`grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 border-b border-linha px-2 py-1.5 ${esconderTitulo ? 'sr-only' : ''}`}
-            >
+            <header className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 border-b border-linha px-2 py-1.5">
               <span aria-hidden />
               <h2 data-ff-titulo tabIndex={-1} className="min-w-0 break-words text-center text-[17px] font-semibold leading-snug outline-none">
                 {titulo}

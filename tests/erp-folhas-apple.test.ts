@@ -18,7 +18,7 @@ const marcar = (props: Record<string, unknown>) => renderToStaticMarkup(createEl
 describe('folhas da Apple · barra', () => {
   it('diálogo: título no centro em 17 px/600 (letra do sistema), com uma coluna vazia do tamanho do fechar à esquerda', () => {
     const h = marcar({});
-    expect(h).toMatch(/<header class="grid grid-cols-\[2\.75rem_minmax\(0,1fr\)_2\.75rem\] items-center gap-2 border-b border-linha px-2 py-1\.5 "><span aria-hidden="true"><\/span><h2 data-ff-titulo="true" tabindex="-1" class="min-w-0 break-words text-center text-\[17px\] font-semibold leading-snug outline-none">Imprimir a ficha<\/h2>/);
+    expect(h).toMatch(/<header class="grid grid-cols-\[2\.75rem_minmax\(0,1fr\)_2\.75rem\] items-center gap-2 border-b border-linha px-2 py-1\.5"><span aria-hidden="true"><\/span><h2 data-ff-titulo="true" tabindex="-1" class="min-w-0 break-words text-center text-\[17px\] font-semibold leading-snug outline-none">Imprimir a ficha<\/h2>/);
     expect(h).not.toContain('font-display');
   });
 
@@ -35,8 +35,13 @@ describe('folhas da Apple · barra', () => {
     }
   });
 
-  it('título escondido (busca ⌘K): a barra fica só para o leitor de tela', () => {
-    expect(marcar({ esconderTitulo: true, sheet: true })).toMatch(/<header class="grid[^"]* sr-only">/);
+  it('título escondido (busca ⌘K): fica só o título, para o leitor de tela; sem a barra e sem um fechar invisível no Tab', () => {
+    const h = marcar({ esconderTitulo: true, sheet: true, titulo: 'Buscar' });
+    expect(h).toContain('<div class="flex h-full flex-col"><h2 data-ff-titulo="true" tabindex="-1" class="sr-only">Buscar</h2><p>corpo</p></div>');
+    expect(h).not.toContain('<header');
+    expect(h).not.toContain('aria-label="Fechar"');
+    // A busca traz o próprio fechar (e o Escape fecha, como em todo diálogo).
+    expect(readFileSync('src/components/erp/shell/BuscaGlobal.tsx', 'utf8')).toMatch(/esconderTitulo[\s\S]*aria-label="Fechar a busca"/);
   });
 
   it('o contrato do diálogo nativo não muda', () => {

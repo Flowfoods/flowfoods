@@ -4634,11 +4634,12 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
    - fechar continua imediato, sem animação de saída;
    - com movimento reduzido, a regra geral tira a animação.
    - Sem o puxador: a Apple só o põe em folha que muda de altura ou fecha ao arrastar, e as nossas não fazem isso.
-4. **O que não muda:** o contrato do diálogo nativo (`showModal`, Escape, clique no fundo, o foco que volta), as gavetas de lado no computador, a janela de módulo e o fundo de bloqueio.
+4. **Busca ⌘K, o diálogo de título escondido:** fica só o título, para o leitor de tela, sem a barra e sem o fechar. Antes, a barra escondida levava junto um X invisível que recebia o foco: Shift+Tab a partir do campo caía nele. A busca tem o próprio fechar ("Fechar a busca"), e o Escape fecha, como em todo diálogo.
+5. **O que não muda:** o contrato do diálogo nativo (`showModal`, Escape, clique no fundo, o foco que volta), as gavetas de lado no computador, a janela de módulo e o fundo de bloqueio.
 
 **Verificação:**
 - **Testes:**
-  - 10 em `tests/erp-folhas-apple.test.ts`: a barra, a gaveta, o fechar nos dois tipos, o título escondido, o contrato do diálogo, a folha no celular, a entrada, a ordem das regras da ajuda e o contraste do fechar nos dois temas.
+  - 10 em `tests/erp-folhas-apple.test.ts`: a barra, a gaveta, o fechar nos dois tipos, o título escondido (sem barra e sem fechar), o contrato do diálogo, a folha no celular, a entrada, a ordem das regras da ajuda e o contraste do fechar nos dois temas.
   - O contrato de movimento de `erp-padrao-visual` passou a incluir a entrada da folha (`ff-folha`).
   - Com os dois arquivos, 47 passam.
 - **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
