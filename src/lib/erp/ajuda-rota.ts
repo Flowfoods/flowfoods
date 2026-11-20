@@ -135,6 +135,8 @@ export function rotaRelativa(caminho: string): string | null {
   let resto: string | null = null;
   if (limpo === '/erp') resto = '';
   else if (limpo.startsWith('/erp/')) resto = limpo.slice('/erp/'.length);
+  // A foto pessoal do administrador fica fora da seleção de parceiro, mas usa a mesma ajuda.
+  else if (limpo === '/rodolfo/perfil') resto = 'perfil';
   // No nível 1 a conferência Financial fica na central do parceiro.
   else if (/^\/rodolfo\/integracoes\/[^/]+\/financial$/.test(limpo)) resto = 'integracoes/financial';
   else {

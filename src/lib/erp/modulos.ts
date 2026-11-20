@@ -779,7 +779,7 @@ export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
 
 /** "Seu acesso": da própria pessoa (senha, rosto, o que ela pode). Sem permissão. */
 export function telaSeuAcesso(base = '/erp'): ItemNav {
-  return { href: `${base}/acesso`, rotulo: 'Seu acesso', icone: 'acesso', subtitulo: 'Senha, rosto e o que você pode' };
+  return { href: `${base}/acesso`, rotulo: 'Seu acesso', icone: 'acesso', subtitulo: 'Senha, rosto e o que você pode', ativoEm: `^${base}/(acesso|perfil)(/|$)` };
 }
 
 function liberada(alcance: Alcance, t: Tela) {

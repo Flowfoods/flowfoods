@@ -137,6 +137,7 @@ export const TELAS_DO_ERP: { href: string; rotulo: string; permissao: Permissao 
   { href: '/erp/equipe', rotulo: 'Equipe', permissao: 'acessos.gerir' },
   { href: '/erp/historico', rotulo: 'Histórico', permissao: 'historico.ver' },
   { href: '/erp/acesso', rotulo: 'Seu acesso', permissao: null },
+  { href: '/erp/perfil', rotulo: 'Meu perfil', permissao: null },
 ];
 
 export function telasPermitidas(alcance: Alcance) {

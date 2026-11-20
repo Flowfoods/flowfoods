@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { FormCanais } from '@/components/erp/telas/estrutura/form-canais';
 import { FormCnpj } from '@/components/erp/telas/estrutura/form-cnpj';
 import { FormNome } from '@/components/erp/telas/estrutura/form-nome';
+import { EditorImagem } from '@/components/erp/telas/identidade/editor-imagem';
 import { resumoDaEstrutura, TelaEstrutura } from '@/components/erp/telas/estrutura/tela-estrutura';
 import { acaoCadastrarLoja, acaoCadastrarMarca, acaoSalvarCanaisDaLoja, acaoSalvarCnpjDaLoja } from '../actions';
 
@@ -32,6 +33,10 @@ export default async function LojasDoParceiroPage(props: { params: Promise<{ slu
       <TelaEstrutura
         lojas={lojas}
         marcas={marcas}
+        identidadeMarca={(marca) => {
+          const url = `/rodolfo/erp/${encodeURIComponent(slug)}/identidade/marcas/${encodeURIComponent(marca.id)}/logo`;
+          return <EditorImagem url={url} atual={marca.logoArquivo ? `${url}?v=${encodeURIComponent(marca.logoArquivo)}` : null} nome={marca.nome} tipo="logo" podeEditar={!ctx.bloqueio} />;
+        }}
         bloqueio={ctx.bloqueio}
         mostrarLink
         formLoja={<FormNome acao={acaoCadastrarLoja.bind(null, slug)} tipo="loja" />}

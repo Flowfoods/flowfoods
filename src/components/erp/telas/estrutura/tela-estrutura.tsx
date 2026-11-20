@@ -110,9 +110,10 @@ export function TelaEstrutura({
   mostrarLink = false,
   formCanais,
   formCnpj,
+  identidadeMarca,
 }: {
   lojas: { id: string; nome: string; slug: string; ativa: boolean; criadoEm: Date; canaisDeVenda?: CanalVenda[] | null; cnpj?: string | null }[];
-  marcas: { id: string; nome: string; ativa: boolean; criadoEm: Date }[];
+  marcas: { id: string; nome: string; ativa: boolean; criadoEm: Date; logoArquivo?: string | null }[];
   bloqueio: string | null;
   /** Sem formulário: a pessoa não cadastra lojas/marcas (a linha do campo some). */
   formLoja?: ReactNode;
@@ -123,8 +124,11 @@ export function TelaEstrutura({
   formCanais?: (l: { id: string; nome: string; canais: readonly CanalVenda[] }) => ReactNode;
   /** F.1a: o controle do CNPJ de uma loja (só para quem cadastra lojas). */
   formCnpj?: (l: { id: string; nome: string; cnpj: string }) => ReactNode;
+  /** Logo da marca canônica; o servidor decide se a pessoa pode editá-la. */
+  identidadeMarca?: (marca: { id: string; nome: string; logoArquivo?: string | null }) => ReactNode;
 }) {
   return (
+    <div className="space-y-4">
     <div className="grid gap-4 lg:grid-cols-2">
       <Painel titulo="Lojas" acessorio={<Contagem>{lojas.length}</Contagem>} semRespiro>
         {/* Bloqueado: no celular o aviso do topo já explica; no desktop, a frase fica no lugar do campo. */}
@@ -161,6 +165,22 @@ export function TelaEstrutura({
           <Tabela rotulo="Marca" linhas={marcas} mostrarLink={false} />
         )}
       </Painel>
+    </div>
+    {identidadeMarca && marcas.length > 0 && (
+      <Painel id="identidade-visual" titulo="Identidade visual" subtitulo="Logo de cada marca, disponível no cabeçalho do sistema." semRespiro>
+        <div className="divide-y divide-linha">
+          {marcas.map((marca) => (
+            <details key={marca.id} className="group px-4 sm:px-5">
+              <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 py-3 text-sm font-semibold text-texto">
+                <span className="min-w-0 break-words">{marca.nome}{!marca.ativa && <span className="ml-2 text-[12px] font-normal text-suave">inativa</span>}</span>
+                <span aria-hidden className="shrink-0 text-suave group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="max-w-2xl pb-4">{identidadeMarca(marca)}</div>
+            </details>
+          ))}
+        </div>
+      </Painel>
+    )}
     </div>
   );
 }

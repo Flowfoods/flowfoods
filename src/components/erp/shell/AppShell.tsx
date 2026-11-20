@@ -11,6 +11,7 @@
 
 import type { ReactNode } from 'react';
 import '../tokens.css';
+import './cabecalho-identidade.css';
 import { Shell } from './Shell';
 import type { PropsDoShell } from './tipos';
 
