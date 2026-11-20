@@ -260,7 +260,8 @@ describe('padrão visual · geometria', () => {
     expect(CAMPO).toContain('placeholder:text-suave ');
     expect(CAMPO).not.toMatch(/placeholder:text-suave\//);
     expect(CAMPO).toContain('rounded-campo');
-    expect(renderToStaticMarkup(createElement(Painel, { titulo: 'Painel', children: 'x' }))).toMatch(/^<section class="min-w-0 rounded-cartao border border-linha bg-painel /);
+    // `ff-painel` (decisão 533): o gancho da lista agrupada no celular; o raio do cartão segue o nomeado.
+    expect(renderToStaticMarkup(createElement(Painel, { titulo: 'Painel', children: 'x' }))).toMatch(/^<section class="ff-painel min-w-0 rounded-cartao border border-linha bg-painel /);
     expect(regra('.ff-app dialog.ff-dialogo')).toContain('border-radius: var(--ff-raio-modal)');
     expect(regra('.ff-app .ff-popover')).toContain('border-radius: var(--ff-raio-popover)');
     expect(regra('.ff-app .ff-nav-item')).toContain('border-radius: var(--ff-raio-nav)');

@@ -7,7 +7,7 @@
  */
 
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { LinhaDeNota } from '@/lib/erp/compras';
 import { formatarData, NOTAS_POR_PAGINA, numeroDaNota, queryDosFiltrosDeNota, temFiltroDeNota, type FiltrosDeNota } from '@/lib/erp/compra-campos';
@@ -227,23 +227,24 @@ export function TelaListaNotas({
 
   return (
     <Painel semRespiro>
-      {/* Celular: cartões que abrem o detalhe. */}
-      <ul className="divide-y divide-linha sm:hidden">
+      {/* Celular: lista agrupada da Apple (decisão 533), com linhas que abrem o detalhe. */}
+      <ul className="ff-lista-agrupada sm:hidden">
         {linhas.map((n) => (
           <li key={n.id}>
-            <Link href={hrefDoDetalhe(base, n.id, f)} className="ff-transicao flex min-h-16 items-center justify-between gap-3 px-4 py-3 hover:bg-texto/[0.03]">
-              <span className="min-w-0">
-                <span className={`block truncate font-medium ${n.cancelada ? 'text-suave line-through' : 'text-texto'}`}>{n.fornecedor}</span>
-                <span className="block text-[12px] tabular-nums text-suave">
+            <Link href={hrefDoDetalhe(base, n.id, f)} className="ff-transicao flex min-h-16 items-center justify-between gap-3 py-3 pl-4 pr-3 hover:bg-texto/[0.03]">
+              <span className="min-w-0 flex-1">
+                <span className={`block truncate text-[17px] font-medium leading-snug ${n.cancelada ? 'text-suave line-through' : 'text-texto'}`}>{n.fornecedor}</span>
+                <span className="block text-[13px] tabular-nums text-suave">
                   Nota {numeroDaNota(n)} · {formatarData(n.entradaEm)}
                 </span>
-                <span className="block truncate text-[12px] text-suave">
+                <span className="block truncate text-[13px] text-suave">
                   {n.loja} · {n.itens} {n.itens === 1 ? 'item' : 'itens'}
                 </span>
               </span>
               <span className="shrink-0 text-right text-sm tabular-nums">
                 {n.cancelada ? <Selo>Cancelada</Selo> : <span className="font-semibold text-texto">{formatarDinheiro(n.totalCentavos)}</span>}
               </span>
+              <ChevronRight size={16} aria-hidden className="ff-seta-da-linha" />
             </Link>
           </li>
         ))}

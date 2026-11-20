@@ -17,7 +17,7 @@
 
 import { useState } from 'react';
 import { CONSERVACOES, ORDEM_DAS_CONSERVACOES, ROTULO_DA_OPCAO, validadesParaCampos, type Conservacao, type EmQue, type Validades } from '@/lib/erp/validade';
-import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
+import { AJUDA, CAMPO, Erro, INTERRUPTOR, MARCAR, ROTULO } from '../../ui/campos';
 import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { IconeDaConservacao } from '../cadastro/validade';
 
@@ -140,17 +140,22 @@ export function CamposDeConservacao({
             return (
               <li key={c} className="py-2.5">
                 <div className="grid grid-cols-[5.5rem_6.5rem_minmax(0,1fr)] items-center gap-x-2 gap-y-1 sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem]">
-                  <label className="col-span-3 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm sm:col-span-1 sm:min-h-[42px]">
+                  {/* Como nos Ajustes (decisão 533): o lugar e, na ponta, o interruptor que liga e desliga; a linha toda é o alvo. */}
+                  <label className="col-span-3 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm sm:col-span-1 sm:min-h-[42px] sm:pr-2">
+                    <IconeDaConservacao conservacao={c} />
+                    <span className="min-w-0 flex-1">
+                      <span className="text-texto">{ROTULO_DA_OPCAO[c]}</span>
+                      {/* O espaço vai no texto (e não só na margem): o leitor de tela lê "Refrigerado conservação principal". */}
+                      {principal === c && <>{' '}<span className="ml-1 text-[12px] text-suave">conservação principal</span></>}
+                    </span>
                     <input
                       type="checkbox"
+                      role="switch"
                       name={`aceita_${c}`}
                       checked={l.marcada}
                       onChange={(e) => mudar(c, { marcada: e.target.checked })}
-                      className={MARCAR}
+                      className={INTERRUPTOR}
                     />
-                    <IconeDaConservacao conservacao={c} />
-                    <span className="text-texto">{ROTULO_DA_OPCAO[c]}</span>
-                    {principal === c && <span className="text-[12px] text-suave">conservação principal</span>}
                   </label>
                   <div>
                     <label htmlFor={`${idBase}-${chave}`} className="sr-only">
@@ -196,7 +201,7 @@ export function CamposDeConservacao({
         </ul>
         {!temPonto.prazo && (
           <p className={AJUDA}>
-            Marque só onde o insumo pode ficar. A data de vencimento do lote e a de abertura entram no recebimento da compra e nas etiquetas.
+            Ligue só onde o insumo pode ficar. A data de vencimento do lote e a de abertura entram no recebimento da compra e nas etiquetas.
           </p>
         )}
       </fieldset>

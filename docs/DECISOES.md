@@ -4568,6 +4568,49 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - A área segura (`env(safe-area-inset-bottom)`) só vale com `viewport-fit=cover`, que o `/erp` não usa: hoje ela é 0. Hipótese, a conferir no aparelho: o próprio iOS mantém o conteúdo fora da faixa do indicador, e a barra fica logo acima dela.
 - Nota de compra: o aviso de período fechado nasce enquanto a pessoa digita a data, com a barra escondida pelo foco; ao sair do campo, a barra volta e pode cobrir o fim do aviso ("Ver os períodos"). Só por leitura de código, porque os dados de teste não têm período fechado.
 - Com o teclado aberto, a barra some pelo foco do campo; um teclado que abre sem foco num campo (raro) não a esconde.
+- Com cores forçadas (alto contraste do aparelho), a aba atual se distingue pelo peso 600 e pelo `aria-current`; o ícone herda a cor do nome, como o das outras abas. É o mesmo limite do menu (decisão 531).
 - Abaixo de 640 px o título grande ocupa mais altura que antes.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 533. 2026-11-19 · Visual da Apple no ERP, fatia A4: listas agrupadas no celular e o interruptor dos Ajustes
+
+**Fonte e recorte:** quarta fatia do visual da Apple aprovado por Rodolfo em 18/11/2026 (decisões 530 a 532); em 18/11 ele pediu que o plano seguisse com todas as fases sem nova pergunta. O protótipo mostrava, no iPhone, a lista de insumos como lista agrupada (linhas com o nome, o apoio e a seta, separadores recuados) e, no formulário, "onde fica" ligado e desligado por interruptores. Só aparência: sem regra, permissão, destino, nome de campo, valor enviado, schema, migration, dado ou infraestrutura.
+
+1. **Listas agrupadas no celular** (abaixo de 640 px), nas listas que viram linhas: insumos, fichas e notas de compra.
+   - O separador começa onde começa o texto, como nos Ajustes (`.ff-lista-agrupada`, recuo em `--ff-recuo-da-lista`): 16 px; nas fichas, depois da miniatura (72 px); nos insumos com a caixa de marcar, depois dela (52 px).
+   - A linha que abre o detalhe termina numa seta (`ff-seta-da-linha`), dentro do próprio link; com cores forçadas, a seta herda a cor do link.
+   - O nome vai a 17 px/500 e quebra em vez de cortar (nos insumos, antes cortado com reticências); as linhas de apoio vão a 13 px (antes, 12 px).
+   - Nas fichas, Editar e Remover saem do lado do nome para uma linha própria, embaixo, como nos insumos: ao lado da seta, apertavam o nome a 8 ou 9 linhas a 320 px (achado da revisão).
+   - O painel em volta dessas listas perde a borda e fica com o raio de 12 px do grupo; com cores forçadas, a borda volta. No computador, nada muda: lá elas são tabela.
+2. **Interruptor dos Ajustes** (`INTERRUPTOR`, `.ff-interruptor`) para o que liga e desliga:
+   - "Onde fica" da ficha e "prazo depois de aberto" do insumo. Antes era uma caixa de marcar à esquerda; agora, o lugar e, na ponta da linha, o interruptor. A linha inteira continua sendo o alvo do toque.
+   - Continua um `input type="checkbox"`, agora com `role="switch"`. O nome (`aceita_X`) e o valor enviado não mudam, e o servidor lê igual.
+   - 51 × 31 px como no iPhone, ligado no verde do `ok` com o polegar branco. O desligado leva um contorno no `suave` para ter 3:1 de componente; o cinza da Apple sozinho fica perto de 1,2:1.
+   - Com cores forçadas, volta a ser a caixa do sistema. Com movimento reduzido, a regra geral tira a transição.
+   - O foco é o anel neutro dos campos (2 px na cor do texto a 70 %, folga de 1 px), como em todo campo: vermelho no campo quer dizer erro.
+   - No insumo, o nome que o leitor de tela lê tem o espaço entre o lugar e "conservação principal" (estava colado, achado da revisão).
+   - A ajuda das duas telas passa a dizer "Ligue" em vez de "Marque".
+   - O "Principal" da ficha segue rádio.
+3. **"Principal" a 320 px:** as colunas do celular de "onde fica" passaram de 5,5 + 6,5 rem para 4,75 + 6 rem, com 6 px entre elas (antes, 8). O rótulo, que passava 2 px da tela e da borda do painel (limite antigo registrado na decisão 530), agora fica dentro do painel; ainda passa alguns pixels da própria coluna, para o espaço interno do painel.
+
+**Verificação:**
+- **Testes:** 12 em `tests/erp-listas-agrupadas.test.ts`. Cobrem:
+  - as três listas: classe, nome em 17 px, apoio em 13 px, texto no meio e a seta por último dentro do link;
+  - as ações das fichas embaixo, o recuo do separador, o nome dos insumos que quebra e o painel no celular e no alto contraste;
+  - o interruptor: tamanho, ligado, desligado, o foco dos campos, cores forçadas e movimento reduzido, e o contraste nos dois temas;
+  - a ficha: quatro interruptores com os nomes de antes, sem `value`, o rádio do "Principal" e as colunas novas;
+  - o insumo, desenhado: o interruptor na ponta, sem `value`, com o estado, e o nome lido com espaço;
+  - a ajuda que diz "Ligue".
+  - Em `erp-padrao-visual`, o painel passou a levar `ff-painel`.
+- **Revisão independente** (subagente só de leitura) em 8791c7f: **aprovado com ressalvas**, sem bloqueante. Conferiu que o formulário manda o mesmo de antes (nome, tipo, valor, marcado), a recuperação do Novo insumo (decisão 529), a seleção em massa e as ações dos insumos, o interruptor por toque e teclado, as cores forçadas, o contraste, o computador e a rolagem lateral. Rodou 12 mutantes.
+  - Duas regressões importantes: o nome do interruptor do insumo colado para o leitor de tela e as fichas com ações espremidas abaixo de 360 px.
+  - Menores: a regra de foco do interruptor que nunca valia, o "Principal" sobre a borda do painel, o separador fora do começo do texto, a seta antes dos botões, o nome dos insumos mais cortado, a seta com cores forçadas, lacunas de teste e a ajuda que dizia "Marque".
+  - Todos tratados no commit seguinte.
+- **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
+
+**Limites:**
+- As outras listas com divisórias (detalhes, compras, fornecedores) seguem como estavam; entram quando a tela delas for revista.
+- Não testado em Safari/iOS de verdade nem com leitor de tela real (o anúncio de "interruptor, ligado/desligado").
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.

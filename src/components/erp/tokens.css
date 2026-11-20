@@ -368,6 +368,106 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 
 /*
+ * Lista agrupada da Apple (A4, decisão 533), nas listas que viram linhas no celular (insumos, fichas, notas de compra): o
+ * separador começa onde começa o texto (16 px), como nos Ajustes, e a linha que abre o detalhe termina numa seta. No celular,
+ * o painel em volta dessas listas perde a borda e fica com o raio de 12 px do grupo; no computador, nada muda (lá é tabela).
+ */
+.ff-app .ff-lista-agrupada > li {
+  position: relative;
+}
+/* O recuo do separador acompanha o começo do texto: 16 px por padrão; a lista que tem miniatura ou caixa de marcar à esquerda
+   diz o seu em `--ff-recuo-da-lista`. */
+.ff-app .ff-lista-agrupada > li + li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--ff-recuo-da-lista, 16px);
+  border-top: 1px solid var(--ff-linha);
+  pointer-events: none;
+}
+.ff-app .ff-seta-da-linha {
+  flex-shrink: 0;
+  margin-left: -4px;
+  color: rgb(var(--ff-suave));
+}
+/* Cores forçadas: a seta herda a cor do link (o `suave` cairia a 2,17:1 com o tema cruzado). */
+@media (forced-colors: active) {
+  .ff-app .ff-seta-da-linha {
+    color: inherit;
+  }
+}
+@media (max-width: 639px) {
+  .ff-app .ff-painel:has(.ff-lista-agrupada) {
+    border-color: transparent;
+    border-radius: 12px;
+  }
+}
+@media (forced-colors: active) {
+  .ff-app .ff-painel:has(.ff-lista-agrupada) {
+    border-color: CanvasText;
+  }
+}
+
+/*
+ * Interruptor da Apple (A4, decisão 533) para o que liga e desliga ("onde fica": seco, refrigerado, congelado, pista fria):
+ * um `input type="checkbox"` com `role="switch"`, 51 × 31 px como no iPhone, ligado no verde do `ok` e com o polegar branco.
+ * O alvo de toque é a linha inteira (o rótulo envolve o campo). Com cores forçadas, volta a ser a caixa de marcar do sistema.
+ * O foco é o anel neutro dos campos (2 px na cor do texto a 70 %, folga de 1 px): vermelho no campo quer dizer erro.
+ * Com movimento reduzido, a regra geral (`.ff-app *::after`) já tira a transição do trilho e do polegar.
+ */
+.ff-app .ff-interruptor {
+  position: relative;
+  width: 51px;
+  height: 31px;
+  flex: none;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  border-radius: 16px;
+  background-color: var(--ff-preenchimento-forte);
+  /* O contorno no `suave` dá ao desligado os 3:1 de um componente (o cinza da Apple sozinho fica perto de 1,2:1). */
+  box-shadow: inset 0 0 0 1px rgb(var(--ff-suave));
+  transition: background-color 0.2s;
+}
+.ff-app .ff-interruptor::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background-color: #fff;
+  box-shadow: 0 3px 8px rgb(0 0 0 / 0.15), 0 1px 1px rgb(0 0 0 / 0.16);
+  transition: transform 0.2s;
+}
+.ff-app .ff-interruptor:checked {
+  background-color: rgb(var(--ff-ok));
+  box-shadow: none;
+}
+.ff-app .ff-interruptor:checked::after {
+  transform: translateX(20px);
+}
+.ff-app .ff-interruptor:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+@media (forced-colors: active) {
+  .ff-app .ff-interruptor {
+    width: 20px;
+    height: 20px;
+    appearance: auto;
+    -webkit-appearance: auto;
+    box-shadow: none;
+  }
+  .ff-app .ff-interruptor::after {
+    display: none;
+  }
+}
+
+/*
  * Campo de busca da Apple (decisão 530): todo `input[type=search]` do ERP fica preenchido, sem borda, com a lupa (imagem de
  * fundo do tema), sem mexer nas telas. O texto de exemplo é o texto a 75 %: sobre o preenchimento, o `suave` cairia abaixo de
  * 4,5:1 no fundo creme. A regra vence as classes do campo (`border-linha-forte`, `bg-campo`, `px-3`) pela especificidade.

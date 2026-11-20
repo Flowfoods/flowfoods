@@ -8,8 +8,8 @@
  */
 
 import Link from 'next/link';
-import { Fragment } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Fragment, type CSSProperties } from 'react';
+import { ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { validadesEmTexto } from '@/lib/erp/validade';
 import type { LinhaDeFicha } from '@/lib/erp/fichas';
 import type { CustoDaFicha } from '@/lib/erp/ficha-campos';
@@ -175,38 +175,41 @@ export function TelaListaFichas({
 
   return (
     <Painel semRespiro>
-      <ul className="divide-y divide-linha sm:hidden">
+      {/* Celular: lista agrupada da Apple (decisão 533). O separador começa onde começa o nome, depois da miniatura (16 + 44 + 12 px).
+          Editar e Remover ficam numa linha própria, embaixo, como na lista de insumos; ao lado, apertavam o nome (8 a 9 linhas a 320 px). */}
+      <ul className="ff-lista-agrupada sm:hidden" style={{ '--ff-recuo-da-lista': '72px' } as CSSProperties}>
         {linhas.map((l) => (
           <li key={l.id}>
             <div className="flex items-center">
             <Link href={hrefDoDetalhe(base, l.id, f)} className="ff-transicao flex min-h-16 min-w-0 flex-1 items-center gap-3 py-3 pl-4 pr-3 hover:bg-texto/[0.03]">
               <Miniatura base={base} id={l.id} foto={l.foto} />
               <span className="min-w-0 flex-1">
-                <span className={`block break-words font-medium [overflow-wrap:anywhere] ${l.ativa ? 'text-texto' : 'text-suave'}`}>{l.nome}</span>
-                <span className="block truncate text-[12px] text-suave">
+                <span className={`block break-words text-[17px] font-medium leading-snug [overflow-wrap:anywhere] ${l.ativa ? 'text-texto' : 'text-suave'}`}>{l.nome}</span>
+                <span className="block truncate text-[13px] text-suave">
                   {TIPOS_DE_FICHA[l.tipo]} · rende {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}
                   {!l.ativa && ' · Desativada'}
                 </span>
                 {/* 1.5 (herança d): validade em linha própria, quebrando em vez de cortar. */}
-                {(l.consumoImediato || validadesEmTexto(l.validades)) && <span className="mt-0.5 block text-[12px] leading-snug text-suave">{l.consumoImediato ? 'Consumo imediato' : validadesEmTexto(l.validades)}</span>}
+                {(l.consumoImediato || validadesEmTexto(l.validades)) && <span className="mt-0.5 block text-[13px] leading-snug text-suave">{l.consumoImediato ? 'Consumo imediato' : validadesEmTexto(l.validades)}</span>}
               </span>
               {l.custo && (
                 <span className="shrink-0 text-right text-sm tabular-nums">
                   <CustoPorRende l={{ ...l, custo: l.custo }} empilhado />
                 </span>
               )}
+              <ChevronRight size={16} aria-hidden className="ff-seta-da-linha" />
             </Link>
-            {acoes && (
-              <span className="shrink-0 py-2 pr-4">
-                <AcoesDaFicha l={l} base={base} f={f} empilhado />
-              </span>
-            )}
             </div>
             {(l.classificacao.secao || l.classificacao.subsecao || precos?.has(l.id) || correspondenciasCmv?.get(l.id)?.length || correspondenciasFaixasCmv?.get(l.id)?.length) ? <div className="min-w-0 space-y-2 px-4 pb-3">
               <TextoClassificacao classificacao={l.classificacao} />
               <Correspondencias pares={correspondenciasCmv?.get(l.id)} faixas={correspondenciasFaixasCmv?.get(l.id)} />
               {precos?.get(l.id) && <CmvPorCanalCompacto contas={precos.get(l.id)!} href={hrefDoDetalhe(base, l.id, f)} nome={l.nome} />}
             </div> : null}
+            {acoes && (
+              <div className="-mt-1 flex justify-end px-3 pb-1.5">
+                <AcoesDaFicha l={l} base={base} f={f} />
+              </div>
+            )}
           </li>
         ))}
       </ul>
