@@ -4568,6 +4568,7 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - A área segura (`env(safe-area-inset-bottom)`) só vale com `viewport-fit=cover`, que o `/erp` não usa: hoje ela é 0. Hipótese, a conferir no aparelho: o próprio iOS mantém o conteúdo fora da faixa do indicador, e a barra fica logo acima dela.
 - Nota de compra: o aviso de período fechado nasce enquanto a pessoa digita a data, com a barra escondida pelo foco; ao sair do campo, a barra volta e pode cobrir o fim do aviso ("Ver os períodos"). Só por leitura de código, porque os dados de teste não têm período fechado.
 - Com o teclado aberto, a barra some pelo foco do campo; um teclado que abre sem foco num campo (raro) não a esconde.
+- Com cores forçadas (alto contraste do aparelho), a aba atual se distingue pelo peso 600 e pelo `aria-current`; o ícone herda a cor do nome, como o das outras abas. É o mesmo limite do menu (decisão 531).
 - Abaixo de 640 px o título grande ocupa mais altura que antes.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
