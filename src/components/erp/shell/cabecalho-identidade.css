@@ -9,6 +9,11 @@
 }
 .ff-cabecalho-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 250px) minmax(0, 1fr); align-items: center; gap: 22px; padding: 12px 26px; }
 .ff-assinatura-central { display: flex; flex-direction: column; align-items: center; justify-self: start; gap: 18px; border-radius: 5px; }
+@media (min-width: 900px) {
+  /* Centro da coluna lateral de 232 px: desconta os 26 px de respiro de cada lado.
+     Na lateral recolhida (68 px) preserva a logo legível de 96 px, à esquerda. */
+  .ff-cabecalho-identidade[data-menu='expandido'] .ff-assinatura-central { width: calc(232px - 52px); }
+}
 .ff-logo-janela { position: relative; display: block; width: 96px; aspect-ratio: 780 / 500; overflow: hidden; }
 .ff-logo-janela img { position: absolute; width: 138.46154%; max-width: none; height: auto; left: -19.23077%; top: -56%; }
 .ff-logo-janela .ff-logo-escuro { display: none; }

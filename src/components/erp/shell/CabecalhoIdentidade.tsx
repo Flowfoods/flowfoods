@@ -9,7 +9,7 @@ import { MenuUsuario } from './MenuUsuario';
 import { Popover } from './Popover';
 import { ImagemDeIdentidade } from './ImagemDeIdentidade';
 
-export function CabecalhoIdentidade({ props, slug, inicio }: { props: PropsDoShell; slug: string | null; inicio: string }) {
+export function CabecalhoIdentidade({ props, slug, inicio, menuRecolhido }: { props: PropsDoShell; slug: string | null; inicio: string; menuRecolhido: boolean }) {
   const identidade = props.identidade;
   const chave = `${props.chaveDoContexto ?? ''}:${slug ?? ''}`;
   const [carregado, setCarregado] = useState<{ chave: string; dados: IdentidadeDoCabecalho } | null>(null);
@@ -54,7 +54,7 @@ export function CabecalhoIdentidade({ props, slug, inicio }: { props: PropsDoShe
   }
 
   return (
-    <header className="ff-cabecalho-identidade ff-material" aria-label="Identidade do sistema">
+    <header className="ff-cabecalho-identidade ff-material" data-menu={menuRecolhido ? 'recolhido' : 'expandido'} aria-label="Identidade do sistema">
       <div className="ff-cabecalho-grade">
         <Link href={inicio} className="ff-assinatura-central" aria-label="FlowFoods — início. BARNEY OS">
           <span className="ff-logo-janela" aria-hidden>

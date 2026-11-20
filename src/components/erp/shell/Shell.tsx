@@ -226,7 +226,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
         podeAbrirSozinho={!ajudaAberta}
         aoVerPassoAPasso={(secao, origem) => abrirAjuda(secao ?? undefined, origem)}
       >
-      <CabecalhoIdentidade props={props} slug={slug} inicio={nav.inicio.href} />
+      <CabecalhoIdentidade props={props} slug={slug} inicio={nav.inicio.href} menuRecolhido={recolhido} />
       <div
         className={`grid min-h-dvh grid-cols-[minmax(0,1fr)] ${
           recolhido ? 'min-[900px]:grid-cols-[68px_minmax(0,1fr)]' : 'min-[900px]:grid-cols-[232px_minmax(0,1fr)]'
