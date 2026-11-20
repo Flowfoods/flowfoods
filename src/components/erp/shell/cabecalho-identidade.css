@@ -1,16 +1,7 @@
-/* Correção de 20/11: FlowFoods menor (96 px), à esquerda; 18 px até BARNEY OS.
-   Escopo local: os controles e o restante do ERP continuam respeitando o tema escolhido. */
+/* O cabeçalho acompanha claro/escuro/sistema do ERP e o material compartilhado
+   da direção Apple. Não redefine a paleta nem mantém um tema independente. */
 .ff-cabecalho-identidade {
-  --ff-texto: 245 240 236;
-  --ff-suave: 177 168 162;
-  --ff-painel: 25 22 21;
-  --ff-forte: 40 35 33;
-  --ff-linha: #302a27;
-  --ff-linha-forte: #5d534e;
-  --ff-erro: 255 153 149;
-  color-scheme: dark;
   color: rgb(var(--ff-texto));
-  background: #0a0a0a;
   border-bottom: 1px solid var(--ff-linha);
   position: relative;
   z-index: 31;
@@ -20,8 +11,16 @@
 .ff-assinatura-central { display: flex; flex-direction: column; align-items: center; justify-self: start; gap: 18px; border-radius: 5px; }
 .ff-logo-janela { position: relative; display: block; width: 96px; aspect-ratio: 780 / 500; overflow: hidden; }
 .ff-logo-janela img { position: absolute; width: 138.46154%; max-width: none; height: auto; left: -19.23077%; top: -56%; }
+.ff-logo-janela .ff-logo-escuro { display: none; }
+.ff-app[data-tema='escuro'] .ff-logo-claro { display: none; }
+.ff-app[data-tema='escuro'] .ff-logo-escuro { display: block; }
+/* A escolha manual prevalece sobre o aparelho. Em sistema, muda sem JS/flash. */
+@media (prefers-color-scheme: dark) {
+  .ff-app[data-tema='sistema'] .ff-logo-claro { display: none; }
+  .ff-app[data-tema='sistema'] .ff-logo-escuro { display: block; }
+}
 .ff-barney-os { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; font-weight: 650; letter-spacing: .17em; line-height: 1.4; }
-.ff-barney-os span { font-size: 10px; line-height: 1; letter-spacing: .08em; padding: 4px 5px; background: #ef172b; color: #fff; border-radius: 4px; }
+.ff-barney-os span { font-size: 10px; line-height: 1; letter-spacing: .08em; padding: 4px 5px; background: rgb(var(--ff-acao)); color: rgb(var(--ff-sobre-acao)); border-radius: 4px; }
 .ff-cabecalho-marca { width: 100%; max-width: 250px; min-width: 0; justify-self: center; }
 .ff-marca-selecionada { display: flex; position: relative; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 100%; min-height: 96px; padding: 6px 24px; border: 1px solid transparent; border-radius: 12px; text-align: center; }
 .ff-marca-selecionada:hover, .ff-marca-selecionada[aria-expanded='true'] { background: rgb(var(--ff-painel)); border-color: var(--ff-linha); }

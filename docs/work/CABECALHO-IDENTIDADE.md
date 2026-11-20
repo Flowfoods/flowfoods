@@ -4,7 +4,8 @@ Entrega autorizada em 20/11/2026 sobre a base `fa7d7401506786a010e93a9931e18684c
 
 ## Contrato
 
-- Cabeçalho compartilhado do parceiro e da gestão FlowFoods, em superfície escura: imagem original FlowFoods com 96 px de largura; assinatura BARNEY OS com intervalo vertical de 18 px. Sem ERP na composição da marca. Correção de 20/11 durante a implementação: FlowFoods menor e à esquerda substitui a referência anterior centralizada de 145 px.
+- Cabeçalho compartilhado do parceiro e da gestão FlowFoods: imagem original FlowFoods com 96 px de largura; assinatura BARNEY OS com intervalo vertical de 18 px. Sem ERP na composição da marca. Correção de 20/11 durante a implementação: FlowFoods menor e à esquerda substitui a referência anterior centralizada de 145 px.
+- Revisão de 20/11 após a publicação: a faixa acompanha claro, escuro e sistema do próprio ERP, revogando a exceção anterior de fundo sempre escuro. Herda os tokens e o material da direção Apple (decisão 530), com fundo sólido quando transparência reduzida ou sem suporte. As variantes originais da logo mudam por CSS; a preferência manual prevalece sobre o aparelho. Logos de clientes e fotos pessoais não recebem filtros nem recoloração.
 - FlowFoods fica à esquerda, independentemente da lateral aberta ou recolhida. A marca cliente fica no centro geométrico do cabeçalho; até 540 px, ocupa uma segunda linha centralizada. Conta pessoal à direita.
 - A logo cliente tem área de 128 × 64 px, preservando proporção e nome legível. Faixa com 12 px de respiro vertical, reduzindo a altura sem perder alvos de toque; rótulo redundante da seleção é apenas acessível.
 - A seleção da marca é uma preferência visual validada no servidor, com escopo de usuário e parceiro. Não altera a visão de lojas nem filtros de negócio. Respostas de contextos anteriores não substituem a marca atual.
