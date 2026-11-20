@@ -376,7 +376,7 @@ describe('ERP 1.2 · filtros da lista de fichas na URL', () => {
 });
 
 describe('ERP 1.2 · rota de arquivo do /erp confere a permissão', () => {
-  it('toda route.ts sob src/app/erp chama pode(...) ou exigirPermissao(...) com a sessão', async () => {
+  it('toda route.ts sob src/app/erp protege o contexto ou delega ao serviço privado da identidade', async () => {
     const { readdirSync, readFileSync, statSync } = await import('node:fs');
     const { join } = await import('node:path');
     const andar = (d: string): string[] =>
@@ -385,6 +385,20 @@ describe('ERP 1.2 · rota de arquivo do /erp confere a permissão', () => {
     expect(rotas.length).toBeGreaterThan(0);
     for (const f of rotas) {
       const t = readFileSync(f, 'utf8');
+      // Exceções NOMINAIS: os handlers reais e a recusa antes de ler o corpo são executados
+      // em erp-identidade-http.test.ts. Foto própria não deve depender de permissão de uma marca.
+      if (f === join('src', 'app', 'erp', 'perfil', 'foto', 'route.ts')) {
+        expect(t, f).toContain("from '@/lib/erp/sessao'");
+        expect(t, f).toContain("from '@/lib/erp/identidade-http'");
+        expect(t, f).toMatch(/return responderFotoDaPessoa\(req, await sessaoDaRequisicao\(\)\)/);
+        continue;
+      }
+      if (f === join('src', 'app', 'erp', 'identidade', 'marcas', '[id]', 'logo', 'route.ts')) {
+        expect(t, f).toMatch(/const ctx = await parceiroDaSessaoOuNada\(\)/);
+        expect(t, f).toContain("from '@/lib/erp/identidade-http'");
+        expect(t, f).toMatch(/return responderLogoDaMarca\(req, ctx, \(await params\)\.id\)/);
+        continue;
+      }
       expect(t, f).toMatch(/exigirParceiroDaSessao\(\)|parceiroDaSessaoOuNada\(\)/);
       expect(t, f).toMatch(/pode\(ctx\.alcance, '[a-z]+\.[a-z]+'\)|exigirPermissao\(ctx, |receberFotoDaFicha\(/);
     }

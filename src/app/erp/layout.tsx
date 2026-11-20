@@ -20,6 +20,7 @@ import { modulosLiberados } from '@/lib/erp/liberacao';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { COOKIE_MENU, COOKIE_TEMA, lerMenuRecolhido, lerTema } from '@/lib/erp/tema';
 import { AppShell } from '@/components/erp/shell/AppShell';
+import { escolherMarcaDaSessao, identidadeDaSessao } from '@/components/erp/shell/identidade-acoes';
 import { EscopoDoRascunho } from '@/components/erp/telas/cadastro/rascunho';
 import { Aviso } from '@/components/erp/ui/superficies';
 import { acaoSair } from '../entrar/actions';
@@ -42,10 +43,10 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const { parceiro, pessoa, bloqueio, alcance } = ctx;
   const status = STATUS_DO_PARCEIRO[parceiro.status];
   // INT-1.8 (decisão 491): aba de módulo com liberação só aparece com o módulo liberado para o parceiro.
-  const [{ opcoes, valor }, liberados] = await Promise.all([visaoDaRequisicao(ctx), modulosLiberados(ctx.cliente)]);
+  const [{ opcoes, valor }, liberados, identidade] = await Promise.all([visaoDaRequisicao(ctx), modulosLiberados(ctx.cliente), identidadeDaSessao()]);
   const c = await cookies();
 
-  const links = [{ rotulo: 'Seu acesso', href: '/erp/acesso' }];
+  const links = [{ rotulo: 'Meu perfil', href: '/erp/perfil' }, { rotulo: 'Seu acesso', href: '/erp/acesso' }];
   if (pessoa.parceiros.length > 1) links.push({ rotulo: 'Trocar de parceiro', href: '/entrar/escolher' });
 
   return (
@@ -57,7 +58,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         nome: pessoa.usuario.nome,
         papel: pessoa.perfilRotulo ?? 'Acesso próprio',
         email: pessoa.usuario.email,
+        fotoUrl: pessoa.usuario.fotoArquivo ? `/erp/perfil/foto?v=${encodeURIComponent(pessoa.usuario.fotoArquivo)}` : null,
       }}
+      identidade={{ modo: 'parceiro', dados: identidade, escolher: escolherMarcaDaSessao }}
       tema={lerTema(c.get(COOKIE_TEMA)?.value)}
       menuRecolhido={lerMenuRecolhido(c.get(COOKIE_MENU)?.value)}
       versao={VERSAO_DO_ERP}

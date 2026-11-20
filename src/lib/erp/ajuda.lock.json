@@ -3,6 +3,10 @@
     "versao": 12,
     "hash": "4fafb130deff6c17"
   },
+  "perfil": {
+    "versao": 1,
+    "hash": "a0ccb4354f471991"
+  },
   "acesso": {
     "versao": 2,
     "hash": "03594e07f69d873c"

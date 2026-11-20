@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { FormCanais } from '@/components/erp/telas/estrutura/form-canais';
 import { FormCnpj } from '@/components/erp/telas/estrutura/form-cnpj';
 import { FormNome } from '@/components/erp/telas/estrutura/form-nome';
+import { EditorImagem } from '@/components/erp/telas/identidade/editor-imagem';
 import { resumoDaEstrutura, TelaEstrutura } from '@/components/erp/telas/estrutura/tela-estrutura';
 import { acaoCadastrarLojaDaSessao, acaoCadastrarMarcaDaSessao, acaoSalvarCanaisDaLojaDaSessao, acaoSalvarCnpjDaLojaDaSessao } from '../actions';
 
@@ -33,6 +34,10 @@ export default async function ErpLojasPage() {
       <TelaEstrutura
         lojas={lojas}
         marcas={marcas}
+        identidadeMarca={(marca) => {
+          const url = `/erp/identidade/marcas/${encodeURIComponent(marca.id)}/logo`;
+          return <EditorImagem url={url} atual={marca.logoArquivo ? `${url}?v=${encodeURIComponent(marca.logoArquivo)}` : null} nome={marca.nome} tipo="logo" podeEditar={cadastra && !ctx.bloqueio} />;
+        }}
         bloqueio={ctx.bloqueio}
         formLoja={cadastra ? <FormNome acao={acaoCadastrarLojaDaSessao} tipo="loja" /> : undefined}
         formMarca={cadastra ? <FormNome acao={acaoCadastrarMarcaDaSessao} tipo="marca" /> : undefined}

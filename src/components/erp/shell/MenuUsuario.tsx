@@ -12,10 +12,10 @@ import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
 import { EnvioComEstado } from '../ui/botoes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import { LogOut, Monitor, Moon, Sun } from 'lucide-react';
 import { signOut } from 'next-auth/react';
-import { iniciais } from '@/lib/erp/modulos';
+import { ImagemDeIdentidade } from './ImagemDeIdentidade';
 import { ROTULO_DO_TEMA, TEMAS, type Tema } from '@/lib/erp/tema';
 import { acaoTrocarTema } from './acoes';
 import { limparRascunhos } from '../telas/cadastro/rascunho';
@@ -29,17 +29,17 @@ export function MenuUsuario({
   links,
   sair,
 }: {
-  usuario: { nome: string; papel: string; email?: string };
+  usuario: { nome: string; papel: string; email?: string; fotoUrl?: string | null };
   tema: Tema;
   links: { rotulo: string; href: string }[];
   sair: (() => Promise<void>) | null;
 }) {
   const router = useRouter();
-  const [tema, setTema] = useState(temaInicial);
+  // A preferência revalidada mantém as entradas do cabeçalho e da barra de rolagem em acordo.
+  const tema = temaInicial;
   const [saindo, iniciarSaida] = useTransition();
 
   function trocar(t: Tema) {
-    setTema(t);
     document.querySelector('.ff-app')?.setAttribute('data-tema', t);
     void acaoTrocarTema(t).then(() => router.refresh());
   }
@@ -53,11 +53,11 @@ export function MenuUsuario({
         <>
           <span
             aria-hidden
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-linha-forte bg-forte text-[12px] font-semibold text-texto"
+            className="ff-conta-foto grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full border border-linha-forte bg-forte text-[12px] font-semibold text-texto"
           >
-            {iniciais(usuario.nome)}
+            <ImagemDeIdentidade key={usuario.fotoUrl ?? usuario.nome} url={usuario.fotoUrl} nome={usuario.nome} pessoal />
           </span>
-          <span className="hidden min-w-0 text-left lg:block">
+          <span className="ff-conta-nome hidden min-w-0 text-left lg:block">
             <span className="block max-w-[10rem] truncate text-[13px] font-medium leading-tight text-texto">
               {usuario.nome}
             </span>

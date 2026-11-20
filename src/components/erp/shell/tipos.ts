@@ -71,7 +71,10 @@ export interface PropsDoShell {
   navegacao: Navegacao;
   /** Linha de contexto embaixo da marca (o parceiro na sessão, ou "Nível 1 · FlowFoods"). */
   contexto: string;
-  usuario: { nome: string; papel: string; email?: string };
+  usuario: { nome: string; papel: string; email?: string; fotoUrl?: string | null };
+  identidade?:
+    | { modo: 'parceiro'; dados: import('@/lib/erp/marca-cabecalho').IdentidadeDoCabecalho; escolher: (id: string) => Promise<{ ok: boolean; mensagem?: string }> }
+    | { modo: 'nivel1'; revisao: number; carregar: (slug: string) => Promise<import('@/lib/erp/marca-cabecalho').IdentidadeDoCabecalho>; escolher: (slug: string, id: string) => Promise<{ ok: boolean; mensagem?: string }> };
   tema: Tema;
   menuRecolhido: boolean;
   versao: string;

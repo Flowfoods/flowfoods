@@ -113,6 +113,19 @@ describe('0.6 · o gate: ajuda sempre atualizada', () => {
     expect(entradaDoCaminho('/rodolfo/integracoes/financial', ENTRADAS)).toBeNull();
   });
 
+  it('Meu perfil usa a ajuda da própria pessoa no ERP e no nível 1, fora da seleção de parceiro', () => {
+    for (const caminho of ['/erp/perfil', '/rodolfo/perfil?salvou=1']) {
+      expect(entradaDoCaminho(caminho, ENTRADAS)?.chave).toBe('perfil');
+      expect(entradaDoCaminho(caminho, ajudaParaATela(OPERADOR))?.aula.join(' ')).toContain('mesma foto');
+    }
+    for (const caminho of ['/erp/perfil/foto', '/rodolfo/perfil/foto', '/rodolfo/perfil-de-outra-pessoa']) {
+      expect(entradaDoCaminho(caminho, ENTRADAS)).toBeNull();
+    }
+    const perfil = ajudaParaATela(OPERADOR).find((e) => e.chave === 'perfil')!;
+    expect(perfil.secoes.flatMap((s) => s.blocos).join(' ')).not.toContain('Identidade visual');
+    expect(ajudaParaATela(DONO).find((e) => e.chave === 'perfil')!.secoes.flatMap((s) => s.blocos).join(' ')).toContain('Identidade visual');
+  });
+
   it('o registro cumpre as regras: chaves, versões, permissões do catálogo, jargão, frases', () => {
     expect(problemasDoRegistro()).toEqual([]);
     for (const e of ENTRADAS) for (const b of [...e.aula, ...(e.secoes ?? []).flatMap((s) => s.blocos)]) for (const p of b.para ?? []) expect(TODAS_AS_PERMISSOES).toContain(p);
