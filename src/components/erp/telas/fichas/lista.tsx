@@ -176,7 +176,7 @@ export function TelaListaFichas({
   return (
     <Painel semRespiro>
       {/* Celular: lista agrupada da Apple (decisão 533). O separador começa onde começa o nome, depois da miniatura (16 + 44 + 12 px).
-          Editar e Remover ficam numa linha própria, embaixo, como nos insumos: ao lado, apertavam o nome (8 a 9 linhas a 320 px). */}
+          Editar e Remover ficam numa linha própria, embaixo, como na lista de insumos; ao lado, apertavam o nome (8 a 9 linhas a 320 px). */}
       <ul className="ff-lista-agrupada sm:hidden" style={{ '--ff-recuo-da-lista': '72px' } as CSSProperties}>
         {linhas.map((l) => (
           <li key={l.id}>
