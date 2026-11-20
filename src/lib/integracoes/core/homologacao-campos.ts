@@ -1,4 +1,14 @@
 /** Registro humano do parecer externo. Validar o formulário não homologa o app no iFood. */
+export function appAceitaParecer(a: { ambiente: string; categoria: string; modulos: readonly string[] }): boolean {
+  if (a.ambiente !== 'PRODUCAO') return false;
+  if (a.categoria === 'BI') return a.modulos.length === 1 && a.modulos[0] === 'ANALYTICS';
+  // O cadastro de Finanças admite Financial sozinho ou acompanhado de Merchant, em qualquer ordem.
+  // Merchant sozinho não comprova que este app dispõe do módulo financeiro.
+  return a.categoria === 'FINANCAS' && a.modulos.includes('FINANCIAL')
+    && new Set(a.modulos).size === a.modulos.length
+    && a.modulos.every(m => m === 'FINANCIAL' || m === 'MERCHANT');
+}
+
 export const ESTADOS_DO_PARECER = ['PENDENTE', 'EM_ANDAMENTO', 'HOMOLOGADO', 'RECUSADO'] as const;
 export type EstadoDoParecer = typeof ESTADOS_DO_PARECER[number];
 export interface ParecerDoApp {

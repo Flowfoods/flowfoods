@@ -1,10 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { lerParecer } from '@/lib/integracoes/core/homologacao-campos';
+import { appAceitaParecer, lerParecer } from '@/lib/integracoes/core/homologacao-campos';
 
 const base = { estado: 'HOMOLOGADO', validacaoEm: '2026-11-07', liberacaoEm: '2026-11-08', referencia: 'https://developer.ifood.com.br/pt-BR/developer/applications/app-bi/details', conferido: 'sim' };
 const hoje = '2026-11-08';
 
-describe('parecer externo Analytics', () => {
+describe('escopo do parecer externo', () => {
+  it.each([
+    { categoria: 'BI', modulos: ['ANALYTICS'] },
+    { categoria: 'FINANCAS', modulos: ['FINANCIAL'] },
+    { categoria: 'FINANCAS', modulos: ['FINANCIAL', 'MERCHANT'] },
+    { categoria: 'FINANCAS', modulos: ['MERCHANT', 'FINANCIAL'] },
+  ])('aceita produção $categoria com $modulos sem alterar a ordem', app => {
+    const antes = [...app.modulos];
+    expect(appAceitaParecer({ ...app, ambiente: 'PRODUCAO' })).toBe(true);
+    expect(app.modulos).toEqual(antes);
+    expect(appAceitaParecer({ ...app, ambiente: 'TEST' })).toBe(false);
+  });
+  it.each([
+    { categoria: 'FINANCAS', modulos: [] },
+    { categoria: 'FINANCAS', modulos: ['MERCHANT'] },
+    { categoria: 'FINANCAS', modulos: ['FINANCIAL', 'FINANCIAL'] },
+    { categoria: 'FINANCAS', modulos: ['FINANCIAL', 'MERCHANT', 'MERCHANT'] },
+    { categoria: 'FINANCAS', modulos: ['FINANCIAL', 'ANALYTICS'] },
+    { categoria: 'FINANCAS', modulos: ['FINANCIAL', 'REVIEW'] },
+    { categoria: 'BI', modulos: ['ANALYTICS', 'MERCHANT'] },
+    { categoria: 'BI', modulos: ['FINANCIAL'] },
+    { categoria: 'TEST', modulos: ['FINANCIAL'] },
+    { categoria: 'AVALIACOES', modulos: ['MERCHANT', 'REVIEW'] },
+    { categoria: 'DESCONHECIDA', modulos: ['FINANCIAL'] },
+  ])('recusa produção $categoria com $modulos fora do recorte', app => {
+    expect(appAceitaParecer({ ...app, ambiente: 'PRODUCAO' })).toBe(false);
+  });
+});
+
+describe('parecer externo Analytics e Financial', () => {
   it('mantém datas distintas e não transforma aprovação técnica em liberação', () => {
     expect(lerParecer(base, hoje)).toMatchObject({ ok: true, dados: { validacaoEm: '2026-11-07', liberacaoEm: '2026-11-08' } });
     expect(lerParecer({ ...base, estado: 'EM_ANDAMENTO', liberacaoEm: '' }, hoje)).toMatchObject({ ok: true, dados: { estado: 'EM_ANDAMENTO', liberacaoEm: null } });

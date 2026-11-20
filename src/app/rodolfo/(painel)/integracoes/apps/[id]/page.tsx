@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 import { appPorId } from '@/lib/integracoes/core/apps';
+import { ROTULO_DO_MODULO } from '@/lib/integracoes/core/campos';
 import { appAceitaParecer, historicoDoParecer } from '@/lib/integracoes/core/homologacao';
 import { type EstadoDoParecer } from '@/lib/integracoes/core/homologacao-campos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
@@ -27,7 +28,7 @@ export default async function ParecerAppPage({ params, searchParams }: { params:
       O estado atual no ERP é {ROTULO_DA_HOMOLOGACAO[app.estadoHomologacao]}. Esta página registra o parecer que você conferiu no iFood; não consulta o provedor.
       Autorizações e ativação por loja continuam separadas. Retirar a homologação bloqueia novas coletas; os registros e vínculos existentes são preservados.
     </Aviso>
-    <Painel titulo="App de produção · BI · Analytics">
+    <Painel titulo={`App de produção · ${app.categoria === 'BI' ? 'BI' : 'Finanças'} · ${app.modulos.map(m => ROTULO_DO_MODULO[m]).join(' e ')}`}>
       <p className="mb-4 break-all text-sm">Client ID: <span className="font-mono">{app.clientId}</span></p>
       <FormParecer key={app.atualizadoEm.toISOString()} appId={app.id} versao={app.atualizadoEm.toISOString()} estadoAtual={app.estadoHomologacao as EstadoDoParecer} referencia={`https://developer.ifood.com.br/pt-BR/developer/applications/${encodeURIComponent(app.clientId)}/details`} />
     </Painel>

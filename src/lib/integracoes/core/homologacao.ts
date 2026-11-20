@@ -1,12 +1,10 @@
 import { prisma } from '@/lib/db';
-import { lerParecer } from './homologacao-campos';
+import { appAceitaParecer, lerParecer } from './homologacao-campos';
+export { appAceitaParecer } from './homologacao-campos';
 
 export const EVENTO_PARECER = 'integracao.app-parecer-registrado';
 export const CONFLITO_PARECER = 'Este app mudou desde que a página foi aberta. Recarregue e confira o parecer; nada foi gravado.';
-export const ESCOPO_PARECER = 'O registro de parecer nesta etapa atende somente apps de produção BI com Analytics.';
-
-export const appAceitaParecer = (a: { ambiente: string; categoria: string; modulos: readonly string[] }) =>
-  a.ambiente === 'PRODUCAO' && a.categoria === 'BI' && a.modulos.length === 1 && a.modulos[0] === 'ANALYTICS';
+export const ESCOPO_PARECER = 'O registro de parecer atende apps de produção BI com Analytics ou Finanças com Financeiro, acompanhado ou não do módulo Loja.';
 
 export async function registrarParecerApp(appId: string, versao: string, entrada: Record<string, unknown>, autor: { userId: string; autorNome: string }, agora = new Date()) {
   if (!appId || appId.length > 60 || !autor.userId || !autor.autorNome.trim()) return { ok: false as const, erros: { geral: 'Não foi possível identificar o app ou o responsável.' } };
@@ -22,7 +20,8 @@ export async function registrarParecerApp(appId: string, versao: string, entrada
     // A versão sempre avança, inclusive quando dois pareceres chegam no mesmo milissegundo.
     const atualizadoEm = new Date(Math.max(agora.getTime(), dataVersao.getTime() + 1));
     const mudou = await tx.integracaoApp.updateMany({
-      where: { id: appId, atualizadoEm: dataVersao, ambiente: 'PRODUCAO', categoria: 'BI', modulos: { equals: ['ANALYTICS'] } },
+      // Confira a configuração lida, inclusive a ordem armazenada dos módulos, sem normalizar o cadastro.
+      where: { id: appId, atualizadoEm: dataVersao, ambiente: app.ambiente, categoria: app.categoria, clientId: app.clientId, modulos: { equals: app.modulos } },
       data: { estadoHomologacao: lido.dados.estado, atualizadoEm },
     });
     if (mudou.count !== 1) return { ok: false as const, erros: { geral: CONFLITO_PARECER } };
