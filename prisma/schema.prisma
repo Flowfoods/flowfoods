@@ -567,6 +567,8 @@ model ParceiroFlow {
   // campos homônimos do Diagnóstico (`lojas`, `fichasTecnicas`).
   insumos                     Insumo[]
   erpLojas                    Loja[]
+  erpReviewPoliticas          ReviewPolitica[]
+  erpReviewPoliticaVersoes     ReviewPoliticaVersao[]
   erpMarcas                   Marca[]
   erpColaboradores            Colaborador[]
   erpFornecedores             Fornecedor[]
@@ -732,6 +734,7 @@ model Loja {
   conjuntosDeMetaCmv   MetaCmvConjunto[]
   // INT-1.1: as lojas de um provedor (iFood) ligadas a esta loja.
   conexoesDeIntegracao IntegracaoConexao[]
+  reviewPoliticas     ReviewPolitica[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, slug])
@@ -2520,6 +2523,45 @@ model FarolFaixa {
 // Todo corte/ajuste/alteração de cadastro sensível (preço, ficha, meta,
 // faturamento manual, despesa) grava antes/depois aqui. Só se acrescenta.
 // Movimento de estoque já carrega saldo antes/depois por conta própria.
+// Preparação Review: configuração interna INATIVA. Nunca habilita resposta no provedor.
+// alvo = PARCEIRO ou LOJA:<lojaId>; CHECK e índice único também protegem o escopo.
+model ReviewPolitica {
+  id          String       @id @default(cuid())
+  parceiroId  String
+  parceiro    ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  alvo        String
+  lojaId      String?
+  loja        Loja?        @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  versaoAtual Int
+  criadoEm    DateTime     @default(now())
+  versoes     ReviewPoliticaVersao[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, alvo])
+}
+
+// Conteúdo completo de cada versão, sem herança parcial nem edição destrutiva.
+model ReviewPoliticaVersao {
+  id              String         @id @default(cuid())
+  parceiroId      String
+  parceiro        ParceiroFlow   @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  politicaId      String
+  politica        ReviewPolitica @relation(fields: [parceiroId, politicaId], references: [parceiroId, id], onDelete: Restrict)
+  numero          Int
+  tom             String
+  assinatura      String
+  exemplos        String[]
+  restricoes      String[]
+  limiteEditorial Int
+  autorUserId     String
+  autorNome       String
+  motivo          String
+  criadoEm        DateTime       @default(now())
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, politicaId, numero])
+}
+
 model HistoricoAlteracao {
   id            String       @id @default(cuid())
   parceiroId    String
