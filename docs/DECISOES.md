@@ -4543,18 +4543,30 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 1. **Título grande** (`PageHeader`, todas as larguras): h1 em Gelasio 34 px/1,15, peso regular, sem o quadrado da área ao lado. Substitui o padrão de 09/11 (29 px, 25 no celular, com o quadrado de 40 px). O subtítulo fica logo abaixo, 13 px no celular e 14 a partir de 640 px. As telas seguem passando `icone` e `cor`: a identidade da área continua no menu (decisão 531), nos cards e na aba do celular.
 2. **Barra de abas do celular** (`BarraDeAbas`, abaixo de 640 px):
    - **Quais abas** (`abasDoCelular`): Início, as três primeiras áreas da pessoa que têm tela, na ordem do menu (já filtradas por permissão e liberação: o "Em breve" não entra), e Mais, que abre a mesma gaveta do botão de menu. O nome na aba é a primeira palavra da área ("Cadastros e Cardápio" → "Cadastros"). Não cria destino: só repete entradas do menu.
-   - **Qual acende:** a da área da tela atual, em qualquer tela dela (`aria-current="page"` na própria entrada, `"true"` dentro da área); se a área ficou fora das abas, o Mais. A atual fica em 600 na cor do texto, com o ícone na tinta da área. O nome na cor da área não daria 4,5:1 em toda a paleta.
-   - **Onde:** fixa no pé, 49 px mais a área segura, no material translúcido da barra do topo (o borrão no `::before`). Some nas telas com barra fixa de ações, que já ocupa o pé, e enquanto um campo de texto está em foco (o teclado aberto). O conteúdo reserva o espaço dela no fim da página e ao rolar até um campo. Sem `:has()` no navegador, ela não aparece, e fica o menu de antes.
+   - **Qual acende:** a da área da tela atual, em qualquer tela dela (`aria-current="page"` na própria entrada, `"true"` dentro da área); se a área ficou fora das abas, o Mais, que diz isso também ao leitor de tela ("Mais (área atual)"). A atual fica em 600 na cor do texto, com o ícone na tinta da área; o nome na cor da área não daria 4,5:1 em toda a paleta. Com cores forçadas, o ícone da atual herda a cor do nome. O nome da aba vai a 10,5 px, um pouco mais justo (-0,01 em), como no iPhone.
+   - **Onde:** fixa no pé, 50 px (49 da lista e 1 da borda) mais a área segura, no material translúcido da barra do topo (o borrão no `::before`). Some nas telas com barra fixa de ações, que já ocupa o pé, e enquanto um campo de texto ou uma lista de escolha está em foco (o teclado aberto). O conteúdo reserva o espaço dela no fim da página e, ao rolar até um campo, mais 8 px para o anel de foco aparecer. Sem `:has()` no navegador, ela não aparece, e fica o menu de antes.
+   - **Gaveta pelo Mais:** fechar com Escape, com o X ou tocando fora devolve o foco a quem abriu (o Mais ou o menu do topo); escolher um destino leva o foco ao menu do topo, e não ao Mais, que seria a última parada do Tab da página nova.
    - **Barras fixas:** toda barra fixa de ações no pé das telas leva `data-barra-fixa` (faltava em Planejar produção, Pedido e Entrega de requisição; teste). O aviso de período fechado passa a rolar o aviso para cima da barra de abas também.
    - O botão de menu do topo continua: nas telas sem abas, ele é a navegação.
    - **Só no ERP do parceiro (`/erp`).** No nível 1 (`/rodolfo`), o menu é o dos fluxos comerciais internos, fora deste plano: lá a barra não aparece e nada muda.
 
 **Verificação:**
-- **Testes:** 17 em `tests/erp-abas-celular.test.ts`: quais abas (dono, pessoa com menos áreas, alcance FlowFoods com o "Em breve"), qual acende, nome curto, marcação, ordem no shell e só no `/erp`, regras de CSS (escondida por padrão, só com `:has()` e abaixo de 640 px, some com barra fixa e com foco, espaço reservado, impressão), toda barra fixa marcada, o aviso de período fechado, contraste sobre o material com preto e branco por baixo nos dois temas e o título grande. O título de `erp-padrao-visual` passou a 34 px. Com os arquivos de navegação, ajuda e visual, 342 passam em 9 arquivos.
-- **Navegador, portão completo local, CI e revisão independente:** ficam no PR e na página de evidências.
+- **Testes:** 20 em `tests/erp-abas-celular.test.ts`. Cobrem:
+  - quais abas: dono, pessoa com menos áreas, alcance FlowFoods com o "Em breve" e um módulo sem tela no meio das áreas;
+  - qual acende, nome curto, marcação (inclusive o Mais aceso para o leitor de tela), ordem no shell e só no `/erp`, e o foco ao fechar a gaveta;
+  - regras de CSS: escondida por padrão, só com `:has()` e abaixo de 640 px, some com barra fixa e com foco, espaço reservado, cores forçadas e impressão;
+  - classes separadas das abas da área, toda barra fixa marcada, o aviso de período fechado e o contraste sobre o material com preto e branco por baixo nos dois temas;
+  - o título grande.
+  - O título de `erp-padrao-visual` passou a 34 px.
+- **Revisão independente** (subagente só de leitura) em fb56e1a: **aprovado com ressalvas**, sem bloqueante nem importante. Conferiu o título nas 51 rotas fixas a 320 px e a barra a 390 e 320 px nos dois temas, em 10 telas. Conferiu também as larguras de 639 a 1280 px, o foco, a gaveta, o Tab com a rolagem suave, as cores forçadas, a impressão e as abas da área. Rodou 14 mutantes, 13 mortos.
+  - Os 8 achados menores foram o anel de foco coberto pela barra ao rolar, o ícone da aba atual com cores forçadas, o foco que voltava ao Mais depois de escolher um destino, o Mais aceso sem aviso ao leitor de tela, "Faturamento" justo a 320 px, textos, a área segura e o aviso de período fechado da nota.
+  - Os seis primeiros foram tratados no commit seguinte; os dois últimos estão nos limites.
+- **Navegador, portão completo local e CI:** ficam no PR e na página de evidências.
 
 **Limites:**
-- Não testado em Safari/iOS de verdade: área segura, teclado e o borrão no iPhone ficam para a validação no aparelho (UX-MOD-3).
+- Não testado em Safari/iOS de verdade: teclado e o borrão no iPhone ficam para a validação no aparelho (UX-MOD-3).
+- A área segura (`env(safe-area-inset-bottom)`) só vale com `viewport-fit=cover`, que o `/erp` não usa: hoje ela é 0. Hipótese, a conferir no aparelho: o próprio iOS mantém o conteúdo fora da faixa do indicador, e a barra fica logo acima dela.
+- Nota de compra: o aviso de período fechado nasce enquanto a pessoa digita a data, com a barra escondida pelo foco; ao sair do campo, a barra volta e pode cobrir o fim do aviso ("Ver os períodos"). Só por leitura de código, porque os dados de teste não têm período fechado.
 - Com o teclado aberto, a barra some pelo foco do campo; um teclado que abre sem foco num campo (raro) não a esconde.
 - Abaixo de 640 px o título grande ocupa mais altura que antes.
 

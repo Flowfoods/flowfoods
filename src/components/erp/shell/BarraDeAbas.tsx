@@ -55,6 +55,8 @@ export function BarraDeAbas({
           >
             <Ellipsis size={24} strokeWidth={1.75} aria-hidden className="ff-aba-celular-icone" />
             <span className="ff-aba-celular-rotulo">Mais</span>
+            {/* O Mais aceso também para o leitor de tela: a área da tela atual ficou fora das abas. */}
+            {maisAtiva && <span className="sr-only"> (área atual)</span>}
           </button>
         </li>
       </ul>

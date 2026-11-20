@@ -76,6 +76,13 @@ describe('abas do celular · quais abas', () => {
     expect(r.maisAtiva).toBe(false);
   });
 
+  it('módulo sem tela no meio das áreas não toma o lugar de uma aba (o filtro vem antes do corte em três)', () => {
+    const [a, b, c] = NAV_DONO.modulos;
+    const futuro = { ...a, chave: 'futuro', nome: 'Módulo futuro', href: null, grupos: [], acoes: [] };
+    const nav = { ...NAV_DONO, modulos: [a, futuro, b, c] };
+    expect(abasDoCelular(nav, '/erp').abas.map((x) => x.rotulo)).toEqual(['Início', rotuloDaAba(a.nome), rotuloDaAba(b.nome), rotuloDaAba(c.nome)]);
+  });
+
   it('pessoa com menos áreas: só as dela; o catálogo "Em breve" (sem tela) nunca entra', () => {
     const navFin = navegacaoDoParceiro(proprio(['faturamento.ver']), NENHUM_MODULO_LIBERADO);
     const fin = abasDoCelular(navFin, '/erp');
@@ -116,15 +123,28 @@ describe('abas do celular · marcação', () => {
     expect(marcar(`${entrada}/algo`).match(/aria-current/g)).toHaveLength(1);
     expect(marcar(NAV_DONO.modulos[4].href!)).toContain('data-ativa=""');
     expect(marcar('/erp')).not.toContain('data-ativa');
+    // O Mais aceso também para o leitor de tela.
+    expect(marcar(NAV_DONO.modulos[4].href!)).toContain('<span class="ff-aba-celular-rotulo">Mais</span><span class="sr-only"> (área atual)</span>');
+    expect(marcar('/erp')).not.toContain('(área atual)');
   });
 
   it('o shell põe a barra depois do conteúdo (ordem do Tab) e o Mais abre a mesma gaveta do menu', () => {
     const shell = readFileSync('src/components/erp/shell/Shell.tsx', 'utf8');
     expect(shell.indexOf('<BarraDeAbas')).toBeGreaterThan(shell.indexOf('</main>'));
     // Só no ERP do parceiro (/erp): no nível 1 o menu é o dos fluxos comerciais internos, fora do plano.
-    expect(shell).toMatch(/\{nav\.rotuloDaArea === 'ERP' && <BarraDeAbas nav=\{nav\} caminho=\{caminho\} gavetaAberta=\{gaveta\} aoAbrirMais=\{\(\) => setGaveta\(true\)\} \/>\}/);
+    expect(shell).toMatch(/\{nav\.rotuloDaArea === 'ERP' && <BarraDeAbas nav=\{nav\} caminho=\{caminho\} gavetaAberta=\{gaveta\} aoAbrirMais=\{abrirGaveta\} \/>\}/);
     expect(NAV_DONO.rotuloDaArea).toBe('ERP');
-    expect(shell).toContain('<Dialogo id="ff-gaveta"');
+    expect(shell).toContain('<Dialogo id="ff-gaveta" aberto={gaveta} aoFechar={() => setGaveta(false)} titulo="Menu" gaveta voltarPara={retornoDaGaveta}>');
+  });
+
+  it('o foco ao fechar a gaveta: Escape e o X devolvem a quem abriu (o Mais ou o menu); escolher um destino leva ao menu do topo', () => {
+    const shell = readFileSync('src/components/erp/shell/Shell.tsx', 'utf8');
+    // Abrir (pelo Mais ou pelo menu) zera o retorno: o diálogo devolve o foco a quem o abriu.
+    expect(shell).toMatch(/const abrirGaveta = useCallback\(\(\) => \{\s*retornoDaGaveta\.current = null;\s*setGaveta\(true\);\s*\}, \[\]\);/);
+    expect(shell).toMatch(/ref=\{botaoMenu\}\s*type="button"\s*onClick=\{abrirGaveta\}/);
+    // Trocar de tela fecha a gaveta mandando o foco ao menu do topo, não ao Mais (a última parada do Tab da página nova).
+    expect(shell).toMatch(/useEffect\(\(\) => \{\s*retornoDaGaveta\.current = botaoMenu\.current;\s*setGaveta\(false\);/);
+    expect(readFileSync('src/components/erp/ui/Dialogo.tsx', 'utf8')).toMatch(/\(destino\?\.current \?\? antes\)\?\.focus\(\)/);
   });
 });
 
@@ -143,9 +163,10 @@ describe('abas do celular · onde aparece', () => {
   it('some com uma barra fixa de ações na tela e com um campo de texto em foco (teclado); o fim da página fica acima dela', () => {
     expect(bloco).toMatch(/\.ff-app:has\(\[data-barra-fixa\]\) \.ff-abas-celular,\s*\.ff-app:has\(:is\(input:not\([^)]*\), textarea, select, \[contenteditable='true'\]\):focus\) \.ff-abas-celular \{\s*display: none;/);
     for (const t of ['checkbox', 'radio', 'button', 'submit', 'file', 'hidden']) expect(bloco).toContain(`[type='${t}']`);
-    expect(bloco).toMatch(/\.ff-app:has\(\.ff-abas-celular\):not\(:has\(\[data-barra-fixa\]\)\) #conteudo \{\s*padding-bottom: calc\(49px \+ env\(safe-area-inset-bottom\) \+ 3rem\);/);
+    // A barra mede 50 px (49 da lista + 1 da borda); a rolagem até um campo deixa mais 8 px para o anel de foco (3 + 4 px).
+    expect(bloco).toMatch(/\.ff-app:has\(\.ff-abas-celular\):not\(:has\(\[data-barra-fixa\]\)\) #conteudo \{\s*padding-bottom: calc\(50px \+ env\(safe-area-inset-bottom\) \+ 3rem\);/);
     expect(bloco).toMatch(/html:has\(\.ff-app \.ff-abas-celular\):not\(:has\(\[data-barra-fixa\]\)\) \{/);
-    expect(bloco).toMatch(/scroll-padding-bottom: calc\(49px \+ env\(safe-area-inset-bottom\)\);/);
+    expect(bloco).toMatch(/scroll-padding-bottom: calc\(50px \+ env\(safe-area-inset-bottom\) \+ 8px\);/);
   });
 
   it('toda barra fixa de ações no pé das telas é marcada com `data-barra-fixa`', () => {
@@ -190,6 +211,10 @@ describe('abas do celular · onde aparece', () => {
     const aba = regra('.ff-app .ff-aba-celular');
     for (const d of ['height: 100%', 'width: 100%', 'color: rgb(var(--ff-suave))']) expect(aba).toContain(d);
     expect(regra('.ff-app .ff-aba-celular-rotulo')).toContain('white-space: nowrap');
+    // Um pouco mais justo: "Faturamento" em 600 passava 0,3 px dos 64 px da aba a 320 px.
+    expect(regra('.ff-app .ff-aba-celular-rotulo')).toContain('letter-spacing: -0.01em');
+    // Cores forçadas: o ícone da aba atual herda a cor do nome (a tinta da área cairia abaixo de 3:1 com o tema cruzado).
+    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.ff-app \.ff-aba-celular\[aria-current\] \.ff-aba-celular-icone \{\s*color: inherit;\s*\}\s*\}/);
     const atual = css.slice(css.indexOf(".ff-app .ff-aba-celular[aria-current],"));
     expect(atual).toMatch(/^\.ff-app \.ff-aba-celular\[aria-current\],\s*\.ff-app \.ff-aba-celular\[data-ativa\] \{\s*color: rgb\(var\(--ff-texto\)\);\s*font-weight: 600;/);
     expect(regra('.ff-app .ff-aba-celular[aria-current] .ff-aba-celular-icone')).toContain('color: var(--ff-modulo-tinta)');

@@ -309,12 +309,13 @@ html:has(.ff-app[data-tema='escuro']) {
     .ff-app:has(:is(input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='file'], [type='range'], [type='color'], [type='hidden']), textarea, select, [contenteditable='true']):focus) .ff-abas-celular {
       display: none;
     }
-    /* O fim da página e o que rola até um campo ficam acima da barra (só onde ela existe: o nível 1 não tem). */
+    /* O fim da página e o que rola até um campo ficam acima da barra (só onde ela existe: o nível 1 não tem). A barra mede
+       50 px (49 da lista + 1 da borda); a rolagem até um campo deixa mais 8 px, para o anel de foco (3 + 4 px) aparecer. */
     .ff-app:has(.ff-abas-celular):not(:has([data-barra-fixa])) #conteudo {
-      padding-bottom: calc(49px + env(safe-area-inset-bottom) + 3rem);
+      padding-bottom: calc(50px + env(safe-area-inset-bottom) + 3rem);
     }
     html:has(.ff-app .ff-abas-celular):not(:has([data-barra-fixa])) {
-      scroll-padding-bottom: calc(49px + env(safe-area-inset-bottom));
+      scroll-padding-bottom: calc(50px + env(safe-area-inset-bottom) + 8px);
     }
   }
 }
@@ -338,11 +339,13 @@ html:has(.ff-app[data-tema='escuro']) {
   line-height: 1.15;
   -webkit-tap-highlight-color: transparent;
 }
+/* Um pouco mais justo, como no iPhone: "Faturamento" em 600 cabe nos 64 px de cada aba a 320 px. */
 .ff-app .ff-aba-celular-rotulo {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 .ff-app .ff-aba-celular[aria-current],
 .ff-app .ff-aba-celular[data-ativa] {
@@ -351,6 +354,12 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 .ff-app .ff-aba-celular[aria-current] .ff-aba-celular-icone {
   color: var(--ff-modulo-tinta);
+}
+/* Cores forçadas: o ícone da aba atual herda a cor do nome (a tinta da área ficaria abaixo de 3:1 com o tema cruzado). */
+@media (forced-colors: active) {
+  .ff-app .ff-aba-celular[aria-current] .ff-aba-celular-icone {
+    color: inherit;
+  }
 }
 .ff-app .ff-aba-celular:focus-visible {
   outline: 3px solid rgb(var(--ff-acento));

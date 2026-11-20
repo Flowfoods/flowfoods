@@ -87,7 +87,7 @@ editoriais: h1 da página, o título grande da Apple
 (34 px/1,15, peso regular, em todas as larguras; decisão 532), título de diálogo e de gaveta
 (20 px), número grande e título de estado vazio (sempre
 `lining-nums tabular-nums`). Escala 12 · 13 · 14 · 15 · 20 · 34; título de
-painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px; no menu lateral, desde a decisão 531, o grupo é em letra normal). Caixa
+painel 14 px/600. Mínimo 12 px (rótulo de grupo em caixa alta: 11 px; no menu lateral, desde a decisão 531, o grupo é em letra normal; nome da aba do celular, decisão 532: 10,5 px, como no iPhone). Caixa
 alta só no rótulo de seção do hub e nos grupos do seletor de áreas.
 
 ## Espaço e raio
