@@ -16,10 +16,22 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
+    inputs:
+      modo:
+        description: Execução normal ou consulta do deployment já pinado
+        type: choice
+        default: normal
+        options: [normal, consultar_deploy]
+      deployment_id:
+        description: Alvo fixo da consulta (ignorado na execução normal)
+        type: choice
+        default: 4EL-ASTRyGb91bC4CyVQW
+        options: [4EL-ASTRyGb91bC4CyVQW]
 
 jobs:
   portao:
     name: Portão (lint · tipos · testes com banco · build)
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.modo == 'consultar_deploy') }}
     runs-on: ubuntu-latest
     # Ponto 4 do plano: os testes de integridade (isolamento entre parceiros e
     # lojas, RLS, compra que não duplica, concorrência, migrations com dado
@@ -118,7 +130,7 @@ jobs:
   deploy:
     name: Deploy no Dokploy
     needs: portao
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master' && (github.event_name != 'workflow_dispatch' || inputs.modo == '' || inputs.modo == 'normal')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     concurrency:
@@ -136,3 +148,31 @@ jobs:
           DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
           COMPOSE_ID: JWsPI2ZLgUrh11MS_EwwB
         run: node scripts/disparar-deploy.mjs
+
+  consulta_deploy:
+    name: Consultar deployment existente (somente GET)
+    if: github.event_name == 'workflow_dispatch' && inputs.modo == 'consultar_deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Restringir diagnóstico à branch isolada
+        run: test "$GITHUB_REF" = 'refs/heads/codex/deploy-consulta-20261120'
+      - name: Contratos locais da consulta e do deploy
+        run: node --test tests/deploy-consulta.node.mjs tests/deploy-confirmacao.node.mjs
+      - name: Consultar somente o deployment pinado
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          CONSULTA_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          CONSULTA_COMPOSE_ID: JWsPI2ZLgUrh11MS_EwwB
+          CONSULTA_CREATED_AT: '2026-11-20T16:33:18.950Z'
+          CONSULTA_SHA: 3fa3bbb76bc2f128dc124b2841d486f3f7a92961
+          CONSULTA_RUN_ID: '44771930161'
+          CONSULTA_RUN_ATTEMPT: '1'
+        run: node scripts/consultar-deploy.mjs
