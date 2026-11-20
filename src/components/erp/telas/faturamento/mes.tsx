@@ -326,7 +326,7 @@ export function TelaDoMes({
   const lojaQuery = lojaAberta ? `&loja=${lojaAberta.loja.id}` : '';
   const faltas = lojaAberta ? lojaAberta.faltas : m.faltas;
   return (
-    <div className="space-y-6">
+    <div className="ff-faturamento-mes space-y-6">
       {/* Leitura nova da Home (e não a guardada pelo roteador): a pendência só muda com a consulta seguinte à fonte. */}
       {volta && (
         <div className="flex items-center gap-1">
@@ -354,7 +354,7 @@ export function TelaDoMes({
           ) : undefined
         }
       >
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="ff-divisoria-filtros flex flex-wrap items-center gap-x-4 gap-y-2">
           <nav aria-label="Trocar de mês" className="flex items-center gap-1 rounded-[10px] border border-linha bg-painel p-1">
             <Link href={comVoltaParaAHome(`${base}?mes=${anterior}${lojaQuery}`, volta)} aria-label={`Mês anterior: ${rotuloDoMes(anterior)}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
               <ChevronLeft size={18} aria-hidden />
@@ -462,16 +462,18 @@ function GraficoDoMes({ m, lojaAberta, contexto }: { m: MesDoFaturamento; lojaAb
   }));
   const melhor = s.dias.reduce<(typeof s.dias)[number] | null>((b, d) => (d.total !== null && (!b || (b.total ?? 0) < d.total) ? d : b), null);
   return (
-    <Painel
-      titulo="Faturamento por dia"
-      subtitulo={`${contexto} · ${s.diasLancados} ${s.diasLancados === 1 ? 'dia lançado' : 'dias lançados'}${melhor ? ` · maior dia: ${dataCurta(melhor.data)}, ${formatarDinheiro(melhor.total ?? 0)}` : ''}${s.diasComFalta ? ` · ${s.diasComFalta} com falta` : ''}`}
-    >
-      <GraficoDeColunas
-        titulo={`Faturamento por dia em ${rotuloDoMes(m.mes)}, por canal`}
-        series={CANAIS_EM_ORDEM.filter((c) => s.canais.includes(c)).map((c) => ({ chave: c, rotulo: CANAIS[c].rotulo, cor: COR_DO_CANAL[c] }))}
-        pontos={pontos}
-      />
-    </Painel>
+    <div className="ff-divisoria-secao">
+      <Painel
+        titulo="Faturamento por dia"
+        subtitulo={`${contexto} · ${s.diasLancados} ${s.diasLancados === 1 ? 'dia lançado' : 'dias lançados'}${melhor ? ` · maior dia: ${dataCurta(melhor.data)}, ${formatarDinheiro(melhor.total ?? 0)}` : ''}${s.diasComFalta ? ` · ${s.diasComFalta} com falta` : ''}`}
+      >
+        <GraficoDeColunas
+          titulo={`Faturamento por dia em ${rotuloDoMes(m.mes)}, por canal`}
+          series={CANAIS_EM_ORDEM.filter((c) => s.canais.includes(c)).map((c) => ({ chave: c, rotulo: CANAIS[c].rotulo, cor: COR_DO_CANAL[c] }))}
+          pontos={pontos}
+        />
+      </Painel>
+    </div>
   );
 }
 
