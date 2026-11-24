@@ -954,23 +954,63 @@ export function colunaDoAtalho(indice: number, total: number): number {
   return indice < aEsquerda ? COLUNA_DE_MODULOS - aEsquerda + indice : COLUNA_DE_MODULOS + 1 + (indice - aEsquerda);
 }
 
+/** O Início como atalho: a entrada do menu (o hub), com a chave fixa "inicio". */
+function inicioComoAtalho(nav: Navegacao) {
+  return { chave: 'inicio', href: nav.inicio.href, rotulo: 'Início', nome: nav.inicio.titulo, icone: 'inicio' as ChaveIcone, cor: COR.inicio };
+}
+
+/**
+ * Decisão 536 · o que pode ir para a barra: o Início e as áreas da pessoa que têm tela, na ordem do menu (já filtradas por
+ * permissão e liberação em `modulosDoParceiro`: o "Em breve" nunca entra). É a mesma lista que o servidor aceita ao salvar.
+ */
+export function opcoesDaBarra(nav: Navegacao): Omit<AtalhoDaBarra, 'coluna' | 'ativo'>[] {
+  return [
+    inicioComoAtalho(nav),
+    ...nav.modulos.filter((m) => m.href !== null).map((m) => ({ chave: m.chave, href: m.href!, rotulo: rotuloDaAba(m.nome), nome: m.nome, icone: m.icone, cor: m.cor })),
+  ];
+}
+
+/** Quantas posições laterais a barra tem para esta pessoa: quatro, ou menos quando ela tem menos opções. */
+export function vagasDaBarra(nav: Navegacao): number {
+  return Math.min(ATALHOS_DA_BARRA, opcoesDaBarra(nav).length);
+}
+
+/** O padrão (decisão 535): as quatro primeiras áreas; com menos de quatro, o Início entra primeiro. */
+export function padraoDaBarra(nav: Navegacao): string[] {
+  const areas = nav.modulos.filter((m) => m.href !== null).slice(0, ATALHOS_DA_BARRA).map((m) => m.chave);
+  return areas.length < ATALHOS_DA_BARRA ? ['inicio', ...areas] : areas;
+}
+
+/**
+ * Decisão 536 · as chaves que a barra mostra, na ordem da tela: primeiro as que a pessoa escolheu ("Editar barra") e que
+ * ainda estão no menu dela, sem repetir; o que faltar vem do padrão e, por fim, da ordem do menu. Área que a pessoa perdeu
+ * (permissão, liberação) sai sozinha; a escolha salva nunca abre destino que o menu não tem.
+ */
+export function chavesDaBarra(nav: Navegacao, escolhidos: readonly string[] = []): string[] {
+  const opcoes = opcoesDaBarra(nav).map((o) => o.chave);
+  const vagas = vagasDaBarra(nav);
+  const lista: string[] = [];
+  for (const c of [...escolhidos, ...padraoDaBarra(nav), ...opcoes]) {
+    if (lista.length >= vagas) break;
+    if (opcoes.includes(c) && !lista.includes(c)) lista.push(c);
+  }
+  return lista;
+}
+
 /**
  * A barra de Módulos do celular e do tablet (decisão 535, prévia aprovada em 23/11/2026): cinco posições, o botão Módulos
- * fixo no centro e quatro atalhos laterais. Os atalhos são as primeiras áreas da pessoa que têm tela, na ordem do menu (já
- * filtradas por permissão e liberação em `modulosDoParceiro`: o "Em breve" não entra); com menos de quatro áreas, o Início
- * entra primeiro. Não cria destino nem libera nada: só repete entradas que o menu já tem. `ativo` é a coluna do atalho da
- * área atual (onde a Cápsula fica); fora dos atalhos, null: o Módulos não recebe o estado da seção.
+ * fixo no centro e quatro atalhos laterais (`chavesDaBarra`: a escolha da pessoa, decisão 536, ou o padrão). Não cria
+ * destino nem libera nada: só repete entradas que o menu já tem. `ativo` é a coluna do atalho da área atual (onde a Cápsula
+ * fica); fora dos atalhos, null: o Módulos não recebe o estado da seção.
  */
-export function atalhosDaBarra(nav: Navegacao, caminho: string): { atalhos: AtalhoDaBarra[]; ativo: number | null } {
+export function atalhosDaBarra(nav: Navegacao, caminho: string, escolhidos: readonly string[] = []): { atalhos: AtalhoDaBarra[]; ativo: number | null } {
   const atual = itemAtivo(nav, caminho);
-  const areas = nav.modulos.filter((m) => m.href !== null).slice(0, ATALHOS_DA_BARRA);
-  const base = [
-    ...(areas.length < ATALHOS_DA_BARRA
-      ? [{ chave: 'inicio', href: nav.inicio.href, rotulo: 'Início', nome: nav.inicio.titulo, icone: 'inicio' as ChaveIcone, cor: COR.inicio, ativo: caminho === nav.inicio.href }]
-      : []),
-    ...areas.map((m) => ({ chave: m.chave, href: m.href!, rotulo: rotuloDaAba(m.nome), nome: m.nome, icone: m.icone, cor: m.cor, ativo: atual?.modulo.chave === m.chave })),
-  ];
-  const atalhos = base.map((a, i) => ({ ...a, coluna: colunaDoAtalho(i, base.length) }));
+  const porChave = new Map(opcoesDaBarra(nav).map((o) => [o.chave, o]));
+  const chaves = chavesDaBarra(nav, escolhidos);
+  const atalhos = chaves.map((c, i) => {
+    const o = porChave.get(c)!;
+    return { ...o, coluna: colunaDoAtalho(i, chaves.length), ativo: c === 'inicio' ? caminho === nav.inicio.href : atual?.modulo.chave === c };
+  });
   return { atalhos, ativo: atalhos.find((a) => a.ativo)?.coluna ?? null };
 }
 

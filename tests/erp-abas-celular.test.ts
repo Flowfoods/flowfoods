@@ -22,7 +22,11 @@ import {
   COLUNA_DE_MODULOS,
   COR,
   atalhosDaBarra,
+  chavesDaBarra,
   colunaDoAtalho,
+  opcoesDaBarra,
+  padraoDaBarra,
+  vagasDaBarra,
   filtrarModulos,
   navegacaoDoParceiro,
   nomeCurtoDoModulo,
@@ -30,7 +34,7 @@ import {
 } from '@/lib/erp/modulos';
 import { NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
 import { BarraDeAbas } from '@/components/erp/shell/BarraDeAbas';
-import { JanelaDeModulos, origemDaExpansao } from '@/components/erp/shell/JanelaDeModulos';
+import { JanelaDeModulos, origemDaExpansao, rotuloDaPosicao } from '@/components/erp/shell/JanelaDeModulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 
 vi.mock('next/navigation', () => ({ useSelectedLayoutSegments: () => [], usePathname: () => '/erp', useRouter: () => ({ refresh: () => {}, push: () => {} }) }));
@@ -146,6 +150,86 @@ describe('barra de Módulos · quais atalhos', () => {
   });
 });
 
+describe('barra de Módulos · a escolha da pessoa ("Editar barra", decisão 536)', () => {
+  const [cad, comp, est, prod, etq, fat, rede] = NAV_DONO.modulos.map((m) => m.chave);
+
+  it('as opções são o Início e as áreas com tela, na ordem do menu; o padrão é o da decisão 535', () => {
+    expect(opcoesDaBarra(NAV_DONO).map((o) => o.chave)).toEqual(['inicio', ...NAV_DONO.modulos.filter((m) => m.href).map((m) => m.chave)]);
+    expect(vagasDaBarra(NAV_DONO)).toBe(4);
+    expect(padraoDaBarra(NAV_DONO)).toEqual([cad, comp, est, prod]);
+    expect(chavesDaBarra(NAV_DONO)).toEqual(padraoDaBarra(NAV_DONO));
+    // O "Em breve" nunca é opção.
+    const n1 = navegacaoDoParceiro(ALCANCE_FLOWFOODS, NENHUM_MODULO_LIBERADO);
+    const futuros = n1.modulos.filter((m) => !m.href).map((m) => m.chave);
+    expect(futuros.length).toBeGreaterThan(0);
+    for (const f of futuros) expect(opcoesDaBarra(n1).map((o) => o.chave)).not.toContain(f);
+  });
+
+  it('a escolha vale na ordem da tela: substitui e reordena; o que faltar vem do padrão, sem repetir', () => {
+    expect(chavesDaBarra(NAV_DONO, [fat, 'inicio', rede, comp])).toEqual([fat, 'inicio', rede, comp]);
+    const { atalhos } = atalhosDaBarra(NAV_DONO, '/erp', [fat, 'inicio', rede, comp]);
+    expect(atalhos.map((a) => [a.chave, a.coluna])).toEqual([[fat, 0], ['inicio', 1], [rede, 3], [comp, 4]]);
+    // No Início, o atalho do Início acende (a Cápsula fica nele).
+    expect(atalhosDaBarra(NAV_DONO, '/erp', [fat, 'inicio', rede, comp]).ativo).toBe(1);
+    // Só duas escolhidas: completa com o padrão, sem repetir.
+    expect(chavesDaBarra(NAV_DONO, [etq, cad])).toEqual([etq, cad, comp, est]);
+  });
+
+  it('a escolha nunca abre destino fora do menu: chave sem acesso, "Em breve", repetida ou inventada fica de fora', () => {
+    const navFin = navegacaoDoParceiro(proprio(['faturamento.ver']), NENHUM_MODULO_LIBERADO);
+    const opcoes = opcoesDaBarra(navFin).map((o) => o.chave);
+    const r = chavesDaBarra(navFin, [cad, fat, fat, 'nao-existe', 'inicio']);
+    expect(r).not.toContain(cad);
+    expect(r).not.toContain('nao-existe');
+    expect(new Set(r).size).toBe(r.length);
+    expect(r.every((c) => opcoes.includes(c))).toBe(true);
+    expect(r.length).toBe(vagasDaBarra(navFin));
+    expect(r.slice(0, 2)).toEqual([fat, 'inicio']);
+    // Escolha maior que as vagas: só as primeiras valem.
+    expect(chavesDaBarra(NAV_DONO, [rede, fat, etq, prod, est])).toEqual([rede, fat, etq, prod]);
+  });
+
+  it('o rótulo de cada seletor diz o lado do Módulos', () => {
+    expect([0, 1, 2, 3].map((i) => rotuloDaPosicao(i, 4))).toEqual([
+      '1º atalho · à esquerda do Módulos',
+      '2º atalho · à esquerda do Módulos',
+      '3º atalho · à direita do Módulos',
+      '4º atalho · à direita do Módulos',
+    ]);
+    expect([0, 1, 2].map((i) => rotuloDaPosicao(i, 3))).toEqual(['1º atalho · à esquerda do Módulos', '2º atalho · à esquerda do Módulos', '3º atalho · à direita do Módulos']);
+  });
+
+  it('a janela oferece "Editar barra" só com a edição; o editor grava só no "Salvar barra" e o "Cancelar" não tem efeito', () => {
+    const botao = { current: null };
+    const com = renderToStaticMarkup(
+      createElement(JanelaDeModulos, { id: 'j', nav: NAV_DONO, atual: null, botao, aoFechar: () => {}, edicao: { opcoes: opcoesDaBarra(NAV_DONO).map((o) => ({ chave: o.chave, nome: o.nome })), atuais: chavesDaBarra(NAV_DONO), padrao: padraoDaBarra(NAV_DONO), salvar: async () => ({ ok: true }) } }),
+    );
+    expect(com).toMatch(/<button type="button" class="[^"]*text-acento[^"]*"><svg[^>]*>.*<\/svg>Editar barra<\/button>/);
+    const sem = renderToStaticMarkup(createElement(JanelaDeModulos, { id: 'j', nav: NAV_DONO, atual: null, botao, aoFechar: () => {} }));
+    expect(sem).not.toContain('Editar barra');
+    const fonte = readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8');
+    const editor = fonte.slice(fonte.indexOf('function EditorDaBarra('));
+    // Só o "Salvar barra" chama a ação; "Cancelar" e "Voltar ao padrão" só mexem no que está na tela.
+    expect(editor.match(/edicao\.salvar\(/g)).toHaveLength(1);
+    expect(editor).toMatch(/onClick=\{\(\) => aoTerminar\(false\)\} className=\{classeDeBotao\('fantasma'\)\}>\s*Cancelar/);
+    expect(editor).toMatch(/onClick=\{\(\) => \{\s*setEscolha\(edicao\.padrao\);/);
+    // Repetida trava o salvar e é dita (com o campo marcado); o seletor mantém a barra à vista.
+    expect(editor).toContain('disabled={!!repetida || pendente || !mudou}');
+    expect(editor).toContain('está em duas posições. Cada área entra na barra uma vez só.');
+    expect(editor).toMatch(/<select[\s\S]*?data-mantem-barra[\s\S]*?aria-invalid=\{repetida === chave \? true : undefined\}/);
+    // As opções do seletor são as da barra (nunca uma lista à parte).
+    expect(editor).toContain('{edicao.opcoes.map((o) => (');
+  });
+
+  it('a barra passa a escolha salva adiante: o layout lê da sessão, a ação é a do servidor', () => {
+    const layout = readFileSync('src/app/erp/layout.tsx', 'utf8');
+    expect(layout).toContain('barra={{ escolhidos: pessoa.atalhosDaBarra, salvar: acaoSalvarAtalhosDaBarra }}');
+    const barra = readFileSync('src/components/erp/shell/BarraDeAbas.tsx', 'utf8');
+    expect(barra).toContain('const { atalhos, ativo } = atalhosDaBarra(nav, caminho, escolhidos);');
+    expect(barra).toContain('opcoes: opcoesDaBarra(nav).map((o) => ({ chave: o.chave, nome: o.nome }))');
+  });
+});
+
 describe('barra de Módulos · marcação', () => {
   const marcar = (caminho: string) => renderToStaticMarkup(createElement(BarraDeAbas, { nav: NAV_DONO, caminho }));
 
@@ -195,7 +279,7 @@ describe('barra de Módulos · marcação', () => {
   it('o shell põe a barra depois do conteúdo (ordem do Tab), só no ERP do parceiro; o menu inteiro segue na gaveta do topo', () => {
     const shell = readFileSync('src/components/erp/shell/Shell.tsx', 'utf8');
     expect(shell.indexOf('<BarraDeAbas')).toBeGreaterThan(shell.indexOf('</main>'));
-    expect(shell).toMatch(/\{nav\.rotuloDaArea === 'ERP' && <BarraDeAbas nav=\{nav\} caminho=\{caminho\} \/>\}/);
+    expect(shell).toMatch(/\{nav\.rotuloDaArea === 'ERP' && <BarraDeAbas nav=\{nav\} caminho=\{caminho\} barra=\{props\.barra\} \/>\}/);
     expect(NAV_DONO.rotuloDaArea).toBe('ERP');
     expect(shell).toContain('<Dialogo id="ff-gaveta" aberto={gaveta} aoFechar={() => setGaveta(false)} titulo="Menu" gaveta voltarPara={retornoDaGaveta}>');
     expect(shell).toMatch(/ref=\{botaoMenu\}\s*type="button"\s*onClick=\{abrirGaveta\}/);
@@ -279,7 +363,7 @@ describe('barra de Módulos · onde aparece', () => {
   });
 
   it('some com uma barra fixa de ações e com um campo de texto em foco (teclado), menos a busca da janela; o fim da página fica acima', () => {
-    expect(bloco).toMatch(/\.ff-app:has\(\[data-barra-fixa\]\) \.ff-abas-celular,\s*\.ff-app:has\(:is\(input:not\([^)]*\), textarea, select, \[contenteditable='true'\]\):focus\) \.ff-abas-celular \{\s*display: none;/);
+    expect(bloco).toMatch(/\.ff-app:has\(\[data-barra-fixa\]\) \.ff-abas-celular,\s*\.ff-app:has\(:is\(input:not\([^)]*\), textarea, select:not\(\[data-mantem-barra\]\), \[contenteditable='true'\]\):focus\) \.ff-abas-celular \{\s*display: none;/);
     for (const t of ['checkbox', 'radio', 'button', 'submit', 'file', 'hidden']) expect(bloco).toContain(`[type='${t}']`);
     expect(bloco).toContain("[type='hidden'], [data-mantem-barra])");
     // Só a busca da janela de Módulos fica de fora (ela abre acima da barra, que é a âncora dela).

@@ -2777,10 +2777,28 @@ model AcessoParceiro {
   setores             Setor[]       @default([])
   redeInteira         Boolean       @default(true)
   lojaIds             String[]      @default([])
+  // Decisão 536: os atalhos que a pessoa escolheu para a barra de Módulos neste parceiro (tabela própria: mudar a barra
+  // não mexe no `atualizadoEm` do vínculo, que a tela da equipe usa).
+  atalhos             AtalhosDaBarraErp?
 
   @@unique([parceiroId, usuarioId])
   @@index([usuarioId])
   @@index([parceiroId, perfilId])
+}
+
+// Decisão 536 · "Editar barra": os quatro atalhos laterais da barra de Módulos (celular e tablet), por VÍNCULO pessoa ×
+// parceiro: as áreas mudam de um parceiro para outro, e numa troca de pessoa no aparelho compartilhado a barra é a de quem
+// entrou. É PREFERÊNCIA, não permissão: guarda chaves de área ("compras", "inicio"); o shell só mostra as que estão no menu
+// da pessoa, e o servidor só grava as que estão nele quando ela salva. Vazia (ou sem linha) = o padrão (as primeiras áreas
+// do menu). FORA do tenant, como as outras credenciais: é lida junto com a sessão; o papel `erp_tenant` não tem GRANT e só
+// `credenciais.ts` toca (o `prisma` do portal recusa). No máximo 4 chaves de até 40 caracteres (CHECK no banco). Apagar o
+// vínculo apaga os atalhos.
+model AtalhosDaBarraErp {
+  acessoId     String   @id
+  chaves       String[] @default([])
+  atualizadoEm DateTime @updatedAt
+
+  acesso AcessoParceiro @relation(fields: [acessoId], references: [id], onDelete: Cascade)
 }
 
 // ------------------------------------------------- ERP · permissões (0.4)

@@ -4645,3 +4645,29 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - O rótulo "Grupo ativo" da prévia não foi escrito: o seletor escolhe a MARCA do cabeçalho, e chamar de grupo seria outro dado.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 536. 2026-11-24 · Barra e cabeçalho, segunda fatia: "Editar barra" e "Trocar logo da marca"
+
+**Fonte e recorte:** a mesma prévia final aprovada por Rodolfo em 23/11/2026 (decisão 535), nos itens que ficaram para depois: "Módulos → Editar barra" (substituir ou reordenar os quatro atalhos laterais, salvar no perfil ou cancelar sem efeito, revalidando contexto e permissões no servidor) e o atalho "Trocar logo da marca" no seletor, separado da troca, reusando o fluxo de Identidade visual e as permissões existentes. Pedido de Rodolfo em 24/11/2026: seguir com o plano. Uma migration ADITIVA (tabela nova de credencial); nenhuma regra de negócio, rota ou permissão nova.
+
+1. **Editar barra** (rodapé da janela de Módulos, só no ERP do parceiro):
+   - um seletor por posição, da esquerda para a direita ("1º atalho · à esquerda do Módulos"); trocar o que está num seletor substitui, escolher em outra posição o que já está numa reordena; a repetição é dita e trava o salvar;
+   - "Voltar ao padrão" só preenche os seletores; nada grava até "Salvar barra"; "Cancelar" volta à grade sem efeito; o foco vai ao 1º seletor ao abrir e volta ao "Editar barra" ao sair;
+   - as opções são o Início e as áreas com tela do menu da pessoa (`opcoesDaBarra`): o "Em breve" nunca entra;
+   - a barra mostra a escolha salva que ainda está no menu, sem repetir, e completa com o padrão (`chavesDaBarra`): área que a pessoa perdeu sai sozinha;
+   - os seletores da janela ficam na exceção da regra do teclado (`data-mantem-barra`), senão a barra e a janela sumiam ao focar um deles no celular.
+2. **Onde a escolha mora:** `AtalhosDaBarraErp`, por VÍNCULO pessoa × parceiro (as áreas mudam de um parceiro para outro, e no aparelho compartilhado a barra é a de quem entrou). Tabela própria, e não coluna no vínculo: mudar a barra não mexe no `atualizadoEm` do vínculo, que a tela da equipe usa. Mesmo modelo da preferência de ajuda (decisão 112): fora do tenant, sem GRANT para `erp_tenant`, só `credenciais.ts` toca, o `prisma` do portal recusa, CHECK de até 4 chaves de até 40 caracteres, apagar o vínculo apaga os atalhos. Lida junto com a sessão (`validarSessao`), sem consulta a mais.
+3. **Gravação** (`gravarAtalhosDaBarra` + `acaoSalvarAtalhosDaBarra`): quem é a pessoa e o vínculo vêm só do token; a ação recalcula o menu da pessoa (permissões e módulos liberados, como o layout) e só aceita chave dele. Chave fora do menu, repetida, malformada, lista de mais de quatro ou que não é lista recusa o pedido inteiro; lista vazia volta ao padrão. Parceiro suspenso não impede: é a barra da pessoa, não um dado do parceiro.
+4. **Trocar logo da marca:** no seletor da marca do cabeçalho, depois das marcas, "Trocar logo da marca · Altera a imagem de X" abre uma janela com o MESMO editor da Identidade visual (prévia, Salvar logo, Cancelar), na rota da marca selecionada. Só aparece para quem pode alterar a logo (`logoBase`: `lojas.gerir` e parceiro desbloqueado, a regra da tela de Lojas); a rota confere de novo. A marca da janela fica presa ao abrir; foto pessoal e outras marcas não mudam; o foco volta ao seletor. No celular a logo continua fora do cabeçalho (decisão 535).
+5. **Expansão** no painel do seletor da marca: a segunda janela que já existia a receber o movimento, como pede o plano antes da adoção gradual.
+
+**Verificação:**
+- **Testes:** `erp-atalhos-barra.db.test.ts` (Postgres real: padrão sem linha; vale para a pessoa no parceiro e em outro aparelho, não para outra pessoa nem para ela em outro parceiro; recusas sem gravar pela metade; lista vazia; sem sessão; CHECK; cascata; portal e `erp_tenant`), `erp-atalhos-barra-acao.test.ts` (o permitido sai do menu real, nunca o "Em breve"), `erp-abas-celular` (escolha, opções, padrão, rótulos, editor) e `erp-cabecalho-identidade`/`erp-cabecalho-linha` (quem vê o atalho da logo, o mesmo editor, a Expansão).
+- **Navegador (local, Chromium, banco e conta sintéticos):** editar, repetir (alerta e salvar travado), cancelar sem efeito, salvar, recarregar e continuar, voltar ao padrão; trocar a logo com prévia e ver a nova no cabeçalho do desktop, sem ela no celular.
+
+**Limites:**
+- Não testado em Safari/iPhone físico nem com leitor de tela real.
+- O botão vermelho "Módulos" no menu lateral do desktop (prévia) não entrou: ele trocaria o seletor de área, que hoje diz em que área a pessoa está, e isso é decisão de navegação, não de estilo.
+- O nível 1 (`/rodolfo`) não tem a barra; o "Editar barra" é só do ERP do parceiro.
+
+**Reversão:** reverter os commits desta decisão; a migration é aditiva (a tabela pode ficar sem uso ou ser apagada por uma migration própria).

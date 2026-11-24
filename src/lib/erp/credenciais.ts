@@ -1679,6 +1679,11 @@ export interface SessaoValida {
   setores: Setor[];
   /** 0.6: o que a pessoa escolheu sobre as caixas de ajuda (por pessoa, vale em todo parceiro). */
   ajuda: PreferenciaDeAjuda;
+  /**
+   * Decisão 536: os atalhos que a pessoa escolheu para a barra de Módulos NESTE parceiro (chaves de área, na ordem da tela;
+   * vazio = o padrão). É preferência: o shell só mostra as que estão no menu da pessoa, que é quem decide o acesso.
+   */
+  atalhosDaBarra: string[];
 }
 
 /**
@@ -1695,7 +1700,8 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
       usuario: {
         // Decisão 92: vínculo com parceiro em RASCUNHO não vale (a sessão já aberta morre aqui).
         // 0.6: a preferência de ajuda vem na mesma ida ao banco (sem consulta extra).
-        include: { preferencia: true, acessos: { where: { status: 'ATIVO', parceiro: { status: { not: 'RASCUNHO' } } }, include: { parceiro: true, ...COM_PERFIL } } },
+        // Decisão 536: os atalhos da barra também, do vínculo, na mesma ida.
+        include: { preferencia: true, acessos: { where: { status: 'ATIVO', parceiro: { status: { not: 'RASCUNHO' } } }, include: { parceiro: true, atalhos: true, ...COM_PERFIL } } },
       },
     },
   });
@@ -1723,6 +1729,7 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
     perfilRotulo: atual ? perfilRotuloDe(atual) : null,
     setores: atual ? normalizarSetores(atual.setores ?? []) : [],
     ajuda: preferenciaDe(s.usuario.preferencia),
+    atalhosDaBarra: atual?.atalhos?.chaves ?? [],
   };
 }
 
@@ -1783,6 +1790,38 @@ export type MudancaDeAjuda =
 
 /** Teto de passos gravados de uma vez (uma tela tem bem menos pontos que isso). */
 export const MAXIMO_DE_PONTOS_POR_SEQUENCIA = 40;
+
+/** Decisão 536: quantos atalhos laterais a barra de Módulos tem (o teto do CHECK no banco). */
+export const MAXIMO_DE_ATALHOS_DA_BARRA = 4;
+const FORMA_DA_CHAVE_DE_AREA = /^[a-z0-9-]{1,40}$/;
+
+/**
+ * Decisão 536 · "Editar barra": grava os atalhos da barra de Módulos da pessoa NESTE parceiro (o da sessão). Quem é a pessoa
+ * e qual o vínculo vêm só do token; do navegador vem só a lista. `permitidas` são as chaves que a pessoa pode pôr na barra,
+ * calculadas pelo servidor a partir do menu dela (áreas com tela e o Início): chave fora dele, repetida, malformada ou além
+ * de quatro recusa o pedido inteiro, e nada grava pela metade. Lista vazia volta ao padrão. Parceiro suspenso não impede: é
+ * a barra da pessoa, não um dado do parceiro.
+ */
+export async function gravarAtalhosDaBarra(
+  token: unknown,
+  chaves: unknown,
+  permitidas: ReadonlySet<string>,
+  o?: Opcoes,
+): Promise<{ ok: true; chaves: string[] } | { ok: false; erro: string }> {
+  const sessao = await validarSessao(token, o);
+  if (!sessao?.acessoId) return { ok: false, erro: 'Entre de novo para salvar a barra.' };
+  if (!Array.isArray(chaves) || chaves.length > MAXIMO_DE_ATALHOS_DA_BARRA) return { ok: false, erro: 'A barra tem até quatro atalhos.' };
+  const lista: string[] = [];
+  for (const c of chaves) {
+    if (typeof c !== 'string' || !FORMA_DA_CHAVE_DE_AREA.test(c) || !permitidas.has(c)) return { ok: false, erro: 'Um dos atalhos não está no seu menu. Recarregue a página.' };
+    if (lista.includes(c)) return { ok: false, erro: 'Cada área entra na barra uma vez só.' };
+    lista.push(c);
+  }
+  const { db } = abrir(o);
+  const acessoId = sessao.acessoId;
+  await db.atalhosDaBarraErp.upsert({ where: { acessoId }, create: { acessoId, chaves: lista }, update: { chaves: lista } });
+  return { ok: true, chaves: lista };
+}
 
 /** `ok: false` = sessão morta ou pedido recusado; nada foi gravado. */
 export async function gravarPreferenciaDeAjuda(token: unknown, mudanca: MudancaDeAjuda, o?: Opcoes): Promise<{ ok: boolean }> {

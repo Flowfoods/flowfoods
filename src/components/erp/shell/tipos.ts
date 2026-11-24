@@ -90,4 +90,9 @@ export interface PropsDoShell {
   ajuda?: AjudaDoShell;
   /** Nível 1 dentro de um parceiro: busca os insumos DELE. */
   buscarInsumosDoParceiro?: (slug: string, q: string) => Promise<ResultadoDaBusca[]>;
+  /**
+   * Decisão 536: a barra de Módulos da pessoa neste parceiro. `escolhidos`: os atalhos salvos (chaves de área; vazio = o
+   * padrão); `salvar`: a ação do "Editar barra". Sem ela, a barra usa o padrão e a janela não oferece a edição.
+   */
+  barra?: { escolhidos: string[]; salvar: (chaves: string[]) => Promise<{ ok: boolean; mensagem?: string }> };
 }

@@ -261,6 +261,11 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   não aparece. O conteúdo reserva o espaço dela (`--ff-reserva-da-barra`:
   59 px no celular, 72 no tablet). Só no ERP do parceiro (`/erp`); no nível
   1 (`/rodolfo`), não. O menu inteiro segue na gaveta do botão de menu.
+  **Editar barra** (decisão 536): no rodapé da janela de Módulos, um
+  seletor por posição (rótulo "1º atalho · à esquerda do Módulos"), com
+  "Voltar ao padrão" (fantasma), "Cancelar" (fantasma) e "Salvar barra"
+  (primário); repetição dita em `erro` e salvar travado. A escolha é por
+  vínculo pessoa × parceiro e nunca abre destino fora do menu.
 - **Janela de Módulos** (decisão 535): abre acima da barra pela Expansão,
   painel com raio 19 e sombra: título "Módulos" em Gelasio 20, fechar,
   "Buscar módulo" e a grade compacta (Início, áreas com tela, "Em breve"
@@ -349,6 +354,7 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | Título grande (Gelasio 34 px, sem o quadrado da área) e barra de abas no celular (decisão 532) | protótipo aprovado; a aba repete entradas do menu, some com barra fixa de ações e com o teclado | 2026-11-18 |
 | Listas agrupadas no celular (insumos, fichas, notas) e interruptor para o que liga e desliga (decisão 533) | protótipo aprovado; o desligado com contorno no `suave` para 3:1; o formulário manda o mesmo de antes | 2026-11-19 |
 | Barra de Módulos de cinco posições, Cápsula, janela de Módulos e Expansão; FlowFoods numa linha (recorte da imagem oficial); logo da marca ao lado do nome, e sem ela no celular (decisão 535) | prévia final aprovada em 23/11; a Cápsula no tom da área a 16 % deixa o ícone ≥ 3:1 e o nome ≥ 4,5:1 em toda a paleta | 2026-11-24 |
+| "Editar barra" (seletores por posição, salvo por vínculo) e "Trocar logo da marca" no seletor (o editor da Identidade visual numa janela); Expansão no painel da marca (decisão 536) | prévia final aprovada em 23/11; seletor nativo em vez de arrastar: funciona com teclado, leitor de tela e toque sem gesto escondido | 2026-11-24 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,

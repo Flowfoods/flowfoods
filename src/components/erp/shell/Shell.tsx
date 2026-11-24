@@ -385,7 +385,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
         {/* Barra de Módulos do celular e do tablet (decisão 535; antes, as abas da A3): depois do conteúdo na ordem do Tab; só
             abaixo de 900 px, onde não há menu lateral (regras em tokens.css). Só no ERP do parceiro: no nível 1 (/rodolfo) o
             menu é o dos fluxos comerciais internos, fora deste plano. O menu inteiro segue na gaveta do botão de menu do topo. */}
-        {nav.rotuloDaArea === 'ERP' && <BarraDeAbas nav={nav} caminho={caminho} />}
+        {nav.rotuloDaArea === 'ERP' && <BarraDeAbas nav={nav} caminho={caminho} barra={props.barra} />}
 
         {entradaDaTela && ajuda && (
           <GavetaDeAjuda

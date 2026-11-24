@@ -17,11 +17,30 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { X } from 'lucide-react';
-import { COR, filtrarModulos, nomeCurtoDoModulo, type ModuloNav, type Navegacao } from '@/lib/erp/modulos';
+import { Pencil, X } from 'lucide-react';
+import { COLUNA_DE_MODULOS, COR, colunaDoAtalho, filtrarModulos, nomeCurtoDoModulo, type ModuloNav, type Navegacao } from '@/lib/erp/modulos';
 import { IconeDoModulo } from '../ui/cabecalho';
+import { CAMPO, ROTULO } from '../ui/campos';
 import { SeloEmBreve } from '../ui/em-breve';
+import { classeDeBotao } from '../ui/estilos';
 import { foraDaCaixa } from './Popover';
+
+/**
+ * Decisão 536 · "Editar barra": o que a janela precisa para editar os atalhos. `opcoes` é o que pode ir para a barra (o
+ * Início e as áreas com tela, as mesmas que o servidor aceita); `atuais`, os atalhos de agora, na ordem da tela; `padrao`,
+ * a barra de quem nunca editou.
+ */
+export interface EdicaoDaBarra {
+  opcoes: { chave: string; nome: string }[];
+  atuais: string[];
+  padrao: string[];
+  salvar: (chaves: string[]) => Promise<{ ok: boolean; mensagem?: string }>;
+}
+
+/** "1º atalho · à esquerda do Módulos": a posição de cada seletor, contada da esquerda para a direita. */
+export function rotuloDaPosicao(indice: number, total: number): string {
+  return `${indice + 1}º atalho · à ${colunaDoAtalho(indice, total) < COLUNA_DE_MODULOS ? 'esquerda' : 'direita'} do Módulos`;
+}
 
 /** No servidor não há layout para medir: o efeito de antes da pintura só existe no navegador. */
 const useAntesDaPintura = typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -37,6 +56,7 @@ export function JanelaDeModulos({
   atual,
   botao,
   aoFechar,
+  edicao = null,
 }: {
   id: string;
   nav: Navegacao;
@@ -46,7 +66,12 @@ export function JanelaDeModulos({
   botao: RefObject<HTMLButtonElement | null>;
   /** `devolverFoco`: Escape e o fechar devolvem o foco ao botão; toque fora e foco que sai deixam onde está. */
   aoFechar: (devolverFoco: boolean) => void;
+  /** Sem ela (sem ação de salvar, ou uma opção só), a janela não oferece o "Editar barra". */
+  edicao?: EdicaoDaBarra | null;
 }) {
+  const [editando, setEditando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const botaoEditar = useRef<HTMLButtonElement>(null);
   const janela = useRef<HTMLDivElement>(null);
   const [busca, setBusca] = useState('');
   const [origem, setOrigem] = useState<string | undefined>(undefined);
@@ -119,12 +144,23 @@ export function JanelaDeModulos({
     >
       <div className="ff-janela-modulos-cabeca">
         <h2 id={idTitulo} className="font-display text-[20px] font-normal leading-tight tracking-[-0.01em]">
-          Módulos
+          {editando ? 'Editar barra' : 'Módulos'}
         </h2>
         <button type="button" onClick={() => aoFechar(true)} aria-label="Fechar os módulos" className="ff-transicao inline-grid h-11 w-11 shrink-0 place-items-center rounded-botao text-suave hover:bg-texto/5 hover:text-texto">
           <X size={18} aria-hidden />
         </button>
       </div>
+      {editando && edicao ? (
+        <EditorDaBarra
+          edicao={edicao}
+          aoTerminar={(salvo) => {
+            setEditando(false);
+            setAviso(salvo ? 'Barra salva.' : null);
+          }}
+          botaoEditar={botaoEditar}
+        />
+      ) : (
+      <>
       <div className="px-3 pb-2">
         <input
           type="search"
@@ -201,7 +237,152 @@ export function JanelaDeModulos({
           </>
         )}
       </div>
+      {edicao && (
+        <div className="ff-janela-modulos-pe">
+          <button
+            ref={botaoEditar}
+            type="button"
+            onClick={() => {
+              setAviso(null);
+              setEditando(true);
+            }}
+            className="ff-transicao inline-flex min-h-11 items-center gap-2 rounded-botao px-2 text-[14px] font-semibold text-acento hover:bg-texto/5"
+          >
+            <Pencil size={16} aria-hidden />
+            Editar barra
+          </button>
+          <p role="status" className="text-[13px] text-ok">
+            {aviso}
+          </p>
+        </div>
+      )}
+      </>
+      )}
     </div>
+  );
+}
+
+/**
+ * Decisão 536 · os atalhos da barra, um seletor por posição (da esquerda para a direita). Trocar o que está num seletor
+ * SUBSTITUI o atalho; escolher em outra posição o que já está numa REORDENA (a repetição é dita e trava o salvar). "Voltar
+ * ao padrão" só preenche os seletores; nada grava até "Salvar barra". "Cancelar" volta para a grade sem efeito. O servidor
+ * confere de novo o menu da pessoa antes de gravar.
+ */
+function EditorDaBarra({
+  edicao,
+  aoTerminar,
+  botaoEditar,
+}: {
+  edicao: EdicaoDaBarra;
+  aoTerminar: (salvo: boolean) => void;
+  botaoEditar: RefObject<HTMLButtonElement | null>;
+}) {
+  const [escolha, setEscolha] = useState<string[]>(edicao.atuais);
+  const [erro, setErro] = useState<string | null>(null);
+  const [pendente, setPendente] = useState(false);
+  const idBase = useId();
+  const primeiro = useRef<HTMLSelectElement>(null);
+  const nome = (chave: string) => edicao.opcoes.find((o) => o.chave === chave)?.nome ?? chave;
+  const repetida = escolha.find((c, i) => escolha.indexOf(c) !== i) ?? null;
+  const mudou = escolha.join('|') !== edicao.atuais.join('|');
+
+  // Abrir a edição leva o foco ao primeiro seletor; sair dela (salvar ou cancelar) devolve ao "Editar barra".
+  useEffect(() => {
+    primeiro.current?.focus();
+    const voltar = botaoEditar;
+    return () => {
+      // O botão volta a existir no mesmo render em que a edição some.
+      queueMicrotask(() => voltar.current?.focus());
+    };
+  }, [botaoEditar]);
+
+  async function salvar() {
+    if (repetida || pendente) return;
+    setPendente(true);
+    setErro(null);
+    const r = await edicao.salvar(escolha);
+    setPendente(false);
+    if (!r.ok) {
+      setErro(r.mensagem ?? 'Não foi possível salvar a barra. Tente de novo.');
+      return;
+    }
+    aoTerminar(true);
+  }
+
+  return (
+    <form
+      className="ff-janela-modulos-corpo space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void salvar();
+      }}
+      aria-busy={pendente}
+    >
+      <p className="text-[13px] text-suave">Escolha o que fica dos lados do Módulos. Vale para você, neste parceiro.</p>
+      <div className="ff-editor-barra">
+        {escolha.map((chave, i) => (
+          <div key={i}>
+            <label htmlFor={`${idBase}-${i}`} className={ROTULO}>
+              {rotuloDaPosicao(i, escolha.length)}
+            </label>
+            <select
+              ref={i === 0 ? primeiro : undefined}
+              id={`${idBase}-${i}`}
+              value={chave}
+              disabled={pendente}
+              // A barra continua à vista com o seletor em foco (a regra do teclado em `tokens.css` pula a janela).
+              data-mantem-barra
+              aria-invalid={repetida === chave ? true : undefined}
+              aria-describedby={repetida === chave ? `${idBase}-repetida` : undefined}
+              onChange={(e) => {
+                const nova = [...escolha];
+                nova[i] = e.target.value;
+                setEscolha(nova);
+                setErro(null);
+              }}
+              className={CAMPO}
+            >
+              {edicao.opcoes.map((o) => (
+                <option key={o.chave} value={o.chave}>
+                  {o.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+      {repetida && (
+        <p id={`${idBase}-repetida`} role="alert" className="text-[13px] text-erro">
+          {nome(repetida)} está em duas posições. Cada área entra na barra uma vez só.
+        </p>
+      )}
+      {erro && (
+        <p role="alert" className="text-[13px] text-erro">
+          {erro}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+        <button
+          type="button"
+          disabled={pendente || escolha.join('|') === edicao.padrao.join('|')}
+          onClick={() => {
+            setEscolha(edicao.padrao);
+            setErro(null);
+          }}
+          className={classeDeBotao('fantasma')}
+        >
+          Voltar ao padrão
+        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={pendente} onClick={() => aoTerminar(false)} className={classeDeBotao('fantasma')}>
+            Cancelar
+          </button>
+          <button type="submit" disabled={!!repetida || pendente || !mudou} className={classeDeBotao('primario')}>
+            {pendente ? 'Salvando…' : 'Salvar barra'}
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }
 

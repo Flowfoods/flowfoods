@@ -19,6 +19,7 @@ import { executarCnpjDaLoja } from '@/components/erp/telas/estrutura/executar';
 import {
   concluirRegistroDeRosto,
   ERRO_ATIVAR_ROSTO,
+  gravarAtalhosDaBarra,
   gravarPreferenciaDeAjuda,
   iniciarRegistroDeRosto,
   LimiteDoRosto,
@@ -30,6 +31,8 @@ import { buscarFichas } from '@/lib/erp/fichas';
 import { TIPOS_DE_FICHA } from '@/lib/erp/ficha-campos';
 import type { RegistrationResponseJSON } from '@/lib/erp/rosto';
 import { aparelhoAtual, tokenDoCookie } from '@/lib/erp/sessao';
+import { navegacaoDoParceiro } from '@/lib/erp/modulos';
+import { modulosLiberados } from '@/lib/erp/liberacao';
 import type { RespostaDaVisao, ResultadoDaBusca } from '@/components/erp/shell/tipos';
 import { UNIDADES } from '@/lib/erp/unidades';
 import { sessaoSegura } from '@/lib/erp/sessao-cookie';
@@ -159,6 +162,21 @@ export async function acaoEscolherVisao(valor: string): Promise<RespostaDaVisao>
 export async function acaoAjudaFechar(form: FormData): Promise<void> {
   await gravarPreferenciaDeAjuda(await tokenDoCookie(), { tipo: 'fechar', caixa: String(form.get('caixa') ?? '') });
   revalidatePath('/erp', 'layout');
+}
+
+/**
+ * Decisão 536 · "Editar barra": salva os atalhos da barra de Módulos da pessoa neste parceiro. O servidor recalcula o menu
+ * dela (permissões e módulos liberados, como o layout) e só aceita o Início e as áreas com tela que estão nele: módulo sem
+ * acesso, "Em breve" ou chave inventada recusa tudo. Quem é a pessoa vem só da sessão.
+ */
+export async function acaoSalvarAtalhosDaBarra(chaves: string[]): Promise<{ ok: boolean; mensagem?: string }> {
+  const ctx = await exigirParceiroDaSessao();
+  const nav = navegacaoDoParceiro(ctx.alcance, await modulosLiberados(ctx.cliente));
+  const permitidas = new Set(['inicio', ...nav.modulos.filter((m) => m.href).map((m) => m.chave)]);
+  const r = await gravarAtalhosDaBarra(await tokenDoCookie(), chaves, permitidas);
+  if (!r.ok) return { ok: false, mensagem: r.erro };
+  revalidatePath('/erp', 'layout');
+  return { ok: true };
 }
 
 /** Manter, desligar ou religar as dicas (a pergunta da 1ª vez e "Seu acesso"). */

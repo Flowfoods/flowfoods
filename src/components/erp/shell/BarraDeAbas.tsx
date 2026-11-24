@@ -19,12 +19,17 @@
 import Link from 'next/link';
 import { LayoutGrid } from 'lucide-react';
 import { useCallback, useId, useRef, useState, type CSSProperties } from 'react';
-import { COLUNA_DE_MODULOS, atalhosDaBarra, itemAtivo, type AtalhoDaBarra, type Navegacao } from '@/lib/erp/modulos';
+import { COLUNA_DE_MODULOS, atalhosDaBarra, itemAtivo, opcoesDaBarra, padraoDaBarra, type AtalhoDaBarra, type Navegacao } from '@/lib/erp/modulos';
+import type { PropsDoShell } from './tipos';
 import { Icone } from './icones';
 import { JanelaDeModulos } from './JanelaDeModulos';
 
-export function BarraDeAbas({ nav, caminho }: { nav: Navegacao; caminho: string }) {
-  const { atalhos, ativo } = atalhosDaBarra(nav, caminho);
+export function BarraDeAbas({ nav, caminho, barra }: { nav: Navegacao; caminho: string; barra?: PropsDoShell['barra'] }) {
+  // Decisão 536: a escolha salva vale assim que o servidor confirma (até o layout trazer a nova, fica a daqui); a que veio
+  // do servidor depois manda de novo. `chavesDaBarra` filtra pelo menu: nada fora dele aparece.
+  const [salvosAgora, setSalvosAgora] = useState<{ de: readonly string[] | undefined; chaves: string[] } | null>(null);
+  const escolhidos = salvosAgora && salvosAgora.de === barra?.escolhidos ? salvosAgora.chaves : (barra?.escolhidos ?? []);
+  const { atalhos, ativo } = atalhosDaBarra(nav, caminho, escolhidos);
   const [aberta, setAberta] = useState(false);
   const botao = useRef<HTMLButtonElement>(null);
   const idDaJanela = useId();
@@ -70,7 +75,29 @@ export function BarraDeAbas({ nav, caminho }: { nav: Navegacao; caminho: string 
               </span>
               <span className="ff-aba-celular-rotulo">Módulos</span>
             </button>
-            {aberta && <JanelaDeModulos id={idDaJanela} nav={nav} atual={itemAtivo(nav, caminho)?.modulo ?? null} botao={botao} aoFechar={fechar} />}
+            {aberta && (
+              <JanelaDeModulos
+                id={idDaJanela}
+                nav={nav}
+                atual={itemAtivo(nav, caminho)?.modulo ?? null}
+                botao={botao}
+                aoFechar={fechar}
+                edicao={
+                  barra && opcoesDaBarra(nav).length > 1
+                    ? {
+                        opcoes: opcoesDaBarra(nav).map((o) => ({ chave: o.chave, nome: o.nome })),
+                        atuais: atalhos.map((a) => a.chave),
+                        padrao: padraoDaBarra(nav),
+                        salvar: async (chaves) => {
+                          const r = await barra.salvar(chaves);
+                          if (r.ok) setSalvosAgora({ de: barra.escolhidos, chaves });
+                          return r;
+                        },
+                      }
+                    : null
+                }
+              />
+            )}
           </li>
           {atalhos
             .filter((a) => a.coluna > COLUNA_DE_MODULOS)

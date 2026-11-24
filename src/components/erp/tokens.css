@@ -301,7 +301,7 @@ html:has(.ff-app[data-tema='escuro']) {
  * do topo). Só abaixo de 900 px, onde não há menu lateral: no celular (< 640 px) em largura cheia, presa no pé; no tablet, uma
  * barra flutuante no centro, 12 px acima do pé. Some, e devolve o espaço, nas telas com barra fixa de ações
  * (`data-barra-fixa`, que já ocupa o pé) e fica fora enquanto um campo de texto está em foco (o teclado aberto), menos a busca
- * da janela de Módulos (`data-mantem-barra`), que abre acima dela. Sem `:has()` no navegador, não aparece: fica o menu (≡).
+ * e os seletores da janela de Módulos (`data-mantem-barra`), que abre acima dela. Sem `:has()` no navegador, não aparece: fica o menu (≡).
  * `--ff-reserva-da-barra` é o espaço que ela ocupa acima do pé (a altura, a borda e, no tablet, o vão até o pé).
  */
 .ff-app .ff-abas-celular {
@@ -323,7 +323,7 @@ html:has(.ff-app[data-tema='escuro']) {
       z-index: 40;
     }
     .ff-app:has([data-barra-fixa]) .ff-abas-celular,
-    .ff-app:has(:is(input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='file'], [type='range'], [type='color'], [type='hidden'], [data-mantem-barra]), textarea, select, [contenteditable='true']):focus) .ff-abas-celular {
+    .ff-app:has(:is(input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='file'], [type='range'], [type='color'], [type='hidden'], [data-mantem-barra]), textarea, select:not([data-mantem-barra]), [contenteditable='true']):focus) .ff-abas-celular {
       display: none;
     }
     /* O fim da página e o que rola até um campo ficam acima da barra (só onde ela existe: o nível 1 não tem). A rolagem até um
@@ -517,6 +517,25 @@ html:has(.ff-app[data-tema='escuro']) {
   border: 1px solid transparent;
   color: rgb(var(--ff-texto));
   font-size: 16px;
+}
+.ff-app .ff-janela-modulos-pe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--ff-linha);
+  padding: 4px 10px 6px;
+}
+/* "Editar barra" (decisão 536): um seletor por posição; dois por linha a partir de 400 px (os da esquerda, os da direita). */
+.ff-app .ff-editor-barra {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px 12px;
+}
+@media (min-width: 400px) {
+  .ff-app .ff-editor-barra {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .ff-app .ff-janela-modulos-corpo {
   min-height: 0;
