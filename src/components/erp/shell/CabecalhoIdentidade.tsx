@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
-import type { IdentidadeDoCabecalho } from '@/lib/erp/marca-cabecalho';
+import { ChevronDown, ChevronRight, Pencil } from 'lucide-react';
+import type { IdentidadeDoCabecalho, MarcaDoCabecalho } from '@/lib/erp/marca-cabecalho';
+import { Dialogo } from '../ui/Dialogo';
+import { EditorImagem } from '../telas/identidade/editor-imagem';
 import type { PropsDoShell } from './tipos';
 import { MenuUsuario } from './MenuUsuario';
 import { Popover } from './Popover';
@@ -15,6 +17,9 @@ export function CabecalhoIdentidade({ props, slug, inicio, menuRecolhido }: { pr
   const [carregado, setCarregado] = useState<{ chave: string; dados: IdentidadeDoCabecalho } | null>(null);
   const [falha, setFalha] = useState<string | null>(null);
   const [pendente, setPendente] = useState(false);
+  // "Trocar logo da marca" (decisão 536): a marca cuja logo está sendo trocada, presa ao abrir (trocar a marca do cabeçalho
+  // com a janela aberta não muda de quem é a logo que a pessoa está vendo e vai salvar).
+  const [logoDe, setLogoDe] = useState<MarcaDoCabecalho | null>(null);
   const geracao = useRef(0);
   const carregar = identidade?.modo === 'nivel1' ? identidade.carregar : null;
   const revisao = identidade?.modo === 'nivel1' ? identidade.revisao : null;
@@ -80,6 +85,8 @@ export function CabecalhoIdentidade({ props, slug, inicio, menuRecolhido }: { pr
             classeDoWrapper="w-full"
             classeDoBotao="ff-marca-selecionada ff-transicao"
             alinhar="esquerda"
+            // O painel nasce do seletor (Expansão, decisão 535): a segunda janela que já existia a receber o movimento.
+            expansao
             conteudoDoBotao={<>
               <span className="ff-marca-imagem" aria-hidden><ImagemDeIdentidade key={marca?.logoUrl ?? marca?.id} url={marca?.logoUrl} nome={marca?.nome ?? dados.nomeParceiro} /></span>
               <span className="sr-only">Marca selecionada</span>
@@ -91,13 +98,42 @@ export function CabecalhoIdentidade({ props, slug, inicio, menuRecolhido }: { pr
             <ul>{dados.marcas.map((m) => <li key={m.id}><button type="button" disabled={pendente} aria-pressed={marca?.id === m.id} onClick={() => void escolher(m.id, fechar)} className="flex min-h-11 w-full items-center gap-3 rounded-botao px-3 py-2 text-left text-[13px] hover:bg-texto/5 aria-pressed:bg-forte disabled:opacity-60">
               <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-[8px] bg-forte" aria-hidden><ImagemDeIdentidade key={m.logoUrl ?? m.id} url={m.logoUrl} nome={m.nome} /></span><span className="min-w-0 break-words">{m.nome}</span>
             </button></li>)}</ul>
-            {dados.perfilHref && <Link onClick={fechar} href={dados.perfilHref} className="mt-2 block rounded-botao border-t border-linha px-3 py-3 text-[13px] hover:bg-texto/5">Identidade visual das marcas</Link>}
+            {dados.logoBase && marca && <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => {
+                // `fechar` devolve o foco ao seletor antes de a janela abrir: é para ele que o foco volta quando ela fecha.
+                setLogoDe(marca);
+                fechar();
+              }}
+              className="ff-transicao mt-2 flex min-h-11 w-full items-center gap-3 rounded-botao border-t border-linha px-3 py-2.5 text-left hover:bg-texto/5"
+            >
+              <Pencil size={16} aria-hidden className="shrink-0 text-acento" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-semibold">Trocar logo da marca</span>
+                <span className="block break-words text-[12px] text-suave">Altera a imagem de {marca.nome}</span>
+              </span>
+              <ChevronRight size={16} aria-hidden className="shrink-0 text-suave" />
+            </button>}
+            {dados.perfilHref && <Link onClick={fechar} href={dados.perfilHref} className={`block rounded-botao px-3 py-3 text-[13px] hover:bg-texto/5 ${dados.logoBase && marca ? '' : 'mt-2 border-t border-linha'}`}>Identidade visual das marcas</Link>}
             {dados.marcas.length === 0 && <p className="px-3 py-2 text-[13px] text-suave">Nenhuma marca cadastrada.</p>}
           </div>}</Popover> : <p className="text-center text-[12px] text-suave">{slug && carregar ? 'Carregando marca…' : 'FlowFoods'}</p>}
           {falha && <p role="alert" className="mt-2 text-center text-[12px] text-erro">{falha}</p>}
         </div>
         <div className="ff-cabecalho-conta"><MenuUsuario usuario={props.usuario} tema={props.tema} links={props.links} sair={props.sair} /></div>
       </div>
+      {/* "Trocar logo da marca" (decisão 536): o MESMO editor da Identidade visual (prévia, Salvar logo, Cancelar), na rota da
+          marca escolhida. Só aparece para quem pode alterar (`logoBase`); a rota confere de novo. Não mexe na foto pessoal, na
+          marca selecionada nem em outra marca. Salvar recarrega o cabeçalho com a logo nova. */}
+      {dados?.logoBase && (
+        <Dialogo aberto={logoDe !== null} aoFechar={() => setLogoDe(null)} titulo={logoDe ? `Logo de ${logoDe.nome}` : 'Logo da marca'}>
+          {logoDe && (
+            <div className="px-5 pb-5 pt-4">
+              <EditorImagem url={`${dados.logoBase}/${encodeURIComponent(logoDe.id)}/logo`} atual={logoDe.logoUrl} nome={logoDe.nome} tipo="logo" contexto={`${dados.parceiroId}:${logoDe.id}`} />
+            </div>
+          )}
+        </Dialogo>
+      )}
     </header>
   );
 }

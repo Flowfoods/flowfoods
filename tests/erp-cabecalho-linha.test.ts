@@ -84,3 +84,22 @@ describe('cabeçalho · marca do cliente', () => {
     expect(celular).toMatch(/\.ff-marca-selecionada \{ min-height: 44px;/);
   });
 });
+
+describe('cabeçalho · "Trocar logo da marca" (decisão 536)', () => {
+  it('atalho separado da troca de marca, só com `logoBase`, que abre o MESMO editor da Identidade visual na rota da marca', () => {
+    expect(tsx).toMatch(/\{dados\.logoBase && marca && <button\s+type="button"\s+aria-haspopup="dialog"/);
+    expect(tsx).toContain('Trocar logo da marca');
+    expect(tsx).toContain('Altera a imagem de {marca.nome}');
+    expect(tsx).toContain("import { EditorImagem } from '../telas/identidade/editor-imagem';");
+    expect(tsx).toContain('<EditorImagem url={`${dados.logoBase}/${encodeURIComponent(logoDe.id)}/logo`} atual={logoDe.logoUrl} nome={logoDe.nome} tipo="logo"');
+    // A marca da janela fica presa ao abrir: trocar a marca do cabeçalho não muda de quem é a logo.
+    expect(tsx).toMatch(/setLogoDe\(marca\);\s*fechar\(\);/);
+    // Nada de foto pessoal ou de outra marca na janela.
+    const janela = tsx.slice(tsx.indexOf('<Dialogo aberto={logoDe !== null}'), tsx.indexOf('</Dialogo>'));
+    expect(janela).not.toMatch(/foto|perfil\/foto|tipo="foto"/);
+  });
+
+  it('o painel do seletor nasce dele (Expansão)', () => {
+    expect(tsx).toMatch(/classeDoBotao="ff-marca-selecionada ff-transicao"\s*alinhar="esquerda"\s*\/\/[^\n]*\n\s*expansao/);
+  });
+});

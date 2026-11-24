@@ -39,7 +39,19 @@ describe('marca no cabeçalho: preferência visual com escopo de pessoa e parcei
     expect(d.selecionada).toBe('b');
     expect(d.marcas[1]).toEqual({ id: 'b', nome: 'Marca Beta', logoUrl: '/erp/identidade/marcas/b/logo?v=imagem.webp' });
     expect(d.perfilHref).toBeNull();
+    // Sem `lojas.gerir`, o atalho "Trocar logo da marca" nem aparece (decisão 536).
+    expect(d.logoBase).toBeNull();
     expect(mocks.listar).toHaveBeenCalledWith(mocks.ctx.cliente);
+  });
+
+  it('"Trocar logo da marca" só para quem pode alterar a logo (`lojas.gerir`) e com o parceiro desbloqueado; a rota é a da Identidade visual', async () => {
+    mocks.pode.mockImplementation((_alcance: unknown, permissao: string) => permissao === 'lojas.gerir' || permissao === 'lojas.ver');
+    expect((await identidadeDaSessao()).logoBase).toBe('/erp/identidade/marcas');
+    mocks.pode.mockImplementation((_alcance: unknown, permissao: string) => permissao === 'lojas.ver');
+    expect((await identidadeDaSessao()).logoBase).toBeNull();
+    mocks.pode.mockReturnValue(true);
+    mocks.exigir.mockResolvedValue({ ...mocks.ctx, bloqueio: 'Parceiro suspenso: só leitura.' });
+    expect((await identidadeDaSessao()).logoBase).toBeNull();
   });
 
   it('resolve o nível 1 no servidor e usa o slug canônico nas URLs', async () => {
@@ -47,6 +59,7 @@ describe('marca no cabeçalho: preferência visual com escopo de pessoa e parcei
     expect(mocks.exigirN1).toHaveBeenCalledWith('entrada');
     expect(d.marcas[1].logoUrl).toContain('/rodolfo/erp/casa-alfa/identidade/');
     expect(d.perfilHref).toBe('/rodolfo/erp/casa-alfa/lojas#identidade-visual');
+    expect(d.logoBase).toBe('/rodolfo/erp/casa-alfa/identidade/marcas');
   });
 
   it('recusa marca inexistente/inativa ou de outro parceiro antes de gravar preferência', async () => {
