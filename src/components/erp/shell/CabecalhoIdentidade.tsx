@@ -57,14 +57,22 @@ export function CabecalhoIdentidade({ props, slug, inicio, menuRecolhido }: { pr
     <header className="ff-cabecalho-identidade ff-material" data-menu={menuRecolhido ? 'recolhido' : 'expandido'} aria-label="Identidade do sistema">
       <div className="ff-cabecalho-grade">
         <Link href={inicio} className="ff-assinatura-central" aria-label="FlowFoods — início. BARNEY OS">
-          <span className="ff-logo-janela" aria-hidden>
-            {/* Originais recortados com transparência; o CSS acompanha o tema antes da hidratação. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="ff-logo-claro" src="/identidade/flowfoods-claro-transparente.png" alt="" width={1080} height={1080} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="ff-logo-escuro" src="/identidade/flowfoods-escuro-transparente.png" alt="" width={1080} height={1080} />
+          <span className="ff-assinatura-pilha">
+            {/* FlowFoods numa linha só (prévia aprovada em 23/11/2026, decisão 535): as duas palavras saem da MESMA imagem
+                oficial transparente, recortadas pelo CSS e postas lado a lado, alinhadas pela base. Nenhum arquivo novo e nenhum
+                pixel redesenhado. O CSS acompanha o tema antes da hidratação. */}
+            <span className="ff-logo-linha" aria-hidden>
+              {(['flow', 'foods'] as const).map((palavra) => (
+                <span key={palavra} className={`ff-logo-palavra ff-logo-${palavra}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="ff-logo-claro" src="/identidade/flowfoods-claro-transparente.png" alt="" width={1080} height={1080} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="ff-logo-escuro" src="/identidade/flowfoods-escuro-transparente.png" alt="" width={1080} height={1080} />
+                </span>
+              ))}
+            </span>
+            <span className="ff-barney-os">BARNEY <span>OS</span></span>
           </span>
-          <span className="ff-barney-os">BARNEY <span>OS</span></span>
         </Link>
         <div className="ff-cabecalho-marca" aria-busy={pendente}>
           {dados ? <Popover

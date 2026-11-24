@@ -348,7 +348,7 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | Menu lateral em lista, ativo na cor cheia da área (decisão 531); substitui a grade de duas colunas | barra lateral do iPad, do protótipo aprovado; a seleção cheia tem nome claro ≥ 4,5:1 e contorno ≥ 3:1 no escuro | 2026-11-18 |
 | Título grande (Gelasio 34 px, sem o quadrado da área) e barra de abas no celular (decisão 532) | protótipo aprovado; a aba repete entradas do menu, some com barra fixa de ações e com o teclado | 2026-11-18 |
 | Listas agrupadas no celular (insumos, fichas, notas) e interruptor para o que liga e desliga (decisão 533) | protótipo aprovado; o desligado com contorno no `suave` para 3:1; o formulário manda o mesmo de antes | 2026-11-19 |
-| Barra de Módulos de cinco posições, Cápsula, janela de Módulos e Expansão; logo da marca ao lado do nome, e sem ela no celular (decisão 535) | prévia final aprovada em 23/11; a Cápsula no tom da área a 16 % deixa o ícone ≥ 3:1 e o nome ≥ 4,5:1 em toda a paleta | 2026-11-24 |
+| Barra de Módulos de cinco posições, Cápsula, janela de Módulos e Expansão; FlowFoods numa linha (recorte da imagem oficial); logo da marca ao lado do nome, e sem ela no celular (decisão 535) | prévia final aprovada em 23/11; a Cápsula no tom da área a 16 % deixa o ícone ≥ 3:1 e o nome ≥ 4,5:1 em toda a paleta | 2026-11-24 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,
