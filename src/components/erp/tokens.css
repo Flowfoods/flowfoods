@@ -505,16 +505,16 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 /*
  * Formato central (decisão 537, o desktop da prévia "Um modal, três formatos"): a mesma janela, aberta pelo seletor da
- * lateral, no centro da área de trabalho: entre o fim da lateral (`--ff-lateral`) e a borda direita, 16 px abaixo da barra
+ * lateral, no centro da área de trabalho: entre o fim da lateral (`--ff-fim-da-lateral`; o `--ff-lateral` é a COR dela) e a borda direita, 16 px abaixo da barra
  * presa do topo (`--ff-topo-da-janela`), ambas medidas ao abrir. Quatro colunas. A lateral só existe a partir de 900 px.
  */
 .ff-app .ff-janela-modulos.ff-janela-modulos-central {
   inset-inline: auto;
-  left: var(--ff-lateral, 232px);
+  left: var(--ff-fim-da-lateral, 232px);
   right: 0;
   top: var(--ff-topo-da-janela, 80px);
   bottom: auto;
-  width: min(760px, calc(100% - var(--ff-lateral, 232px) - 64px));
+  width: min(760px, calc(100% - var(--ff-fim-da-lateral, 232px) - 64px));
   max-height: calc(100dvh - var(--ff-topo-da-janela, 80px) - 24px);
   margin-inline: auto;
 }

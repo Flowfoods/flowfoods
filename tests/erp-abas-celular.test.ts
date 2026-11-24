@@ -209,8 +209,13 @@ describe('barra de Módulos · a escolha da pessoa ("Editar barra", decisão 536
     expect(sem).not.toContain('Editar barra');
     const fonte = readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8');
     const editor = fonte.slice(fonte.indexOf('function EditorDaBarra('));
+    // Falha de rede ou do servidor não prende o editor em "Salvando…"; igual ao padrão grava "sem escolha" (lista vazia).
+    expect(editor).toMatch(/try \{[\s\S]*?\} catch \{[\s\S]*?setErro\([\s\S]*?\} finally \{\s*setPendente\(false\);/);
+    expect(editor).toContain("edicao.salvar(escolha.join('|') === edicao.padrao.join('|') ? [] : escolha)");
     // Só o "Salvar barra" chama a ação; "Cancelar" e "Voltar ao padrão" só mexem no que está na tela.
     expect(editor.match(/edicao\.salvar\(/g)).toHaveLength(1);
+    // O Início é "Início" também nas opções do editor (o mesmo nome da barra).
+    expect(opcoesDaBarra(NAV_DONO)[0]).toMatchObject({ chave: 'inicio', rotulo: 'Início', nome: 'Início' });
     expect(editor).toMatch(/onClick=\{\(\) => aoTerminar\(false\)\} className=\{classeDeBotao\('fantasma'\)\}>\s*Cancelar/);
     expect(editor).toMatch(/onClick=\{\(\) => \{\s*setEscolha\(edicao\.padrao\);/);
     // Repetida trava o salvar e é dita (com o campo marcado); o seletor mantém a barra à vista.
@@ -295,7 +300,12 @@ describe('janela de Módulos', () => {
   it('diálogo sem bloqueio, com título, fechar, busca e a Expansão; o Início e as áreas da pessoa, na ordem do menu', () => {
     const h = marcar('/erp');
     expect(h).toMatch(/^<div id="j" role="dialog" aria-modal="false" aria-labelledby="[^"]+" data-janela-de-modulos="true" data-formato="barra" class="ff-janela-modulos ff-expansao">/);
-    expect(h).toMatch(/<h2 id="[^"]+" class="font-display text-\[20px\][^"]*">Módulos<\/h2>/);
+    expect(h).toMatch(/<h2 tabindex="-1" id="[^"]+" class="font-display text-\[20px\][^"]*">Módulos<\/h2>/);
+    // O Início: nome visível e nome acessível iguais (WCAG 2.5.3); "Áreas da Rede" é o título da tela, não o do bloco.
+    expect(h).toMatch(new RegExp(`<a aria-current="true" class="ff-bloco-compacto[^"]*" style="[^"]*" href="${NAV_DONO.inicio.href}">`));
+    expect(h).not.toContain(`aria-label="${NAV_DONO.inicio.titulo}"`);
+    // As regiões de estado ficam montadas (vazias) para o leitor de tela anunciar quando o texto chega.
+    expect(h).toContain('<p role="status" class="sr-only"></p>');
     expect(h).toContain('aria-label="Fechar os módulos"');
     expect(h).toMatch(/<input type="search" aria-label="Buscar módulo" placeholder="Buscar módulo" autoComplete="off" enterKeyHint="search" data-mantem-barra="true" class="ff-busca-modulos" value=""\/>/);
     expect([...h.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1])).toEqual([NAV_DONO.inicio.href, ...NAV_DONO.modulos.filter((m) => m.href).map((m) => m.href)]);
@@ -325,13 +335,19 @@ describe('janela de Módulos', () => {
     expect(h).toMatch(/data-formato="central" class="ff-janela-modulos ff-expansao ff-janela-modulos-central"/);
     expect(h).not.toContain('Editar barra');
     const central = regra('.ff-app .ff-janela-modulos.ff-janela-modulos-central');
-    for (const d of ['left: var(--ff-lateral, 232px)', 'right: 0', 'top: var(--ff-topo-da-janela, 80px)', 'bottom: auto', 'width: min(760px, calc(100% - var(--ff-lateral, 232px) - 64px))', 'margin-inline: auto']) expect(central).toContain(d);
+    for (const d of ['left: var(--ff-fim-da-lateral, 232px)', 'right: 0', 'top: var(--ff-topo-da-janela, 80px)', 'bottom: auto', 'width: min(760px, calc(100% - var(--ff-fim-da-lateral, 232px) - 64px))', 'margin-inline: auto']) expect(central).toContain(d);
     expect(regra('.ff-app .ff-janela-modulos-central .ff-grade-compacta')).toContain('grid-template-columns: repeat(4, minmax(0, 1fr))');
     const fonte = readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8');
     // Vai para o fim do `.ff-app` (a barra presa do topo passaria por cima dela na lateral) e o foco entra na busca.
     expect(fonte).toContain("const destino = central && typeof document !== 'undefined' ? botao.current?.closest('.ff-app') : null;");
     expect(fonte).toContain('return destino ? createPortal(conteudo, destino) : conteudo;');
-    expect(fonte).toMatch(/if \(central\) busca_\.current\?\.focus\(\);/);
+    // Com mouse, a busca; com toque (tablet deitado), o título: o teclado virtual não abre por cima da grade.
+    expect(fonte).toMatch(/if \(window\.matchMedia\?\.\('\(pointer: fine\)'\)\.matches\) busca_\.current\?\.focus\(\);\s*else titulo\.current\?\.focus\(\);/);
+    // O Tab que sai pelas pontas: depois do último, o foco segue para o que vem depois do seletor; antes do primeiro, volta a ele.
+    expect(fonte).toMatch(/if \(e\.shiftKey && document\.activeElement === focaveis\[0\]\) \{\s*e\.preventDefault\(\);\s*aoFechar\(true\);/);
+    expect(fonte).toMatch(/const seguinte = focavelDepois\(botao\.current, janela\.current\);\s*aoFechar\(false\);\s*\(seguinte \?\? botao\.current\)\.focus\(\);/);
+    // As setas andam pela grade, como no seletor da gaveta.
+    expect(fonte).toContain('<div className="ff-janela-modulos-corpo" onKeyDown={andarPelosBlocos}>');
     // Só a lateral do computador abre a central; a gaveta do celular segue com o painel preso ao seletor.
     const nav = readFileSync('src/components/erp/shell/NavLateral.tsx', 'utf8');
     expect(nav).toMatch(/\{janelaCentral \? \(\s*<SeletorComJanela[^>]*\/>\s*\) : \(\s*<SeletorDeModulo/);

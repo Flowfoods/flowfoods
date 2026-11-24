@@ -154,6 +154,14 @@ describe.skipIf(!URL_TESTE)('Decisão 536 · atalhos da barra de Módulos (Postg
     expect(await barra(ana.token)).toEqual(antes);
   });
 
+  it('outra aba trocou de parceiro entre o menu conferido e a gravação: nada grava', async () => {
+    const antes = await barra(ana.token);
+    const r = await gravarAtalhosDaBarra(ana.token, ['compras'], MENU, o(), anaEmB.s.acessoId);
+    expect(r.ok).toBe(false);
+    expect(await barra(ana.token)).toEqual(antes);
+    expect((await gravarAtalhosDaBarra(ana.token, antes, MENU, o(), ana.s.acessoId)).ok).toBe(true);
+  });
+
   it('lista vazia volta ao padrão', async () => {
     expect((await gravarAtalhosDaBarra(bia.token, ['compras'], MENU, o())).ok).toBe(true);
     expect((await gravarAtalhosDaBarra(bia.token, [], MENU, o())).ok).toBe(true);

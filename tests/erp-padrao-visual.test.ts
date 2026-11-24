@@ -538,7 +538,10 @@ describe('padrão visual · grade de módulos do seletor de áreas', () => {
     expect(vizinhoNaGrade(-1, 8, 4, 'ArrowRight')).toBeNull();
     for (const t of ['Tab', 'Escape', 'Enter', ' ', 'Home', 'a']) expect(vizinhoNaGrade(1, 8, 4, t)).toBeNull();
     // Alt, Ctrl, Cmd e Shift com seta são do navegador (voltar, avançar, seleção): o tratador sai antes de qualquer conta.
-    expect(navLateral).toMatch(/function andarPelaGrade\([^)]*\) \{\s*if \(e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey \|\| e\.shiftKey\) return;/);
+    // A regra das setas mora em `grade-teclado.ts` (a janela de Módulos usa a mesma, decisão 537).
+    expect(readFileSync('src/components/erp/shell/grade-teclado.ts', 'utf8')).toMatch(/return \(e: KeyboardEvent<HTMLElement>\) => \{\s*if \(e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey \|\| e\.shiftKey\) return;/);
+    expect(navLateral).toContain("const andarPelaGradeDoSeletor = andarPelaGrade('a.ff-bloco-modulo');");
+    expect(readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8')).toContain("const andarPelosBlocos = andarPelaGrade('a.ff-bloco-compacto');");
   });
 
   it('ícone de cor cheia: o desenho claro fica ≥ 3:1 sobre toda a paleta das áreas; o futuro não usa cor de área', () => {

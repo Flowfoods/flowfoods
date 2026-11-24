@@ -173,7 +173,8 @@ export async function acaoSalvarAtalhosDaBarra(chaves: string[]): Promise<{ ok: 
   const ctx = await exigirParceiroDaSessao();
   const nav = navegacaoDoParceiro(ctx.alcance, await modulosLiberados(ctx.cliente));
   const permitidas = new Set(['inicio', ...nav.modulos.filter((m) => m.href).map((m) => m.chave)]);
-  const r = await gravarAtalhosDaBarra(await tokenDoCookie(), chaves, permitidas);
+  // O vínculo vai junto: a lista é gravada no MESMO parceiro cujo menu foi conferido.
+  const r = await gravarAtalhosDaBarra(await tokenDoCookie(), chaves, permitidas, undefined, ctx.pessoa.acessoId);
   if (!r.ok) return { ok: false, mensagem: r.erro };
   revalidatePath('/erp', 'layout');
   return { ok: true };

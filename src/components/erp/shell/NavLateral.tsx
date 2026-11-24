@@ -19,12 +19,13 @@
  */
 
 import Link from 'next/link';
-import { useCallback, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useCallback, useId, useRef, useState, type CSSProperties } from 'react';
 import { ChevronDown, ChevronsUpDown, Home, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { COR, type ModuloNav, type Navegacao } from '@/lib/erp/modulos';
 import { IconeDoModulo } from '../ui/cabecalho';
 import { SeloEmBreve } from '../ui/em-breve';
 import { Icone } from './icones';
+import { andarPelaGrade, vizinhoNaGrade } from './grade-teclado';
 import { JanelaDeModulos } from './JanelaDeModulos';
 import { Popover } from './Popover';
 
@@ -343,7 +344,7 @@ export function AreasDoSeletor({ nav, atual, aoEscolher }: { nav: Navegacao; atu
     // Piso de 200 px: em tela muito baixa (celular deitado) o painel pode passar do pé e quem rola é a gaveta.
     <div
       className="max-h-[max(200px,min(70vh,calc(100dvh-250px)))] overflow-y-auto overscroll-contain max-[899px]:max-h-[max(200px,min(70vh,calc(100dvh-310px)))]"
-      onKeyDown={andarPelaGrade}
+      onKeyDown={andarPelaGradeDoSeletor}
     >
       {/* avoid-ai-design-ignore: SD4 — rótulo de grupo em caixa alta no seletor de áreas (contrato do shell; os grupos do menu
           lateral são em letra normal desde a decisão 531). */}
@@ -402,32 +403,10 @@ const BLOCO = 'ff-bloco-modulo';
 const NOME_DO_BLOCO = 'mt-2.5 block text-[14px] leading-tight text-texto [overflow-wrap:anywhere]';
 const FUNCAO_DO_BLOCO = 'mt-1 block text-[12px] leading-snug text-suave [overflow-wrap:anywhere]';
 
-/**
- * Para onde a seta leva na grade: o índice do bloco vizinho, ou `null` quando não há (borda da grade, tecla que não é seta,
- * bloco fora da lista). Direita e esquerda seguem a ordem de leitura; cima e baixo pulam uma linha (`colunas` blocos).
- */
-export function vizinhoNaGrade(atual: number, total: number, colunas: number, tecla: string): number | null {
-  const salto = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: Math.max(1, colunas), ArrowUp: -Math.max(1, colunas) }[tecla];
-  if (salto === undefined || atual < 0 || atual >= total) return null;
-  const alvo = atual + salto;
-  return alvo >= 0 && alvo < total ? alvo : null;
-}
-
-/**
- * Setas andam pela grade como numa tela de ícones; o Tab continua passando por todos os blocos. Com Alt, Ctrl, Cmd ou
- * Shift a tecla é do navegador (voltar e avançar, por exemplo) e não é tocada; sem vizinho, a rolagem nativa segue.
- */
-function andarPelaGrade(e: KeyboardEvent<HTMLDivElement>) {
-  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-  if (!(e.target instanceof HTMLElement) || !e.target.matches('a.ff-bloco-modulo')) return;
-  const blocos = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('a.ff-bloco-modulo'));
-  const topo = (b: HTMLElement) => Math.round(b.getBoundingClientRect().top);
-  const colunas = blocos.filter((b) => topo(b) === topo(blocos[0])).length;
-  const alvo = vizinhoNaGrade(blocos.indexOf(e.target), blocos.length, colunas, e.key);
-  if (alvo === null) return;
-  e.preventDefault();
-  blocos[alvo].focus();
-}
+// As setas da grade moram em `grade-teclado.ts` (a janela de Módulos usa as mesmas, decisão 537); o nome continua exportado
+// daqui para quem já o importava.
+export { vizinhoNaGrade };
+const andarPelaGradeDoSeletor = andarPelaGrade('a.ff-bloco-modulo');
 
 function BlocoDeModulo({
   href,

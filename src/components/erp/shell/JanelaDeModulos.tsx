@@ -29,7 +29,21 @@ import { IconeDoModulo } from '../ui/cabecalho';
 import { CAMPO, ROTULO } from '../ui/campos';
 import { SeloEmBreve } from '../ui/em-breve';
 import { classeDeBotao } from '../ui/estilos';
+import { andarPelaGrade } from './grade-teclado';
 import { foraDaCaixa } from './Popover';
+
+const andarPelosBlocos = andarPelaGrade('a.ff-bloco-compacto');
+const FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** O primeiro elemento focável e visível depois de `de` na ordem do documento, fora de `exceto`. */
+function focavelDepois(de: HTMLElement, exceto: HTMLElement): HTMLElement | null {
+  const todos = Array.from(document.querySelectorAll<HTMLElement>(FOCAVEIS));
+  for (const el of todos) {
+    if (exceto.contains(el) || el === de) continue;
+    if (de.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING && el.getClientRects().length > 0) return el;
+  }
+  return null;
+}
 
 /**
  * Decisão 536 · "Editar barra": o que a janela precisa para editar os atalhos. `opcoes` é o que pode ir para a barra (o
@@ -80,6 +94,7 @@ export function JanelaDeModulos({
 }) {
   const central = formato === 'central';
   const busca_ = useRef<HTMLInputElement>(null);
+  const titulo = useRef<HTMLHeadingElement>(null);
   const [editando, setEditando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const botaoEditar = useRef<HTMLButtonElement>(null);
@@ -112,7 +127,7 @@ export function JanelaDeModulos({
       lateral = `${Math.round(botao.current?.closest('aside')?.getBoundingClientRect().right ?? 0)}px`;
       const barra = document.querySelector('.ff-app header.ff-material.sticky')?.getBoundingClientRect();
       topo = `${Math.round(Math.max(0, barra?.bottom ?? 0) + 16)}px`;
-      j.style.setProperty('--ff-lateral', lateral);
+      j.style.setProperty('--ff-fim-da-lateral', lateral);
       j.style.setProperty('--ff-topo-da-janela', topo);
     }
     const caixa = j.getBoundingClientRect();
@@ -121,9 +136,12 @@ export function JanelaDeModulos({
     setPosicao({ origem: origemDaExpansao(b, { left: esquerda, top: alto }), lateral, topo });
   }, [botao, central]);
 
-  // Central: o foco entra na busca (a janela mora no fim do `.ff-app`, longe do seletor na ordem do Tab).
+  // Central: o foco entra na janela (ela mora no fim do `.ff-app`, longe do seletor na ordem do Tab). Com mouse, na busca;
+  // com toque (tablet deitado também passa de 900 px), no título, para não abrir o teclado virtual por cima da grade.
   useEffect(() => {
-    if (central) busca_.current?.focus();
+    if (!central) return;
+    if (window.matchMedia?.('(pointer: fine)').matches) busca_.current?.focus();
+    else titulo.current?.focus();
   }, [central]);
 
   useEffect(() => {
@@ -155,7 +173,7 @@ export function JanelaDeModulos({
   const nada = !inicioAparece && achadas.length === 0 && achadasEmBreve.length === 0;
 
   const estilo = posicao
-    ? ({ transformOrigin: posicao.origem, ...(posicao.lateral ? { '--ff-lateral': posicao.lateral } : {}), ...(posicao.topo ? { '--ff-topo-da-janela': posicao.topo } : {}) } as CSSProperties)
+    ? ({ transformOrigin: posicao.origem, ...(posicao.lateral ? { '--ff-fim-da-lateral': posicao.lateral } : {}), ...(posicao.topo ? { '--ff-topo-da-janela': posicao.topo } : {}) } as CSSProperties)
     : undefined;
   const destino = central && typeof document !== 'undefined' ? botao.current?.closest('.ff-app') : null;
 
@@ -174,9 +192,25 @@ export function JanelaDeModulos({
       onBlur={(e) => {
         if (foraDaCaixa(e.currentTarget, e.relatedTarget) && !botao.current?.contains(e.relatedTarget as Node)) aoFechar(false);
       }}
+      // Central (portal no fim do `.ff-app`): o Tab que sai pelas pontas faz o que faria se a janela estivesse logo depois do
+      // seletor, como o painel de antes. Depois do último, o foco segue para o que vem depois do seletor e a janela fecha;
+      // antes do primeiro, volta ao seletor. Sem isso, o Tab saía do documento e a janela ficava aberta.
+      onKeyDown={(e) => {
+        if (!central || e.key !== 'Tab' || !janela.current || !botao.current) return;
+        const focaveis = Array.from(janela.current.querySelectorAll<HTMLElement>(FOCAVEIS)).filter((el) => el.getClientRects().length > 0);
+        if (e.shiftKey && document.activeElement === focaveis[0]) {
+          e.preventDefault();
+          aoFechar(true);
+        } else if (!e.shiftKey && document.activeElement === focaveis.at(-1)) {
+          e.preventDefault();
+          const seguinte = focavelDepois(botao.current, janela.current);
+          aoFechar(false);
+          (seguinte ?? botao.current).focus();
+        }
+      }}
     >
       <div className="ff-janela-modulos-cabeca">
-        <h2 id={idTitulo} className="font-display text-[20px] font-normal leading-tight tracking-[-0.01em]">
+        <h2 ref={titulo} tabIndex={-1} id={idTitulo} className="font-display text-[20px] font-normal leading-tight tracking-[-0.01em] focus:outline-none">
           {editando ? 'Editar barra' : 'Módulos'}
         </h2>
         <button type="button" onClick={() => aoFechar(true)} aria-label="Fechar os módulos" className="ff-transicao inline-grid h-11 w-11 shrink-0 place-items-center rounded-botao text-suave hover:bg-texto/5 hover:text-texto">
@@ -209,12 +243,12 @@ export function JanelaDeModulos({
           className="ff-busca-modulos"
         />
       </div>
-      <div className="ff-janela-modulos-corpo">
-        {nada ? (
-          <p role="status" className="px-1 py-6 text-center text-[14px] text-suave">
-            Nenhum módulo com “{busca.trim()}”.
-          </p>
-        ) : (
+      <div className="ff-janela-modulos-corpo" onKeyDown={andarPelosBlocos}>
+        {/* A região de estado fica sempre montada (só o texto muda): leitor de tela não anuncia região que nasce preenchida. */}
+        <p role="status" className={nada ? 'px-1 py-6 text-center text-[14px] text-suave' : 'sr-only'}>
+          {nada ? `Nenhum módulo com “${busca.trim()}”.` : ''}
+        </p>
+        {nada ? null : (
           <>
             <p id={idAreas} className="sr-only">
               Áreas
@@ -224,7 +258,8 @@ export function JanelaDeModulos({
                 <li>
                   <BlocoCompacto
                     href={nav.inicio.href}
-                    nome={nav.inicio.titulo}
+                    // O que aparece é "Início", e o nome acessível também (WCAG 2.5.3): "Áreas da Rede" é o título da tela.
+                    nome="Início"
                     rotulo="Início"
                     icone="inicio"
                     cor={COR.inicio}
@@ -259,7 +294,8 @@ export function JanelaDeModulos({
                       <div className="ff-bloco-compacto ff-bloco-compacto-futuro">
                         <IconeDoModulo icone={m.icone} cor={COR.futuro} tamanho={28} variante="futuro" />
                         <span className="min-w-0">
-                          <span className="ff-bloco-compacto-nome block font-medium">{nomeCurtoDoModulo(m.nome)}</span>
+                          {/* Nome inteiro: não é link, então não há nome acessível à parte, e dois "Pedidos…" virariam iguais. */}
+                          <span className="ff-bloco-compacto-nome block font-medium">{m.nome}</span>
                           <SeloEmBreve cadeado={m.cadeado} className="mt-1" />
                         </span>
                       </div>
@@ -285,12 +321,15 @@ export function JanelaDeModulos({
             <Pencil size={16} aria-hidden />
             Editar barra
           </button>
-          <p role="status" className="text-[13px] text-ok">
-            {aviso}
-          </p>
         </div>
       )}
       </>
+      )}
+      {/* "Barra salva.": a região fica montada nos dois modos (só o texto muda), para o leitor de tela anunciar. */}
+      {edicao && (
+        <p role="status" className={aviso ? 'px-4 pb-3 text-[13px] text-ok' : 'sr-only'}>
+          {aviso ?? ''}
+        </p>
       )}
     </div>
   );
@@ -335,13 +374,20 @@ function EditorDaBarra({
     if (repetida || pendente) return;
     setPendente(true);
     setErro(null);
-    const r = await edicao.salvar(escolha);
-    setPendente(false);
-    if (!r.ok) {
-      setErro(r.mensagem ?? 'Não foi possível salvar a barra. Tente de novo.');
-      return;
+    try {
+      // Igual ao padrão: grava "sem escolha" (lista vazia), para a pessoa seguir o padrão quando o menu mudar.
+      const r = await edicao.salvar(escolha.join('|') === edicao.padrao.join('|') ? [] : escolha);
+      if (!r.ok) {
+        setErro(r.mensagem ?? 'Não foi possível salvar a barra. Tente de novo.');
+        return;
+      }
+      aoTerminar(true);
+    } catch {
+      // Rede que caiu, erro do servidor: a tela não fica presa em "Salvando…"; Cancelar e os seletores voltam.
+      setErro('Não foi possível salvar a barra. Confira a conexão e tente de novo.');
+    } finally {
+      setPendente(false);
     }
-    aoTerminar(true);
   }
 
   return (

@@ -53,6 +53,11 @@
 .ff-cabecalho-conta { justify-self: end; min-width: 0; }
 .ff-cabecalho-conta .ff-conta-foto { width: 42px; height: 42px; }
 .ff-conta-barra .ff-conta-nome { display: none; }
+/* Tablet estreito (640 a 899 px): a coluna do meio encolhe para a palavra FlowFoods (149 px a 24 px de altura) caber ao
+   lado sem passar por baixo da pílula da marca (a 640 px, com 320 px no meio, entrava 15 px nela). */
+@container (max-width: 899px) {
+  .ff-cabecalho-grade { grid-template-columns: minmax(0, 1fr) minmax(0, 240px) minmax(0, 1fr); gap: 14px; }
+}
 /* Celular (abaixo de 640 px): FlowFoods + BARNEY OS e a foto na primeira linha; na segunda, uma faixa única com o nome e a
    seta, que abre o mesmo seletor. Sem a logo da marca, sem iniciais e sem lugar guardado para ela (decisão de 23/11/2026):
    o cadastro da logo não muda, ela só não aparece aqui. */

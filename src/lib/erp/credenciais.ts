@@ -1807,9 +1807,12 @@ export async function gravarAtalhosDaBarra(
   chaves: unknown,
   permitidas: ReadonlySet<string>,
   o?: Opcoes,
+  /** O vínculo da sessão que calculou `permitidas`: se outra aba trocou de parceiro entre as duas leituras, nada grava. */
+  acessoEsperado?: string | null,
 ): Promise<{ ok: true; chaves: string[] } | { ok: false; erro: string }> {
   const sessao = await validarSessao(token, o);
   if (!sessao?.acessoId) return { ok: false, erro: 'Entre de novo para salvar a barra.' };
+  if (acessoEsperado !== undefined && acessoEsperado !== sessao.acessoId) return { ok: false, erro: 'Você trocou de parceiro em outra aba. Recarregue a página.' };
   if (!Array.isArray(chaves) || chaves.length > MAXIMO_DE_ATALHOS_DA_BARRA) return { ok: false, erro: 'A barra tem até quatro atalhos.' };
   const lista: string[] = [];
   for (const c of chaves) {

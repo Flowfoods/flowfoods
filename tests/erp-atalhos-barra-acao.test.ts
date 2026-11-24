@@ -37,10 +37,12 @@ describe('Decisão 536 · ação "Salvar barra"', () => {
   });
 
   it('o permitido é o menu da pessoa: o Início e as áreas com tela dela, nunca as de outra permissão', async () => {
-    m.ctx = { alcance: so(['faturamento.ver']), cliente: {} };
+    m.ctx = { alcance: so(['faturamento.ver']), cliente: {}, pessoa: { acessoId: 'vinculo-1' } };
     await acaoSalvarAtalhosDaBarra(['faturamento']);
-    const [token, chaves, permitidas] = m.gravar.mock.calls[0];
+    const [token, chaves, permitidas, , acesso] = m.gravar.mock.calls[0];
     expect(token).toBe('token-da-sessao');
+    // O vínculo da sessão que calculou o menu vai junto (a lista não pode cair no vínculo de outro parceiro).
+    expect(acesso).toBe('vinculo-1');
     expect(chaves).toEqual(['faturamento']);
     const esperado = navegacaoDoParceiro(so(['faturamento.ver']), NENHUM_MODULO_LIBERADO).modulos.filter((x) => x.href).map((x) => x.chave);
     expect([...permitidas].sort()).toEqual(['inicio', ...esperado].sort());
@@ -48,7 +50,7 @@ describe('Decisão 536 · ação "Salvar barra"', () => {
   });
 
   it('o catálogo "Em breve" (sem tela) nunca é permitido, nem para o nível 1', async () => {
-    m.ctx = { alcance: ALCANCE_FLOWFOODS, cliente: {} };
+    m.ctx = { alcance: ALCANCE_FLOWFOODS, cliente: {}, pessoa: { acessoId: 'vinculo-1' } };
     await acaoSalvarAtalhosDaBarra([]);
     const permitidas: Set<string> = m.gravar.mock.calls[0][2];
     const futuros = navegacaoDoParceiro(ALCANCE_FLOWFOODS, NENHUM_MODULO_LIBERADO).modulos.filter((x) => !x.href).map((x) => x.chave);
@@ -57,7 +59,7 @@ describe('Decisão 536 · ação "Salvar barra"', () => {
   });
 
   it('salvou: revalida o layout (a barra lê a escolha da sessão); recusou: devolve o motivo e não revalida', async () => {
-    m.ctx = { alcance: ALCANCE_FLOWFOODS, cliente: {} };
+    m.ctx = { alcance: ALCANCE_FLOWFOODS, cliente: {}, pessoa: { acessoId: 'vinculo-1' } };
     expect(await acaoSalvarAtalhosDaBarra(['compras'])).toEqual({ ok: true });
     expect(m.revalidar).toHaveBeenCalledWith('/erp', 'layout');
     m.revalidar.mockClear();

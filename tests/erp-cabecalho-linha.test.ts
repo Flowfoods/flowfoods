@@ -91,9 +91,12 @@ describe('cabeçalho · "Trocar logo da marca" (decisão 536)', () => {
     expect(tsx).toContain('Trocar logo da marca');
     expect(tsx).toContain('Altera a imagem de {marca.nome}');
     expect(tsx).toContain("import { EditorImagem } from '../telas/identidade/editor-imagem';");
-    expect(tsx).toContain('<EditorImagem url={`${dados.logoBase}/${encodeURIComponent(logoDe.id)}/logo`} atual={logoDe.logoUrl} nome={logoDe.nome} tipo="logo"');
-    // A marca da janela fica presa ao abrir: trocar a marca do cabeçalho não muda de quem é a logo.
-    expect(tsx).toMatch(/setLogoDe\(marca\);\s*fechar\(\);/);
+    expect(tsx).toContain('<EditorImagem url={`${logoDe.base}/${encodeURIComponent(logoDe.marca.id)}/logo`} atual={logoDe.marca.logoUrl} nome={logoDe.marca.nome} tipo="logo"');
+    // A marca da janela fica presa ao abrir, com a rota e o parceiro: trocar a marca do cabeçalho não muda de quem é a logo, e
+    // a janela não depende dos dados do cabeçalho (no nível 1 eles somem um instante quando o layout recarrega ao salvar).
+    expect(tsx).toMatch(/setLogoDe\(\{ marca, base: dados\.logoBase!, parceiroId: dados\.parceiroId \}\);\s*fechar\(\);/);
+    expect(tsx).toContain('<Dialogo aberto={logoDe !== null}');
+    expect(tsx).not.toMatch(/\{dados\?\.logoBase && \(\s*<Dialogo/);
     // Nada de foto pessoal ou de outra marca na janela.
     const janela = tsx.slice(tsx.indexOf('<Dialogo aberto={logoDe !== null}'), tsx.indexOf('</Dialogo>'));
     expect(janela).not.toMatch(/foto|perfil\/foto|tipo="foto"/);

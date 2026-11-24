@@ -122,12 +122,14 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   celular, painel flutuante sob o seletor, que nasce dele pela Expansão
   (decisão 535), com um bloco por área em uso,
   sem cartão nem borda: ícone de cor cheia (a cor da área, desenho claro,
-  44 px), nome em 14/600 e função curta em 12 px, centralizados. Quatro
-  colunas na barra do desktop e duas na gaveta do celular (coluna mínima de
-  120 px; só 320 px com barra de rolagem clássica cai para uma). Área atual =
+  44 px), nome em 14/600 e função curta em 12 px, centralizados, em duas
+  colunas na gaveta (coluna mínima de 120 px; só 320 px com barra de
+  rolagem clássica cai para uma). A janela central usa os blocos compactos
+  da janela de Módulos; o Tab que sai pelas pontas dela segue como se ela
+  estivesse logo depois do seletor. Área atual =
   bloco preenchido no tom da área, contorno na tinta dela, nome em 700 e
   `aria-current`; não clareia sob o ponteiro. Setas sem modificador andam
-  pela grade; o anel de foco fica por dentro do bloco (a grade rola). Escape
+  pela grade (na gaveta e na janela de Módulos, `grade-teclado.ts`); o anel de foco fica por dentro do bloco (a grade rola). Escape
   fecha e devolve o foco ao seletor; clique fora fecha; o foco que sai pelo
   Tab fecha e fica onde foi (vale para todo `Popover`). A altura desconta o
   que fica acima do painel (mais na gaveta), com piso de 200 px: em tela

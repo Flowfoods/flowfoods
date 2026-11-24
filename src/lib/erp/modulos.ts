@@ -954,9 +954,12 @@ export function colunaDoAtalho(indice: number, total: number): number {
   return indice < aEsquerda ? COLUNA_DE_MODULOS - aEsquerda + indice : COLUNA_DE_MODULOS + 1 + (indice - aEsquerda);
 }
 
-/** O Início como atalho: a entrada do menu (o hub), com a chave fixa "inicio". */
+/**
+ * O Início como atalho: a entrada do menu (o hub), com a chave fixa "inicio". O nome é "Início", o mesmo que aparece: o título
+ * da tela ("Áreas da Rede") como nome acessível não conteria o texto visível (WCAG 2.5.3).
+ */
 function inicioComoAtalho(nav: Navegacao) {
-  return { chave: 'inicio', href: nav.inicio.href, rotulo: 'Início', nome: nav.inicio.titulo, icone: 'inicio' as ChaveIcone, cor: COR.inicio };
+  return { chave: 'inicio', href: nav.inicio.href, rotulo: 'Início', nome: 'Início', icone: 'inicio' as ChaveIcone, cor: COR.inicio };
 }
 
 /**
