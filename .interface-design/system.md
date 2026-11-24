@@ -116,7 +116,10 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   nome na dica e para o leitor de tela. Seletor de área no topo; fase no
   rodapé. < 900 px: gaveta com a mesma lista.
 - **Seletor de áreas** abre a **grade de módulos** (referência de 12/11/2026):
-  painel flutuante de 620 px sob o seletor, que nasce dele pela Expansão
+  no computador, desde a decisão 537, a **janela de Módulos central** (a da
+  barra do celular no formato `central`: na área de trabalho, abaixo da barra
+  do topo, até 760 px, quatro colunas e busca com o foco); na gaveta do
+  celular, painel flutuante sob o seletor, que nasce dele pela Expansão
   (decisão 535), com um bloco por área em uso,
   sem cartão nem borda: ícone de cor cheia (a cor da área, desenho claro,
   44 px), nome em 14/600 e função curta em 12 px, centralizados. Quatro
@@ -310,7 +313,8 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   `translateY(-7px) scale(.98)`, `cubic-bezier(.2,.8,.2,1)`; **Expansão**
   (decisão 535, padrão aprovado em 23/11 para janelas e painéis): opacidade
   + `scale(.3)` a partir do centro do acionador (`transform-origin` medido
-  ao abrir), hoje na janela de Módulos e na grade do seletor de áreas; gaveta de detalhes:
+  ao abrir), hoje na janela de Módulos, na grade do seletor de áreas e em
+  todo painel da barra do topo (decisão 537); as folhas e gavetas ainda não; gaveta de detalhes:
   opacidade + `translateX(28px)` pela direita (o menu do celular espelha, pela
   esquerda); fundo de bloqueio: só opacidade, `ease`; botões e navegação: cor,
   fundo e borda. **Fechar é imediato**, sem animação de saída. Sem laço,

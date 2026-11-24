@@ -334,9 +334,18 @@ describe('padrão visual · movimento das camadas', () => {
     // Vem depois da entrada padrão do popover, com a mesma especificidade: no painel que a usa, vale a Expansão.
     expect(css.indexOf('.ff-app .ff-expansao {')).toBeGreaterThan(css.indexOf('.ff-app .ff-popover {'));
     // Usam a Expansão: a janela de Módulos e a grade do seletor de áreas (só o painel ancorado; o fixo segue com a padrão).
-    expect(readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8')).toContain('className="ff-janela-modulos ff-expansao"');
+    expect(readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8')).toContain("className={`ff-janela-modulos ff-expansao${central ? ' ff-janela-modulos-central' : ''}`}");
     const popover = readFileSync('src/components/erp/shell/Popover.tsx', 'utf8');
-    expect(popover).toContain("className={`ff-popover${expansao && !fixo ? ' ff-expansao' : ''} ");
+    expect(popover).toContain("className={`ff-popover${expansao ? ' ff-expansao' : ''} ");
+    // Fixo também: a origem sai da posição calculada para o painel (decisão 537).
+    expect(popover).toMatch(/if \(expansao\) setOrigem\(`\$\{Math\.round\(b\.left \+ b\.width \/ 2 - p\.left\)\}px \$\{Math\.round\(b\.top \+ b\.height \/ 2 - p\.top\)\}px`\);/);
+    // Decisão 537: todos os painéis da barra do topo nascem do botão (visão, parceiro, notificações, conta e os níveis da trilha).
+    const usos = ['SeletorVisao', 'Notificacoes', 'MenuUsuario', 'Shell', 'CabecalhoIdentidade', 'NavLateral'].flatMap((n) => {
+      const f = readFileSync(`src/components/erp/shell/${n}.tsx`, 'utf8');
+      return [...f.matchAll(/<Popover\n([\s\S]*?)>/g)].map((m) => [n, /\n\s*expansao\n/.test(m[1])] as const);
+    });
+    expect(usos.length).toBeGreaterThanOrEqual(8);
+    expect(usos.filter(([, tem]) => !tem)).toEqual([]);
     expect(readFileSync('src/components/erp/shell/NavLateral.tsx', 'utf8')).toMatch(/largura="w-\[620px\] max-\[899px\]:w-full"\s*\/\/[^\n]*\n\s*expansao\n/);
   });
 

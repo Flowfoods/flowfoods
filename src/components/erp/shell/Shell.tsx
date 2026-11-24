@@ -248,6 +248,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
             versao={props.versao}
             recolhido={recolhido}
             aoRecolher={alternarMenu}
+            janelaCentral
           />
         </aside>
 
@@ -284,6 +285,8 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
                     <li className="flex shrink-0 items-center gap-1.5 text-suave xl:hidden">
                       <ChevronRight size={14} aria-hidden className="shrink-0" />
                       <Popover
+                        // Nasce do botão (Expansão, decisão 537), como os outros painéis da barra.
+                        expansao
                         fixo
                         alinhar="esquerda"
                         largura="w-64"

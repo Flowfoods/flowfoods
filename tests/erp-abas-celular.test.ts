@@ -294,7 +294,7 @@ describe('janela de Módulos', () => {
 
   it('diálogo sem bloqueio, com título, fechar, busca e a Expansão; o Início e as áreas da pessoa, na ordem do menu', () => {
     const h = marcar('/erp');
-    expect(h).toMatch(/^<div id="j" role="dialog" aria-modal="false" aria-labelledby="[^"]+" data-janela-de-modulos="true" class="ff-janela-modulos ff-expansao">/);
+    expect(h).toMatch(/^<div id="j" role="dialog" aria-modal="false" aria-labelledby="[^"]+" data-janela-de-modulos="true" data-formato="barra" class="ff-janela-modulos ff-expansao">/);
     expect(h).toMatch(/<h2 id="[^"]+" class="font-display text-\[20px\][^"]*">Módulos<\/h2>/);
     expect(h).toContain('aria-label="Fechar os módulos"');
     expect(h).toMatch(/<input type="search" aria-label="Buscar módulo" placeholder="Buscar módulo" autoComplete="off" enterKeyHint="search" data-mantem-barra="true" class="ff-busca-modulos" value=""\/>/);
@@ -318,6 +318,27 @@ describe('janela de Módulos', () => {
     expect(j).toContain('>Em breve</p>');
     expect(j.match(/ff-bloco-compacto-futuro/g)).toHaveLength(futuros.length);
     expect([...j.matchAll(/<a [^>]*href="([^"]+)"/g)]).toHaveLength(n1.modulos.filter((m) => m.href).length + 1);
+  });
+
+  it('formato central (decisão 537): a mesma janela, no centro da área de trabalho do computador, com quatro colunas e sem "Editar barra"', () => {
+    const h = renderToStaticMarkup(createElement(JanelaDeModulos, { id: 'c', nav: NAV_DONO, atual: null, botao, aoFechar: () => {}, formato: 'central' }));
+    expect(h).toMatch(/data-formato="central" class="ff-janela-modulos ff-expansao ff-janela-modulos-central"/);
+    expect(h).not.toContain('Editar barra');
+    const central = regra('.ff-app .ff-janela-modulos.ff-janela-modulos-central');
+    for (const d of ['left: var(--ff-lateral, 232px)', 'right: 0', 'top: var(--ff-topo-da-janela, 80px)', 'bottom: auto', 'width: min(760px, calc(100% - var(--ff-lateral, 232px) - 64px))', 'margin-inline: auto']) expect(central).toContain(d);
+    expect(regra('.ff-app .ff-janela-modulos-central .ff-grade-compacta')).toContain('grid-template-columns: repeat(4, minmax(0, 1fr))');
+    const fonte = readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8');
+    // Vai para o fim do `.ff-app` (a barra presa do topo passaria por cima dela na lateral) e o foco entra na busca.
+    expect(fonte).toContain("const destino = central && typeof document !== 'undefined' ? botao.current?.closest('.ff-app') : null;");
+    expect(fonte).toContain('return destino ? createPortal(conteudo, destino) : conteudo;');
+    expect(fonte).toMatch(/if \(central\) busca_\.current\?\.focus\(\);/);
+    // Só a lateral do computador abre a central; a gaveta do celular segue com o painel preso ao seletor.
+    const nav = readFileSync('src/components/erp/shell/NavLateral.tsx', 'utf8');
+    expect(nav).toMatch(/\{janelaCentral \? \(\s*<SeletorComJanela[^>]*\/>\s*\) : \(\s*<SeletorDeModulo/);
+    expect(nav).toContain('<JanelaDeModulos id={id} nav={nav} atual={atual} botao={botao} aoFechar={fechar} formato="central" />');
+    const shell = readFileSync('src/components/erp/shell/Shell.tsx', 'utf8');
+    expect(shell.match(/janelaCentral/g)).toHaveLength(1);
+    expect(shell.indexOf('janelaCentral')).toBeLessThan(shell.indexOf('</aside>'));
   });
 
   it('a origem da Expansão é o centro do botão, visto do canto da janela', () => {

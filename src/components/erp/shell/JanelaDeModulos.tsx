@@ -12,11 +12,17 @@
  *
  * Expansão: a origem do movimento é o centro do botão que abriu (medida antes da pintura, `transform-origin`); com movimento
  * reduzido, a regra geral do `tokens.css` tira a animação e a janela aparece direto.
+ *
+ * Formato `central` (decisão 537, o desktop da prévia "Um modal, três formatos"): a MESMA janela, aberta pelo seletor de área
+ * do menu lateral, no centro da área de trabalho (à direita da lateral, abaixo da barra do topo), com quatro colunas. Ela vai
+ * para o fim do `.ff-app` (portal): dentro da lateral, a barra presa do topo passaria por cima dela. Por isso o foco entra na
+ * busca ao abrir (no computador não há teclado virtual para abrir), senão o Tab do seletor seguiria pela lateral.
  */
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { Pencil, X } from 'lucide-react';
 import { COLUNA_DE_MODULOS, COR, colunaDoAtalho, filtrarModulos, nomeCurtoDoModulo, type ModuloNav, type Navegacao } from '@/lib/erp/modulos';
 import { IconeDoModulo } from '../ui/cabecalho';
@@ -57,6 +63,7 @@ export function JanelaDeModulos({
   botao,
   aoFechar,
   edicao = null,
+  formato = 'barra',
 }: {
   id: string;
   nav: Navegacao;
@@ -68,13 +75,17 @@ export function JanelaDeModulos({
   aoFechar: (devolverFoco: boolean) => void;
   /** Sem ela (sem ação de salvar, ou uma opção só), a janela não oferece o "Editar barra". */
   edicao?: EdicaoDaBarra | null;
+  /** `barra`: acima da barra do celular e do tablet. `central`: no centro da área de trabalho do computador (decisão 537). */
+  formato?: 'barra' | 'central';
 }) {
+  const central = formato === 'central';
+  const busca_ = useRef<HTMLInputElement>(null);
   const [editando, setEditando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const botaoEditar = useRef<HTMLButtonElement>(null);
   const janela = useRef<HTMLDivElement>(null);
   const [busca, setBusca] = useState('');
-  const [origem, setOrigem] = useState<string | undefined>(undefined);
+  const [posicao, setPosicao] = useState<{ origem: string; lateral?: string; topo?: string } | null>(null);
   const idTitulo = useId();
   const idAreas = useId();
   const idEmBreve = useId();
@@ -93,11 +104,27 @@ export function JanelaDeModulos({
     const j = janela.current;
     const b = botao.current?.getBoundingClientRect();
     if (!j || !b) return;
+    // Central: a área de trabalho começa onde a lateral termina e abaixo da barra presa do topo (medidas agora, antes de medir
+    // a própria janela, que depende delas).
+    let lateral: string | undefined;
+    let topo: string | undefined;
+    if (central) {
+      lateral = `${Math.round(botao.current?.closest('aside')?.getBoundingClientRect().right ?? 0)}px`;
+      const barra = document.querySelector('.ff-app header.ff-material.sticky')?.getBoundingClientRect();
+      topo = `${Math.round(Math.max(0, barra?.bottom ?? 0) + 16)}px`;
+      j.style.setProperty('--ff-lateral', lateral);
+      j.style.setProperty('--ff-topo-da-janela', topo);
+    }
     const caixa = j.getBoundingClientRect();
     const esquerda = caixa.left - (j.offsetWidth - caixa.width) / 2;
-    const topo = caixa.top - (j.offsetHeight - caixa.height) / 2;
-    setOrigem(origemDaExpansao(b, { left: esquerda, top: topo }));
-  }, [botao]);
+    const alto = caixa.top - (j.offsetHeight - caixa.height) / 2;
+    setPosicao({ origem: origemDaExpansao(b, { left: esquerda, top: alto }), lateral, topo });
+  }, [botao, central]);
+
+  // Central: o foco entra na busca (a janela mora no fim do `.ff-app`, longe do seletor na ordem do Tab).
+  useEffect(() => {
+    if (central) busca_.current?.focus();
+  }, [central]);
 
   useEffect(() => {
     const fora = (e: PointerEvent) => {
@@ -127,7 +154,12 @@ export function JanelaDeModulos({
   const inicioAparece = filtrarModulos([{ nome: nav.inicio.titulo, subtitulo: 'Início · Todas as áreas', grupos: [] }], busca).length > 0;
   const nada = !inicioAparece && achadas.length === 0 && achadasEmBreve.length === 0;
 
-  return (
+  const estilo = posicao
+    ? ({ transformOrigin: posicao.origem, ...(posicao.lateral ? { '--ff-lateral': posicao.lateral } : {}), ...(posicao.topo ? { '--ff-topo-da-janela': posicao.topo } : {}) } as CSSProperties)
+    : undefined;
+  const destino = central && typeof document !== 'undefined' ? botao.current?.closest('.ff-app') : null;
+
+  const conteudo = (
     <div
       ref={janela}
       id={id}
@@ -135,8 +167,9 @@ export function JanelaDeModulos({
       aria-modal="false"
       aria-labelledby={idTitulo}
       data-janela-de-modulos
-      className="ff-janela-modulos ff-expansao"
-      style={origem ? ({ transformOrigin: origem } as CSSProperties) : undefined}
+      data-formato={formato}
+      className={`ff-janela-modulos ff-expansao${central ? ' ff-janela-modulos-central' : ''}`}
+      style={estilo}
       // O foco que sai da janela para outro elemento (que não seja o botão) fecha e fica onde foi.
       onBlur={(e) => {
         if (foraDaCaixa(e.currentTarget, e.relatedTarget) && !botao.current?.contains(e.relatedTarget as Node)) aoFechar(false);
@@ -163,6 +196,7 @@ export function JanelaDeModulos({
       <>
       <div className="px-3 pb-2">
         <input
+          ref={busca_}
           type="search"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
@@ -260,6 +294,7 @@ export function JanelaDeModulos({
       )}
     </div>
   );
+  return destino ? createPortal(conteudo, destino) : conteudo;
 }
 
 /**

@@ -84,6 +84,8 @@ function DoParceiro({ visao }: { visao: VisaoDoParceiro }) {
   }
   return (
     <Popover
+      // Nasce do botão (Expansão, decisão 537), como os outros painéis da barra.
+      expansao
       // No celular o seletor cede espaço (o nome da loja trunca); com "shrink-0" o avatar passava da tela a 390 px com uma loja
       // escolhida (decisão 479). Do tablet para cima, como antes.
       classeDoWrapper="min-w-0 max-w-[11rem] sm:max-w-[16rem] sm:shrink-0"
@@ -161,6 +163,8 @@ function DoNivel1({ visao }: { visao: VisaoDoNivel1 }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <Popover
+        // Nasce do botão (Expansão, decisão 537), como os outros painéis da barra.
+        expansao
         classeDoWrapper="min-w-0 max-w-[11rem] sm:max-w-[16rem]"
         rotulo={parceiro ? `Parceiro: ${parceiro.nome}. Trocar` : 'Nenhum parceiro aberto. Abrir um parceiro'}
         classeDoBotao={GATILHO}
@@ -202,6 +206,8 @@ function DoNivel1({ visao }: { visao: VisaoDoNivel1 }) {
       </Popover>
       {parceiro && lojas && lojas.opcoes.length > 1 && (
         <Popover
+          // Nasce do botão (Expansão, decisão 537), como os outros painéis da barra.
+          expansao
           classeDoWrapper="min-w-0 max-w-[11rem] sm:max-w-[16rem]"
           rotulo={`Visão: ${rotuloDaLoja ?? ''}. Trocar`}
           classeDoBotao={`${GATILHO} hidden md:flex`}

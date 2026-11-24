@@ -19,12 +19,13 @@
  */
 
 import Link from 'next/link';
-import { useId, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useCallback, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { ChevronDown, ChevronsUpDown, Home, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { COR, type ModuloNav, type Navegacao } from '@/lib/erp/modulos';
 import { IconeDoModulo } from '../ui/cabecalho';
 import { SeloEmBreve } from '../ui/em-breve';
 import { Icone } from './icones';
+import { JanelaDeModulos } from './JanelaDeModulos';
 import { Popover } from './Popover';
 
 export interface EstadoDaNav {
@@ -47,6 +48,7 @@ export function NavLateral({
   versao,
   recolhido = false,
   aoRecolher,
+  janelaCentral = false,
 }: {
   nav: Navegacao;
   estado: EstadoDaNav;
@@ -55,6 +57,11 @@ export function NavLateral({
   recolhido?: boolean;
   /** Só na barra do desktop (a gaveta não recolhe). */
   aoRecolher?: () => void;
+  /**
+   * Decisão 537 · só na lateral do computador: o seletor abre a janela de Módulos no centro da área de trabalho (o formato
+   * desktop da prévia "Um modal, três formatos"). Na gaveta do celular, o painel de sempre, preso ao seletor.
+   */
+  janelaCentral?: boolean;
 }) {
   const { modulo, hrefAtivo } = estado;
   const noHub = !modulo;
@@ -74,7 +81,11 @@ export function NavLateral({
 
       {/* 8 px de lado, como a lista abaixo: o seletor e as linhas ficam alinhados. */}
       <div className={`shrink-0 px-2 ${recolhido ? 'pt-3' : 'pt-2'}`}>
-        <SeletorDeModulo nav={nav} atual={modulo} recolhido={recolhido} />
+        {janelaCentral ? (
+          <SeletorComJanela nav={nav} atual={modulo} recolhido={recolhido} />
+        ) : (
+          <SeletorDeModulo nav={nav} atual={modulo} recolhido={recolhido} />
+        )}
       </div>
 
       {/* Barra de rolagem fina: com a barra clássica (Windows), o nome ainda cabe na linha quando o menu rola. */}
@@ -240,9 +251,62 @@ function Grupo({
   );
 }
 
-function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: ModuloNav | null; recolhido: boolean }) {
+/** O conteúdo do seletor (o ícone da área, o nome, o resumo e as setas): o mesmo nos dois acionadores. */
+function CaraDoSeletor({ nav, atual, recolhido }: { nav: Navegacao; atual: ModuloNav | null; recolhido: boolean }) {
   const nome = atual?.nome ?? 'Início';
   const sub = atual?.resumo ?? atual?.subtitulo ?? nav.inicio.titulo;
+  return (
+    <>
+      <IconeDoModulo icone={atual?.icone ?? 'inicio'} cor={atual?.cor ?? COR.inicio} tamanho={recolhido ? 36 : 32} variante="cheio" />
+      {!recolhido && (
+        <>
+          {/* Nome e resumo quebram em linhas (nunca cortam): a lateral é estreita e o nome da área é o que diz onde se está. */}
+          <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+            <span className="block text-[13px] font-semibold leading-tight text-texto">{nome}</span>
+            <span className="mt-0.5 block text-[12px] leading-tight text-suave">{sub}</span>
+          </span>
+          <ChevronsUpDown size={14} aria-hidden className="shrink-0 text-suave" />
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * Decisão 537 · o seletor da lateral do computador: continua dizendo em que área a pessoa está, e abre a janela de Módulos
+ * no centro da área de trabalho (quatro colunas, busca), pela Expansão a partir dele. Mesmo comportamento do painel: não
+ * bloqueia, Escape devolve o foco ao seletor, clique fora e foco que sai fecham, trocar de tela fecha.
+ */
+function SeletorComJanela({ nav, atual, recolhido }: { nav: Navegacao; atual: ModuloNav | null; recolhido: boolean }) {
+  const [aberta, setAberta] = useState(false);
+  const botao = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  const fechar = useCallback((devolverFoco: boolean) => {
+    setAberta(false);
+    if (devolverFoco) botao.current?.focus();
+  }, []);
+  const nome = atual?.nome ?? 'Início';
+  return (
+    <div className="ff-identidade-modulo" style={{ '--cor-modulo': atual?.cor ?? COR.inicio } as CSSProperties}>
+      <button
+        ref={botao}
+        type="button"
+        aria-label={`Área: ${nome}. Trocar de área`}
+        aria-haspopup="dialog"
+        aria-expanded={aberta}
+        aria-controls={aberta ? id : undefined}
+        onClick={() => setAberta((v) => !v)}
+        className={`ff-seletor-modulo ff-transicao flex w-full items-center gap-2.5 rounded-nav border text-left ${recolhido ? 'justify-center p-1.5' : 'p-2'}`}
+      >
+        <CaraDoSeletor nav={nav} atual={atual} recolhido={recolhido} />
+      </button>
+      {aberta && <JanelaDeModulos id={id} nav={nav} atual={atual} botao={botao} aoFechar={fechar} formato="central" />}
+    </div>
+  );
+}
+
+function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: ModuloNav | null; recolhido: boolean }) {
+  const nome = atual?.nome ?? 'Início';
   return (
     <div className="ff-identidade-modulo" style={{ '--cor-modulo': atual?.cor ?? COR.inicio } as CSSProperties}>
     <Popover
@@ -256,21 +320,7 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
       classeDoBotao={`ff-seletor-modulo ff-transicao flex w-full items-center gap-2.5 rounded-nav border text-left ${
         recolhido ? 'justify-center p-1.5' : 'p-2'
       }`}
-      conteudoDoBotao={
-        <>
-          <IconeDoModulo icone={atual?.icone ?? 'inicio'} cor={atual?.cor ?? COR.inicio} tamanho={recolhido ? 36 : 32} variante="cheio" />
-          {!recolhido && (
-            <>
-              {/* Nome e resumo quebram em linhas (nunca cortam): a lateral é estreita e o nome da área é o que diz onde se está. */}
-              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                <span className="block text-[13px] font-semibold leading-tight text-texto">{nome}</span>
-                <span className="mt-0.5 block text-[12px] leading-tight text-suave">{sub}</span>
-              </span>
-              <ChevronsUpDown size={14} aria-hidden className="shrink-0 text-suave" />
-            </>
-          )}
-        </>
-      }
+      conteudoDoBotao={<CaraDoSeletor nav={nav} atual={atual} recolhido={recolhido} />}
     >
       {(fechar) => <AreasDoSeletor nav={nav} atual={atual} aoEscolher={fechar} />}
     </Popover>

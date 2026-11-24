@@ -4671,3 +4671,20 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - O nível 1 (`/rodolfo`) não tem a barra; o "Editar barra" é só do ERP do parceiro.
 
 **Reversão:** reverter os commits desta decisão; a migration é aditiva (a tabela pode ficar sem uso ou ser apagada por uma migration própria).
+
+### 537. 2026-11-24 · Barra e cabeçalho, terceira fatia: a janela de Módulos no desktop e a Expansão na barra do topo
+
+**Fonte e recorte:** o formato desktop da prévia final aprovada em 23/11/2026 ("Um modal, três formatos": no computador, "menu lateral · modal central na área de trabalho", quatro colunas) e o passo seguinte do movimento padrão ("depois reutilizar a mesma regra nos componentes compartilhados e migrar as demais janelas por partes"). Pedido de Rodolfo em 24/11/2026: executar as recomendações e continuar o plano. Sem regra, permissão, rota, schema, migration ou dado.
+
+1. **Janela central no computador:** o seletor de área da lateral (a partir de 900 px) abre a MESMA janela de Módulos da barra do celular, no formato `central`: entre o fim da lateral e a borda direita, 16 px abaixo da barra presa do topo (as duas medidas ao abrir, inclusive com a página rolada e o menu recolhido), até 760 px, quatro colunas, busca e sem "Editar barra" (no computador não há barra).
+   - Ela vai para o fim do `.ff-app` (portal): dentro da lateral, a barra presa do topo, que vem depois no HTML com a mesma camada, passaria por cima. Por isso o foco entra na busca ao abrir (no computador não há teclado virtual a abrir).
+   - Mesmo comportamento de antes: não bloqueia a página, Escape devolve o foco ao seletor, clique fora e o foco que sai fecham, trocar de tela fecha.
+   - O seletor continua dizendo em que área a pessoa está. O botão vermelho "Módulos" da prévia, que tomaria o lugar dele, fica para decisão de Rodolfo.
+   - A gaveta do celular segue com o painel preso ao seletor (o celular abre Módulos pela barra).
+2. **Expansão nos painéis da barra do topo:** visão, parceiro, notificações, conta e os níveis da trilha ("…") passam a nascer do botão. O `Popover` fixo também calcula a origem (da posição que ele mesmo calcula para o painel).
+
+**Verificação:** testes em `erp-abas-celular` (formato central, portal, foco, só a lateral abre a central) e `erp-padrao-visual` (todo `Popover` do shell usa a Expansão; a origem do fixo). Navegador local (Chromium, banco e conta sintéticos) a 900, 1024, 1280 (menu recolhido) e 1440 px, claro e escuro: à direita da lateral, centrada na área, abaixo da barra com a página rolada, dentro da tela, quatro colunas, foco na busca, Escape devolve ao seletor, escolher uma área navega e fecha; conta e notificações com a Expansão; sem erros de página.
+
+**Limites:** não testado em Safari/iPhone físico nem com leitor de tela real. As folhas e gavetas (`Dialogo`) ficam com a entrada de hoje: a A5 (PR #80) está mexendo nelas.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.

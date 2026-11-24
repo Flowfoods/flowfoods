@@ -76,7 +76,7 @@ export function Popover({
   fixo?: boolean;
   /** Largura do painel fixo em px (a mesma de `largura`), para não passar da borda direita. */
   larguraFixaPx?: number;
-  /** Entrada pela Expansão (do centro do botão) no lugar da padrão. Só no painel ancorado. */
+  /** Entrada pela Expansão (do centro do botão) no lugar da padrão, no painel ancorado e no fixo. */
   expansao?: boolean;
 }) {
   const [aberto, setAberto] = useState(false);
@@ -160,7 +160,13 @@ export function Popover({
         aria-expanded={aberto}
         aria-controls={id}
         onClick={() => {
-          if (fixo && botao.current) setPosicao(posicaoDoPainelFixo(botao.current.getBoundingClientRect(), larguraFixaPx, window.innerWidth));
+          if (fixo && botao.current) {
+            const b = botao.current.getBoundingClientRect();
+            const p = posicaoDoPainelFixo(b, larguraFixaPx, window.innerWidth);
+            setPosicao(p);
+            // Fixo: o painel abre onde `posicaoDoPainelFixo` disse; a origem é o centro do botão visto desse canto.
+            if (expansao) setOrigem(`${Math.round(b.left + b.width / 2 - p.left)}px ${Math.round(b.top + b.height / 2 - p.top)}px`);
+          }
           setAberto((v) => !v);
         }}
         className={classeDoBotao}
@@ -171,8 +177,8 @@ export function Popover({
         <div
           ref={painel}
           id={id}
-          style={fixo ? (posicao ? { top: posicao.top, left: posicao.left } : undefined) : ajuste || origem ? { ...(ajuste ? { translate: `${ajuste}px 0` } : {}), ...(origem ? { transformOrigin: origem } : {}) } : undefined}
-          className={`ff-popover${expansao && !fixo ? ' ff-expansao' : ''} ${fixo ? 'fixed origin-top-left' : `absolute ${acima ? 'bottom-full mb-2' : 'top-full mt-2'} ${alinhar === 'direita' ? 'right-0' : 'left-0'} ${acima ? 'origin-bottom' : alinhar === 'direita' ? 'origin-top-right' : 'origin-top-left'}`} z-40 ${largura} max-w-[calc(100vw-24px)] border border-linha bg-painel p-1.5 shadow-[var(--ff-sombra)]`}
+          style={fixo ? (posicao ? { top: posicao.top, left: posicao.left, ...(origem ? { transformOrigin: origem } : {}) } : undefined) : ajuste || origem ? { ...(ajuste ? { translate: `${ajuste}px 0` } : {}), ...(origem ? { transformOrigin: origem } : {}) } : undefined}
+          className={`ff-popover${expansao ? ' ff-expansao' : ''} ${fixo ? 'fixed origin-top-left' : `absolute ${acima ? 'bottom-full mb-2' : 'top-full mt-2'} ${alinhar === 'direita' ? 'right-0' : 'left-0'} ${acima ? 'origin-bottom' : alinhar === 'direita' ? 'origin-top-right' : 'origin-top-left'}`} z-40 ${largura} max-w-[calc(100vw-24px)] border border-linha bg-painel p-1.5 shadow-[var(--ff-sombra)]`}
         >
           {children(() => {
             setAberto(false);
