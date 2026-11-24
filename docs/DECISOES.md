@@ -4614,3 +4614,33 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - Não testado em Safari/iOS de verdade nem com leitor de tela real (o anúncio de "interruptor, ligado/desligado").
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 535. 2026-11-24 · Barra de Módulos, Cápsula e Expansão: a primeira fatia da navegação e do cabeçalho responsivos
+
+**Fonte e recorte:** prévia final aprovada por Rodolfo em 23/11/2026 para a próxima atualização visual do ERP (celular, tablet e desktop), com a Expansão como padrão de abertura de janelas e a Cápsula como destaque entre atalhos. O plano pede uma fatia revisável com cabeçalho, barra e janela de Módulos antes da adoção gradual. O número 534 fica com a fatia A5 (as folhas), que segue num PR próprio de outro executor; esta decisão não toca o diálogo nem as folhas. Sem regra de negócio, permissão, rota, schema, migration ou dado.
+
+1. **Barra de Módulos** (substitui a barra de abas da A3, decisão 532), só no ERP do parceiro, como antes:
+   - cinco posições: o botão **Módulos** fixo no centro (quadrado no vermelho de ação, nome na tinta do acento) e quatro atalhos laterais;
+   - os atalhos são as quatro primeiras áreas da pessoa que têm tela, na ordem do menu (`atalhosDaBarra`); com menos de quatro, o Início entra primeiro, e o Módulos não sai do centro (`colunaDoAtalho`);
+   - os ícones guardam o desenho e a cor da área sempre; o nome da área atual fica em 600 na cor do texto, com `aria-current`;
+   - abaixo de 900 px, onde não há menu lateral: no celular em largura cheia; no tablet (640 a 899 px), flutuante no centro, 12 px acima do pé, sem `transform` (a janela que mora nela é fixa na tela);
+   - o "Mais" saiu: o menu inteiro continua na gaveta do botão de menu do topo, e o Início fica no logotipo e na janela de Módulos;
+   - as cinco posições vêm no HTML na ordem da tela (a ordem do Tab), todas na primeira linha da grade.
+2. **Cápsula:** um único fundo arredondado, no tom da área (16 % sobre o painel), que desliza de coluna em coluna (`transform` e opacidade, 220 ms). Módulos não recebe a Cápsula nem o estado da seção; fora dos atalhos, ela some. Borda transparente para aparecer nas cores forçadas; com movimento reduzido, troca na hora.
+3. **Janela de Módulos** (`JanelaDeModulos`): abre acima da barra, com título, fechar, "Buscar módulo" e a grade compacta das áreas (o Início, as áreas com tela e, separado, o "Em breve" como texto): duas colunas no celular, três no tablet. Mesmo comportamento do painel do seletor: não bloqueia a página, Escape e o fechar devolvem o foco ao botão, toque fora e o foco que sai fecham, trocar de tela fecha. A busca usa nome, resumo, função e os sinônimos das abas (`filtrarModulos`), e a barra continua à vista com ela em foco (`data-mantem-barra`). Nome curto no bloco (`nomeCurtoDoModulo`: o inteiro até 14 letras, senão a primeira palavra), o inteiro no nome acessível.
+4. **Expansão** (`ff-expansao`): a janela nasce do centro do botão que a abriu (escala 0,3 → 1 e opacidade, a curva e os 220 ms das camadas), com a origem medida antes da pintura. Nesta fatia: a janela de Módulos e a grade do seletor de áreas do menu (`Popover` com `expansao`). Fechar continua imediato; com movimento reduzido, abre direto.
+5. **Cabeçalho:**
+   - celular (abaixo de 640 px): FlowFoods + BARNEY OS e a foto na primeira linha; na segunda, uma faixa única com o nome e a seta, que abre o mesmo seletor. **Sem a logo da marca, sem iniciais e sem lugar guardado para ela**; o cadastro da logo não muda;
+   - tablet e desktop: a logo cadastrada **ao lado** do nome, numa pílula no centro do cabeçalho (caixa de 72 × 36 px, imagem inteira, sem filtro). Substitui a área de 128 × 64 px acima do nome.
+
+**Verificação:**
+- **Testes:** `tests/erp-abas-celular.test.ts` reescrito para a barra nova (atalhos, colunas, Cápsula, janela, onde aparece, contraste sobre o material e sobre a Cápsula em toda a paleta, nos dois temas); `erp-padrao-visual` ganhou a Expansão no contrato de movimento.
+- **Navegador (local, Chromium, banco e conta sintéticos):** 320, 390, 768, 1024 e 1440 px, claro e escuro; sem rolagem lateral; Cápsula centrada no atalho e deslizando ao trocar de área; janela acima da barra e dentro da tela; Escape devolve o foco; toque fora fecha; a busca acha "Faturamento" por "fin" sem esconder a barra; movimento reduzido sem animação. O QA achou e corrigiu o Módulos caindo para uma segunda linha da grade, fora da tela.
+
+**Limites e o que fica para as próximas fatias:**
+- Não testado em Safari/iPhone físico nem com leitor de tela real; teclado do iOS sobre a busca da janela a conferir no aparelho.
+- "Editar barra" (escolher e reordenar os quatro atalhos, salvo no perfil), o atalho "Trocar logo da marca" no seletor e o botão vermelho "Módulos" no menu lateral do desktop ainda não existem: a janela não mostra link sem destino.
+- A Expansão está em duas janelas; as outras seguem com a entrada padrão até serem migradas.
+- O rótulo "Grupo ativo" da prévia não foi escrito: o seletor escolhe a MARCA do cabeçalho, e chamar de grupo seria outro dado.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.

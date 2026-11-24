@@ -328,6 +328,18 @@ describe('padrão visual · movimento das camadas', () => {
     expect(regra('.ff-app dialog.ff-gaveta[open]')).toContain('animation: ff-gaveta var(--ff-movimento) var(--ff-curva-entrada);');
   });
 
+  it('Expansão (decisão 535): opacidade 0→1 e escala 0,3→1 a partir do botão, com a mesma curva e os mesmos 220 ms', () => {
+    expect(quadros('ff-expansao')).toContain('from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: none; }');
+    expect(regra('.ff-app .ff-expansao')).toContain('animation: ff-expansao var(--ff-movimento) var(--ff-curva-entrada);');
+    // Vem depois da entrada padrão do popover, com a mesma especificidade: no painel que a usa, vale a Expansão.
+    expect(css.indexOf('.ff-app .ff-expansao {')).toBeGreaterThan(css.indexOf('.ff-app .ff-popover {'));
+    // Usam a Expansão: a janela de Módulos e a grade do seletor de áreas (só o painel ancorado; o fixo segue com a padrão).
+    expect(readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8')).toContain('className="ff-janela-modulos ff-expansao"');
+    const popover = readFileSync('src/components/erp/shell/Popover.tsx', 'utf8');
+    expect(popover).toContain("className={`ff-popover${expansao && !fixo ? ' ff-expansao' : ''} ");
+    expect(readFileSync('src/components/erp/shell/NavLateral.tsx', 'utf8')).toMatch(/largura="w-\[620px\] max-\[899px\]:w-full"\s*\/\/[^\n]*\n\s*expansao\n/);
+  });
+
   it('fundo de bloqueio: só opacidade, 220 ms ease, e a página continua reconhecível atrás', () => {
     const fundo = regra('.ff-app dialog.ff-dialogo::backdrop');
     expect(fundo).toContain('animation: ff-fundo var(--ff-movimento, 220ms) ease;');
@@ -349,6 +361,8 @@ describe('padrão visual · movimento das camadas', () => {
     expect(comAnimacao.sort()).toEqual(
       [
         '.ff-app .ff-popover',
+        // Expansão (decisão 535): a janela de Módulos da barra e a grade do seletor de áreas nascem do botão que as abriu.
+        '.ff-app .ff-expansao',
         '.ff-app dialog.ff-dialogo::backdrop',
         '.ff-app dialog.ff-dialogo[open]',
         '.ff-app dialog.ff-gaveta.ff-gaveta-direita[open]',
@@ -356,10 +370,10 @@ describe('padrão visual · movimento das camadas', () => {
         '.ff-veu-ajuda',
       ].sort(),
     );
-    expect([...css.matchAll(/@keyframes ([\w-]+)/g)].map((m) => m[1]).sort()).toEqual(['ff-camada', 'ff-fundo', 'ff-gaveta', 'ff-gaveta-direita', 'ff-veu']);
+    expect([...css.matchAll(/@keyframes ([\w-]+)/g)].map((m) => m[1]).sort()).toEqual(['ff-camada', 'ff-expansao', 'ff-fundo', 'ff-gaveta', 'ff-gaveta-direita', 'ff-veu']);
     expect(css).not.toMatch(/infinite|alternate|animation-delay|transition-delay|:not\(\[open\]\)|bounce|overshoot/);
     // Os componentes fecham na hora: sem esperar animação nem temporizador.
-    for (const arquivo of ['src/components/erp/ui/Dialogo.tsx', 'src/components/erp/shell/Popover.tsx']) {
+    for (const arquivo of ['src/components/erp/ui/Dialogo.tsx', 'src/components/erp/shell/Popover.tsx', 'src/components/erp/shell/JanelaDeModulos.tsx']) {
       expect(readFileSync(arquivo, 'utf8'), arquivo).not.toMatch(/animationend|transitionend|setTimeout|requestAnimationFrame/);
     }
     expect(readFileSync('src/components/erp/ui/Dialogo.tsx', 'utf8')).toMatch(/if \(el\.open\) el\.close\(\);/);

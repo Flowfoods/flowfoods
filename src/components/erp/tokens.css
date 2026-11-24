@@ -296,17 +296,19 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 
 /*
- * Barra de abas do celular (A3, decisão 532), como a do iPhone: fixa no pé, 49 px mais a área segura, no material translúcido
- * (o borrão no `::before`, como na barra do topo). Só abaixo de 640 px. Some, e devolve o espaço, nas telas com barra fixa de
- * ações (`data-barra-fixa`, que já ocupa o pé) e fica fora enquanto um campo de texto está em foco (o teclado aberto). Sem
- * `:has()` no navegador, não aparece: fica o menu (≡) de antes. A aba ativa leva o ícone na tinta da área e o nome na cor do
- * texto, em 600 (o nome na cor da área não daria 4,5:1 em toda a paleta); as outras ficam em `suave`.
+ * Barra de Módulos do celular e do tablet (decisão 535, prévia aprovada em 23/11/2026; substitui a barra de abas da A3): cinco
+ * posições, o Módulos fixo no centro e quatro atalhos laterais, no material translúcido (o borrão no `::before`, como na barra
+ * do topo). Só abaixo de 900 px, onde não há menu lateral: no celular (< 640 px) em largura cheia, presa no pé; no tablet, uma
+ * barra flutuante no centro, 12 px acima do pé. Some, e devolve o espaço, nas telas com barra fixa de ações
+ * (`data-barra-fixa`, que já ocupa o pé) e fica fora enquanto um campo de texto está em foco (o teclado aberto), menos a busca
+ * da janela de Módulos (`data-mantem-barra`), que abre acima dela. Sem `:has()` no navegador, não aparece: fica o menu (≡).
+ * `--ff-reserva-da-barra` é o espaço que ela ocupa acima do pé (a altura, a borda e, no tablet, o vão até o pé).
  */
 .ff-app .ff-abas-celular {
   display: none;
 }
 @supports selector(:has(*)) {
-  @media (max-width: 639px) {
+  @media (max-width: 899px) {
     .ff-app .ff-abas-celular {
       position: fixed;
       inset-inline: 0;
@@ -316,25 +318,63 @@ html:has(.ff-app[data-tema='escuro']) {
       border-top: 1px solid var(--ff-linha);
       padding-bottom: env(safe-area-inset-bottom);
     }
+    /* Com a janela de Módulos aberta, a barra (e a janela, que mora nela) passa da faixa da marca no topo (z-31). */
+    .ff-app .ff-abas-celular[data-modulos-aberto] {
+      z-index: 40;
+    }
     .ff-app:has([data-barra-fixa]) .ff-abas-celular,
-    .ff-app:has(:is(input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='file'], [type='range'], [type='color'], [type='hidden']), textarea, select, [contenteditable='true']):focus) .ff-abas-celular {
+    .ff-app:has(:is(input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='file'], [type='range'], [type='color'], [type='hidden'], [data-mantem-barra]), textarea, select, [contenteditable='true']):focus) .ff-abas-celular {
       display: none;
     }
-    /* O fim da página e o que rola até um campo ficam acima da barra (só onde ela existe: o nível 1 não tem). A barra mede
-       50 px (49 da lista + 1 da borda); a rolagem até um campo deixa mais 8 px, para o anel de foco (3 + 4 px) aparecer. */
+    /* O fim da página e o que rola até um campo ficam acima da barra (só onde ela existe: o nível 1 não tem). A rolagem até um
+       campo deixa mais 8 px, para o anel de foco (3 + 4 px) aparecer. */
     .ff-app:has(.ff-abas-celular):not(:has([data-barra-fixa])) #conteudo {
-      padding-bottom: calc(50px + env(safe-area-inset-bottom) + 3rem);
+      padding-bottom: calc(var(--ff-reserva-da-barra) + env(safe-area-inset-bottom) + 3rem);
     }
     html:has(.ff-app .ff-abas-celular):not(:has([data-barra-fixa])) {
-      scroll-padding-bottom: calc(50px + env(safe-area-inset-bottom) + 8px);
+      scroll-padding-bottom: calc(var(--ff-reserva-da-barra) + env(safe-area-inset-bottom) + 8px);
+    }
+  }
+  /* A reserva vale na barra, na janela de Módulos, no fim do conteúdo e na rolagem: 59 px no celular (58 da lista + 1 da
+     borda), 72 px no tablet (58 + 2 das bordas + 12 do vão até o pé). */
+  @media (max-width: 639px) {
+    :root {
+      --ff-reserva-da-barra: 59px;
+    }
+  }
+  @media (min-width: 640px) and (max-width: 899px) {
+    :root {
+      --ff-reserva-da-barra: 72px;
+    }
+    /* Tablet: flutuante, centralizada, com os cantos arredondados; sem `transform` (a janela de Módulos, que mora nela, é
+       fixa na tela). */
+    .ff-app .ff-abas-celular {
+      inset-inline: 0;
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      width: min(480px, calc(100% - 48px));
+      margin-inline: auto;
+      border: 1px solid var(--ff-linha);
+      border-radius: 20px;
+      padding-bottom: 0;
+      box-shadow: 0 6px 24px rgb(40 48 38 / 0.12);
+    }
+    .ff-app .ff-abas-celular.ff-material::before {
+      border-radius: inherit;
     }
   }
 }
+.ff-app .ff-abas-celular-trilho {
+  position: relative;
+}
 .ff-app .ff-abas-celular-lista {
+  position: relative;
   display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
-  height: 49px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  height: 58px;
+}
+/* Uma linha só: cada posição diz a coluna dela, e uma coluna fora de ordem não pode ir para uma segunda linha (fora da tela). */
+.ff-app .ff-abas-celular-lista > li {
+  grid-row: 1;
 }
 .ff-app .ff-aba-celular {
   display: flex;
@@ -342,15 +382,30 @@ html:has(.ff-app[data-tema='escuro']) {
   width: 100%;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
+  justify-content: flex-start;
+  gap: 3px;
+  padding-top: 6px;
   color: rgb(var(--ff-suave));
   font-size: 10.5px;
   font-weight: 500;
   line-height: 1.15;
   -webkit-tap-highlight-color: transparent;
 }
-/* Um pouco mais justo, como no iPhone: "Faturamento" em 600 cabe nos 64 px de cada aba a 320 px. */
+/* A caixa do ícone tem o tamanho da Cápsula: o fundo dela fica atrás do desenho, nunca do nome. */
+.ff-app .ff-aba-celular-caixa {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  max-width: 100%;
+  height: 32px;
+  border-radius: 11px;
+}
+/* O ícone guarda o desenho e a cor da área sempre (a Cápsula não recolore): a tinta, que mede ≥ 3:1 sobre o material e sobre
+   a Cápsula, nos dois temas. */
+.ff-app .ff-aba-celular .ff-aba-celular-icone {
+  color: var(--ff-modulo-tinta);
+}
+/* Um pouco mais justo, como no iPhone: "Faturamento" em 600 cabe nos 64 px de cada posição a 320 px. */
 .ff-app .ff-aba-celular-rotulo {
   max-width: 100%;
   overflow: hidden;
@@ -358,17 +413,13 @@ html:has(.ff-app[data-tema='escuro']) {
   white-space: nowrap;
   letter-spacing: -0.01em;
 }
-.ff-app .ff-aba-celular[aria-current],
-.ff-app .ff-aba-celular[data-ativa] {
+.ff-app .ff-aba-celular[aria-current] {
   color: rgb(var(--ff-texto));
   font-weight: 600;
 }
-.ff-app .ff-aba-celular[aria-current] .ff-aba-celular-icone {
-  color: var(--ff-modulo-tinta);
-}
-/* Cores forçadas: o ícone da aba atual herda a cor do nome (a tinta da área ficaria abaixo de 3:1 com o tema cruzado). */
+/* Cores forçadas: o ícone herda a cor do nome (a tinta da área ficaria abaixo de 3:1 com o tema cruzado). */
 @media (forced-colors: active) {
-  .ff-app .ff-aba-celular[aria-current] .ff-aba-celular-icone {
+  .ff-app .ff-aba-celular .ff-aba-celular-icone {
     color: inherit;
   }
 }
@@ -376,6 +427,164 @@ html:has(.ff-app[data-tema='escuro']) {
   outline: 3px solid rgb(var(--ff-acento));
   outline-offset: -3px;
   border-radius: 10px;
+}
+/* Módulos: o vermelho de ação identifica o botão (o quadrado cheio, com o desenho claro, e o nome na tinta do acento); não
+   muda com a seção nem recebe a Cápsula. Aberto, o quadrado escurece como o botão principal sob o ponteiro. */
+.ff-app .ff-aba-modulos {
+  color: rgb(var(--ff-acento));
+  font-weight: 600;
+}
+.ff-app .ff-aba-modulos .ff-aba-celular-caixa {
+  width: 48px;
+  background-color: rgb(var(--ff-acao));
+  color: rgb(var(--ff-sobre-acao));
+  box-shadow: 0 2px 6px rgb(var(--ff-acao) / 0.28);
+}
+.ff-app .ff-aba-modulos:is(:hover, [aria-expanded='true']) .ff-aba-celular-caixa {
+  background-color: rgb(var(--ff-acao-hover));
+}
+/*
+ * Cápsula (aprovada em 23/11/2026): um único fundo arredondado, no tom da área atual, que desliza atrás dos ícones de um
+ * atalho para o outro (`--ff-capsula-coluna`, uma das cinco colunas: a largura dela é a de uma coluna, então 100 % é o passo).
+ * Fora dos atalhos ela some, parada onde estava. Fica atrás da lista (a lista é posicionada e vem depois). Borda transparente:
+ * nas cores forçadas, o contorno volta e a Cápsula continua visível. Com movimento reduzido, a regra geral tira a transição.
+ */
+.ff-app .ff-capsula {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 20%;
+  height: 32px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(calc(var(--ff-capsula-coluna, 2) * 100%));
+  transition-property: transform, opacity;
+  transition-duration: var(--ff-movimento);
+  transition-timing-function: var(--ff-curva-entrada);
+}
+.ff-app .ff-capsula[data-visivel] {
+  opacity: 1;
+}
+.ff-app .ff-capsula::before {
+  content: '';
+  display: block;
+  width: 56px;
+  max-width: 100%;
+  height: 100%;
+  margin-inline: auto;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background-color: color-mix(in srgb, var(--ff-modulo-cor) 16%, rgb(var(--ff-painel)));
+  transition: background-color var(--ff-movimento) ease;
+}
+
+/*
+ * Janela de Módulos (decisão 535): abre acima da barra, a partir do Módulos (a Expansão). No celular, na largura da tela com
+ * 8 px de cada lado, duas colunas; no tablet, no centro, três colunas. Não bloqueia a página (como o painel do seletor). A
+ * altura desconta a barra e deixa 16 px no alto; a grade rola por dentro.
+ */
+.ff-app .ff-janela-modulos {
+  position: fixed;
+  z-index: 40;
+  inset-inline: 8px;
+  bottom: calc(var(--ff-reserva-da-barra, 59px) + env(safe-area-inset-bottom) + 8px);
+  display: flex;
+  max-height: calc(100dvh - var(--ff-reserva-da-barra, 59px) - env(safe-area-inset-bottom) - 24px);
+  flex-direction: column;
+  border: 1px solid var(--ff-linha);
+  border-radius: var(--ff-raio-modal);
+  background-color: rgb(var(--ff-painel));
+  box-shadow: var(--ff-sombra);
+}
+@media (min-width: 640px) {
+  .ff-app .ff-janela-modulos {
+    inset-inline: 0;
+    width: min(560px, calc(100% - 48px));
+    margin-inline: auto;
+  }
+}
+.ff-app .ff-janela-modulos-cabeca {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 4px 16px;
+}
+.ff-app .ff-busca-modulos {
+  display: block;
+  width: 100%;
+  height: 44px;
+  border: 1px solid transparent;
+  color: rgb(var(--ff-texto));
+  font-size: 16px;
+}
+.ff-app .ff-janela-modulos-corpo {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 12px 12px;
+}
+.ff-app .ff-grade-compacta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+@media (min-width: 640px) {
+  .ff-app .ff-grade-compacta {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+/* Bloco compacto: ícone de cor cheia e nome, no fundo tonal da área com a borda derivada da tinta (a exceção de 29/10 dos
+   cards e do seletor). O nome não corta: quebra (com hífen, a página é pt-BR) e o bloco cresce. */
+.ff-app .ff-bloco-compacto {
+  display: flex;
+  height: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--ff-modulo-borda, var(--ff-linha));
+  border-radius: var(--ff-raio-nav);
+  background-color: var(--ff-modulo-fundo, transparent);
+  color: rgb(var(--ff-texto));
+  font-size: 14px;
+  line-height: 1.25;
+}
+.ff-app .ff-bloco-compacto-nome {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+/* Abaixo de 360 px a coluna tem uns 136 px: com 13 px e o vão menor, "Faturamento" cabe inteiro, sem hífen. */
+@media (max-width: 359px) {
+  .ff-app .ff-bloco-compacto {
+    gap: 6px;
+    padding-inline: 6px;
+    font-size: 13px;
+  }
+}
+.ff-app a.ff-bloco-compacto:hover {
+  background-color: var(--ff-modulo-realce);
+}
+/* O anel de foco fica por dentro do bloco: a grade rola e cortaria um anel por fora nas bordas. */
+.ff-app a.ff-bloco-compacto:focus-visible {
+  outline-offset: -3px;
+}
+/* Área atual: forma (contorno de 2 px na tinta, ≥ 3:1), peso e `aria-current`, além do tom. */
+.ff-app a.ff-bloco-compacto[aria-current='true'] {
+  background-color: var(--ff-modulo-realce);
+  border-color: var(--ff-modulo-tinta);
+  box-shadow: inset 0 0 0 1px var(--ff-modulo-tinta);
+}
+.ff-app a.ff-bloco-compacto[aria-current='true'] .ff-bloco-compacto-nome {
+  font-weight: 700;
+}
+/* "Em breve": sem identidade de área, contorno tracejado (enfeite); quem diz o estado é o rótulo do grupo e o selo. */
+.ff-app .ff-bloco-compacto.ff-bloco-compacto-futuro {
+  border-style: dashed;
+  border-color: var(--ff-linha-forte);
+  background-color: transparent;
 }
 
 /*
@@ -723,6 +932,15 @@ html:has(.ff-app dialog.ff-janela[open]) {
   border-radius: var(--ff-raio-popover);
   animation: ff-camada var(--ff-movimento) var(--ff-curva-entrada);
 }
+/*
+ * Expansão (padrão aprovado por Rodolfo em 23/11/2026): a janela nasce do botão que a abriu e cresce até o lugar dela, com a
+ * mesma curva e os mesmos 220 ms das outras camadas; a origem (`transform-origin`) é o centro do acionador, medido ao abrir.
+ * Nesta fatia: a janela de Módulos da barra e a grade do seletor de áreas do menu. Vem depois da regra do popover, com a
+ * mesma especificidade: no popover que a usa, ela vale no lugar da entrada padrão. Fechar continua imediato.
+ */
+.ff-app .ff-expansao {
+  animation: ff-expansao var(--ff-movimento) var(--ff-curva-entrada);
+}
 /* A gaveta da ajuda usa o mesmo véu do card: a tela continua reconhecível atrás. */
 .ff-app dialog.ff-dialogo.ff-veu-de-ajuda::backdrop {
   background: var(--ff-veu-ajuda);
@@ -821,6 +1039,16 @@ html:has(.ff-app dialog.ff-janela[open]) {
 @keyframes ff-fundo {
   from {
     opacity: 0;
+  }
+}
+@keyframes ff-expansao {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 

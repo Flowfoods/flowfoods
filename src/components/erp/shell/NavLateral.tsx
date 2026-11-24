@@ -251,6 +251,8 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
       // Na barra do desktop o painel passa da lateral e cobre o conteúdo (620 px: quatro colunas); na gaveta do celular ele
       // fica na largura dela, sem vazar (duas colunas).
       largura="w-[620px] max-[899px]:w-full"
+      // A grade nasce do seletor (Expansão, decisão 535), como a janela de Módulos da barra do celular.
+      expansao
       classeDoBotao={`ff-seletor-modulo ff-transicao flex w-full items-center gap-2.5 rounded-nav border text-left ${
         recolhido ? 'justify-center p-1.5' : 'p-2'
       }`}

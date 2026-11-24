@@ -10,7 +10,7 @@
 @media screen {
   .ff-cabecalho-identidade { border-bottom: 2px solid rgb(var(--ff-acao)); }
 }
-.ff-cabecalho-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 250px) minmax(0, 1fr); align-items: center; gap: 22px; padding: 12px 26px; }
+.ff-cabecalho-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px) minmax(0, 1fr); align-items: center; gap: 22px; padding: 12px 26px; }
 .ff-assinatura-central { display: flex; flex-direction: column; align-items: center; justify-self: start; gap: 18px; border-radius: 5px; }
 @media (min-width: 900px) {
   /* Centro da coluna lateral de 232 px: desconta os 26 px de respiro de cada lado.
@@ -29,18 +29,27 @@
 }
 .ff-barney-os { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; font-weight: 650; letter-spacing: .17em; line-height: 1.4; }
 .ff-barney-os span { font-size: 10px; line-height: 1; letter-spacing: .08em; padding: 4px 5px; background: rgb(var(--ff-acao)); color: rgb(var(--ff-sobre-acao)); border-radius: 4px; }
-.ff-cabecalho-marca { width: 100%; max-width: 250px; min-width: 0; justify-self: center; }
-.ff-marca-selecionada { display: flex; position: relative; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 100%; min-height: 96px; padding: 6px 24px; border: 1px solid transparent; border-radius: 12px; text-align: center; }
-.ff-marca-selecionada:hover, .ff-marca-selecionada[aria-expanded='true'] { background: rgb(var(--ff-painel)); border-color: var(--ff-linha); }
-.ff-marca-imagem { display: grid; place-items: center; width: 128px; height: 64px; overflow: hidden; border-radius: 8px; background: rgb(var(--ff-forte)); font-size: 28px; }
-.ff-marca-nome { overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.3; }
-.ff-marca-seta { position: absolute; right: 6px; top: calc(50% - 7px); }
+/* Seletor da marca (decisão 535, prévia aprovada em 23/11/2026): a logo cadastrada AO LADO do nome, numa pílula no centro do
+   cabeçalho (tablet e desktop). A caixa da logo é 2:1 (72 × 36 px) e a imagem cabe inteira nela, sem filtro nem recorte. */
+.ff-cabecalho-marca { width: 100%; max-width: 320px; min-width: 0; justify-self: center; }
+.ff-marca-selecionada { display: flex; position: relative; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 7px 36px 7px 7px; border: 1px solid var(--ff-linha); border-radius: 12px; background: rgb(var(--ff-painel)); text-align: left; }
+.ff-marca-selecionada:hover, .ff-marca-selecionada[aria-expanded='true'] { background: rgb(var(--ff-forte)); border-color: var(--ff-linha-forte); }
+.ff-marca-imagem { display: grid; flex: none; place-items: center; width: 72px; height: 36px; overflow: hidden; border-radius: 8px; background: rgb(var(--ff-forte)); font-size: 15px; font-weight: 600; }
+.ff-marca-nome { min-width: 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.3; }
+.ff-marca-seta { position: absolute; right: 12px; top: calc(50% - 7.5px); }
 .ff-cabecalho-conta { justify-self: end; min-width: 0; }
 .ff-cabecalho-conta .ff-conta-foto { width: 42px; height: 42px; }
 .ff-conta-barra .ff-conta-nome { display: none; }
-@container (max-width: 540px) {
+/* Celular (abaixo de 640 px): FlowFoods + BARNEY OS e a foto na primeira linha; na segunda, uma faixa única com o nome e a
+   seta, que abre o mesmo seletor. Sem a logo da marca, sem iniciais e sem lugar guardado para ela (decisão de 23/11/2026):
+   o cadastro da logo não muda, ela só não aparece aqui. */
+@container (max-width: 639px) {
   .ff-cabecalho-grade { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; padding: 12px 18px; }
   .ff-assinatura-central { grid-column: 1; grid-row: 1; }
   .ff-cabecalho-conta { grid-column: 3; grid-row: 1; }
-  .ff-cabecalho-marca { grid-column: 1 / -1; grid-row: 2; }
+  .ff-cabecalho-marca { grid-column: 1 / -1; grid-row: 2; max-width: none; }
+  .ff-marca-selecionada { min-height: 44px; padding: 8px 40px 8px 14px; border-color: transparent; border-radius: 10px; background: var(--ff-preenchimento); }
+  .ff-marca-selecionada:hover, .ff-marca-selecionada[aria-expanded='true'] { background: var(--ff-preenchimento-forte); border-color: transparent; }
+  .ff-marca-imagem { display: none; }
+  .ff-marca-nome { font-size: 15px; }
 }
