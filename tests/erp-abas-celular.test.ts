@@ -344,7 +344,7 @@ describe('janela de Módulos', () => {
     // Com mouse, a busca; com toque (tablet deitado), o título: o teclado virtual não abre por cima da grade.
     expect(fonte).toMatch(/if \(window\.matchMedia\?\.\('\(pointer: fine\)'\)\.matches\) busca_\.current\?\.focus\(\);\s*else titulo\.current\?\.focus\(\);/);
     // O Tab que sai pelas pontas: depois do último, o foco segue para o que vem depois do seletor; antes do primeiro, volta a ele.
-    expect(fonte).toMatch(/if \(e\.shiftKey && document\.activeElement === focaveis\[0\]\) \{\s*e\.preventDefault\(\);\s*aoFechar\(true\);/);
+    expect(fonte).toMatch(/if \(e\.shiftKey && \(document\.activeElement === focaveis\[0\] \|\| document\.activeElement === titulo\.current\)\) \{\s*e\.preventDefault\(\);\s*aoFechar\(true\);/);
     expect(fonte).toMatch(/const seguinte = focavelDepois\(botao\.current, janela\.current\);\s*aoFechar\(false\);\s*\(seguinte \?\? botao\.current\)\.focus\(\);/);
     // As setas andam pela grade, como no seletor da gaveta.
     expect(fonte).toContain('<div className="ff-janela-modulos-corpo" onKeyDown={andarPelosBlocos}>');

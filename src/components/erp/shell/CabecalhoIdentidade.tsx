@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 import type { IdentidadeDoCabecalho, MarcaDoCabecalho } from '@/lib/erp/marca-cabecalho';
 import { Dialogo } from '../ui/Dialogo';
@@ -21,6 +21,10 @@ export function CabecalhoIdentidade({ props, slug, inicio, menuRecolhido }: { pr
   // a marca do cabeçalho com a janela aberta não muda de quem é a logo). A janela não depende de `dados`: no nível 1, salvar
   // recarrega o layout e os dados do cabeçalho somem por um instante enquanto voltam; a janela, e o "Logo salva.", ficam.
   const [logoDe, setLogoDe] = useState<{ marca: MarcaDoCabecalho; base: string; parceiroId: string } | null>(null);
+  // Ao fechar a janela, o foco volta ao seletor que estiver na tela AGORA: no nível 1, salvar recarrega os dados e o seletor
+  // é desenhado de novo (o de quando a janela abriu já não existe).
+  const caixaDaMarca = useRef<HTMLDivElement>(null);
+  const voltarAoSeletor = useMemo(() => ({ get current() { return caixaDaMarca.current?.querySelector<HTMLElement>('button[aria-expanded]') ?? null; } }), []);
   const geracao = useRef(0);
   const carregar = identidade?.modo === 'nivel1' ? identidade.carregar : null;
   const revisao = identidade?.modo === 'nivel1' ? identidade.revisao : null;
@@ -80,7 +84,7 @@ export function CabecalhoIdentidade({ props, slug, inicio, menuRecolhido }: { pr
             <span className="ff-barney-os">BARNEY <span>OS</span></span>
           </span>
         </Link>
-        <div className="ff-cabecalho-marca" aria-busy={pendente}>
+        <div ref={caixaDaMarca} className="ff-cabecalho-marca" aria-busy={pendente}>
           {dados ? <Popover
             rotulo={`Marca no cabeçalho: ${marca?.nome ?? 'nenhuma cadastrada'}`}
             classeDoWrapper="w-full"
@@ -126,7 +130,7 @@ export function CabecalhoIdentidade({ props, slug, inicio, menuRecolhido }: { pr
       {/* "Trocar logo da marca" (decisão 536): o MESMO editor da Identidade visual (prévia, Salvar logo, Cancelar), na rota da
           marca escolhida. Só aparece para quem pode alterar (`logoBase`); a rota confere de novo. Não mexe na foto pessoal, na
           marca selecionada nem em outra marca. Salvar recarrega o cabeçalho com a logo nova. */}
-      <Dialogo aberto={logoDe !== null} aoFechar={() => setLogoDe(null)} titulo={logoDe ? `Logo de ${logoDe.marca.nome}` : 'Logo da marca'}>
+      <Dialogo aberto={logoDe !== null} aoFechar={() => setLogoDe(null)} titulo={logoDe ? `Logo de ${logoDe.marca.nome}` : 'Logo da marca'} voltarPara={voltarAoSeletor}>
         {logoDe && (
           <div className="px-5 pb-5 pt-4">
             <EditorImagem url={`${logoDe.base}/${encodeURIComponent(logoDe.marca.id)}/logo`} atual={logoDe.marca.logoUrl} nome={logoDe.marca.nome} tipo="logo" contexto={`${logoDe.parceiroId}:${logoDe.marca.id}`} />

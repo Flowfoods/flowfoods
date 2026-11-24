@@ -96,6 +96,9 @@ describe('cabeçalho · "Trocar logo da marca" (decisão 536)', () => {
     // a janela não depende dos dados do cabeçalho (no nível 1 eles somem um instante quando o layout recarrega ao salvar).
     expect(tsx).toMatch(/setLogoDe\(\{ marca, base: dados\.logoBase!, parceiroId: dados\.parceiroId \}\);\s*fechar\(\);/);
     expect(tsx).toContain('<Dialogo aberto={logoDe !== null}');
+    // O foco volta ao seletor que estiver na tela ao fechar (no nível 1 ele é desenhado de novo depois de salvar).
+    expect(tsx).toContain("get current() { return caixaDaMarca.current?.querySelector<HTMLElement>('button[aria-expanded]') ?? null; }");
+    expect(tsx).toContain('voltarPara={voltarAoSeletor}>');
     expect(tsx).not.toMatch(/\{dados\?\.logoBase && \(\s*<Dialogo/);
     // Nada de foto pessoal ou de outra marca na janela.
     const janela = tsx.slice(tsx.indexOf('<Dialogo aberto={logoDe !== null}'), tsx.indexOf('</Dialogo>'));

@@ -198,7 +198,8 @@ export function JanelaDeModulos({
       onKeyDown={(e) => {
         if (!central || e.key !== 'Tab' || !janela.current || !botao.current) return;
         const focaveis = Array.from(janela.current.querySelectorAll<HTMLElement>(FOCAVEIS)).filter((el) => el.getClientRects().length > 0);
-        if (e.shiftKey && document.activeElement === focaveis[0]) {
+        // O título (foco inicial com toque, fora da ordem do Tab) conta como o começo da janela.
+        if (e.shiftKey && (document.activeElement === focaveis[0] || document.activeElement === titulo.current)) {
           e.preventDefault();
           aoFechar(true);
         } else if (!e.shiftKey && document.activeElement === focaveis.at(-1)) {
