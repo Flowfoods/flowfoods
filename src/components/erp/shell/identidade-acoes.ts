@@ -15,6 +15,8 @@ async function dados(ctx: ContextoDoParceiro, base: string): Promise<IdentidadeD
     parceiroId: ctx.parceiro.id, nomeParceiro: ctx.parceiro.nome, marcas,
     selecionada: escolherMarcaDoCookie((await cookies()).get(COOKIE_MARCA_CABECALHO)?.value, `${ctx.sessao.userId}:${ctx.parceiro.id}`, marcas),
     perfilHref: pode(ctx.alcance, 'lojas.ver') ? `${base}/lojas#identidade-visual` : null,
+    // A mesma regra da tela de Lojas para mostrar o editor (e da rota para aceitar o envio).
+    logoBase: pode(ctx.alcance, 'lojas.gerir') && !ctx.bloqueio ? `${base}/identidade/marcas` : null,
   };
 }
 

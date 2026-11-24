@@ -4614,3 +4614,82 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 - Não testado em Safari/iOS de verdade nem com leitor de tela real (o anúncio de "interruptor, ligado/desligado").
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 535. 2026-11-24 · Barra de Módulos, Cápsula e Expansão: a primeira fatia da navegação e do cabeçalho responsivos
+
+**Fonte e recorte:** prévia final aprovada por Rodolfo em 23/11/2026 para a próxima atualização visual do ERP (celular, tablet e desktop), com a Expansão como padrão de abertura de janelas e a Cápsula como destaque entre atalhos. O plano pede uma fatia revisável com cabeçalho, barra e janela de Módulos antes da adoção gradual. O número 534 fica com a fatia A5 (as folhas), que segue num PR próprio de outro executor; esta decisão não toca o diálogo nem as folhas. Sem regra de negócio, permissão, rota, schema, migration ou dado.
+
+1. **Barra de Módulos** (substitui a barra de abas da A3, decisão 532), só no ERP do parceiro, como antes:
+   - cinco posições: o botão **Módulos** fixo no centro (quadrado no vermelho de ação, nome na tinta do acento) e quatro atalhos laterais;
+   - os atalhos são as quatro primeiras áreas da pessoa que têm tela, na ordem do menu (`atalhosDaBarra`); com menos de quatro, o Início entra primeiro, e o Módulos não sai do centro (`colunaDoAtalho`);
+   - os ícones guardam o desenho e a cor da área sempre; o nome da área atual fica em 600 na cor do texto, com `aria-current`;
+   - abaixo de 900 px, onde não há menu lateral: no celular em largura cheia; no tablet (640 a 899 px), flutuante no centro, 12 px acima do pé, sem `transform` (a janela que mora nela é fixa na tela);
+   - o "Mais" saiu: o menu inteiro continua na gaveta do botão de menu do topo, e o Início fica no logotipo e na janela de Módulos;
+   - as cinco posições vêm no HTML na ordem da tela (a ordem do Tab), todas na primeira linha da grade.
+2. **Cápsula:** um único fundo arredondado, no tom da área (16 % sobre o painel), que desliza de coluna em coluna (`transform` e opacidade, 220 ms). Módulos não recebe a Cápsula nem o estado da seção; fora dos atalhos, ela some. Borda transparente para aparecer nas cores forçadas; com movimento reduzido, troca na hora.
+3. **Janela de Módulos** (`JanelaDeModulos`): abre acima da barra, com título, fechar, "Buscar módulo" e a grade compacta das áreas (o Início, as áreas com tela e, separado, o "Em breve" como texto): duas colunas no celular, três no tablet. Mesmo comportamento do painel do seletor: não bloqueia a página, Escape e o fechar devolvem o foco ao botão, toque fora e o foco que sai fecham, trocar de tela fecha. A busca usa nome, resumo, função e os sinônimos das abas (`filtrarModulos`), e a barra continua à vista com ela em foco (`data-mantem-barra`). Nome curto no bloco (`nomeCurtoDoModulo`: o inteiro até 14 letras, senão a primeira palavra), o inteiro no nome acessível.
+4. **Expansão** (`ff-expansao`): a janela nasce do centro do botão que a abriu (escala 0,3 → 1 e opacidade, a curva e os 220 ms das camadas), com a origem medida antes da pintura. Nesta fatia: a janela de Módulos e a grade do seletor de áreas do menu (`Popover` com `expansao`). Fechar continua imediato; com movimento reduzido, abre direto.
+5. **Cabeçalho:**
+   - **FlowFoods numa linha só**, como na prévia (pedido de Rodolfo em 24/11/2026: "não deve estar quebrado"), com BARNEY OS logo abaixo, alinhado à esquerda (6 px). As duas palavras saem da MESMA imagem oficial transparente, recortadas pelo CSS (cada uma numa janela do tamanho dela) e postas lado a lado, alinhadas pela base: nenhum arquivo novo e nenhum pixel redesenhado. Altura da palavra: 20 px no celular, 24 px a partir de 640 px. No desktop com o menu aberto, o conjunto continua centrado sobre a coluna lateral. Substitui a logo empilhada de 96 px com BARNEY OS 18 px abaixo; o cabeçalho cai de 178 para 124 px no celular e de 124 para 78 px no tablet e no desktop;
+   - celular (abaixo de 640 px): FlowFoods + BARNEY OS e a foto na primeira linha; na segunda, uma faixa única com o nome e a seta, que abre o mesmo seletor. **Sem a logo da marca, sem iniciais e sem lugar guardado para ela**; o cadastro da logo não muda;
+   - tablet e desktop: a logo cadastrada **ao lado** do nome, numa pílula no centro do cabeçalho (caixa de 72 × 36 px, imagem inteira, sem filtro). Substitui a área de 128 × 64 px acima do nome.
+
+**Verificação:**
+- **Testes:** `tests/erp-abas-celular.test.ts` reescrito para a barra nova (atalhos, colunas, Cápsula, janela, onde aparece, contraste sobre o material e sobre a Cápsula em toda a paleta, nos dois temas); `erp-padrao-visual` ganhou a Expansão no contrato de movimento.
+- **Navegador (local, Chromium, banco e conta sintéticos):** 320, 390, 768, 1024 e 1440 px, claro e escuro; a logo em uma linha, com a versão certa em cada tema, as duas palavras na mesma altura e as imagens carregadas; sem rolagem lateral; Cápsula centrada no atalho e deslizando ao trocar de área; janela acima da barra e dentro da tela; Escape devolve o foco; toque fora fecha; a busca acha "Faturamento" por "fin" sem esconder a barra; movimento reduzido sem animação. O QA achou e corrigiu o Módulos caindo para uma segunda linha da grade, fora da tela.
+
+**Limites e o que fica para as próximas fatias:**
+- Não testado em Safari/iPhone físico nem com leitor de tela real; teclado do iOS sobre a busca da janela a conferir no aparelho.
+- "Editar barra" (escolher e reordenar os quatro atalhos, salvo no perfil), o atalho "Trocar logo da marca" no seletor e o botão vermelho "Módulos" no menu lateral do desktop ainda não existem: a janela não mostra link sem destino.
+- A Expansão está em duas janelas; as outras seguem com a entrada padrão até serem migradas.
+- O rótulo "Grupo ativo" da prévia não foi escrito: o seletor escolhe a MARCA do cabeçalho, e chamar de grupo seria outro dado.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+### 536. 2026-11-24 · Barra e cabeçalho, segunda fatia: "Editar barra" e "Trocar logo da marca"
+
+**Fonte e recorte:** a mesma prévia final aprovada por Rodolfo em 23/11/2026 (decisão 535), nos itens que ficaram para depois: "Módulos → Editar barra" (substituir ou reordenar os quatro atalhos laterais, salvar no perfil ou cancelar sem efeito, revalidando contexto e permissões no servidor) e o atalho "Trocar logo da marca" no seletor, separado da troca, reusando o fluxo de Identidade visual e as permissões existentes. Pedido de Rodolfo em 24/11/2026: seguir com o plano. Uma migration ADITIVA (tabela nova de credencial); nenhuma regra de negócio, rota ou permissão nova.
+
+1. **Editar barra** (rodapé da janela de Módulos, só no ERP do parceiro):
+   - um seletor por posição, da esquerda para a direita ("1º atalho · à esquerda do Módulos"); trocar o que está num seletor substitui, escolher em outra posição o que já está numa reordena; a repetição é dita e trava o salvar;
+   - "Voltar ao padrão" só preenche os seletores; nada grava até "Salvar barra"; "Cancelar" volta à grade sem efeito; o foco vai ao 1º seletor ao abrir e volta ao "Editar barra" ao sair;
+   - as opções são o Início e as áreas com tela do menu da pessoa (`opcoesDaBarra`): o "Em breve" nunca entra;
+   - a barra mostra a escolha salva que ainda está no menu, sem repetir, e completa com o padrão (`chavesDaBarra`): área que a pessoa perdeu sai sozinha;
+   - os seletores da janela ficam na exceção da regra do teclado (`data-mantem-barra`), senão a barra e a janela sumiam ao focar um deles no celular.
+2. **Onde a escolha mora:** `AtalhosDaBarraErp`, por VÍNCULO pessoa × parceiro (as áreas mudam de um parceiro para outro, e no aparelho compartilhado a barra é a de quem entrou). Tabela própria, e não coluna no vínculo: mudar a barra não mexe no `atualizadoEm` do vínculo, que a tela da equipe usa. Mesmo modelo da preferência de ajuda (decisão 112): fora do tenant, sem GRANT para `erp_tenant`, só `credenciais.ts` toca, o `prisma` do portal recusa, CHECK de até 4 chaves de até 40 caracteres, apagar o vínculo apaga os atalhos. Lida na mesma chamada que valida a sessão (`validarSessao`, `include`); sem `relationJoins` no Prisma, isso é um SELECT pequeno a mais por requisição (achado da revisão independente: o texto dizia "sem consulta a mais").
+3. **Gravação** (`gravarAtalhosDaBarra` + `acaoSalvarAtalhosDaBarra`): quem é a pessoa e o vínculo vêm só do token; a ação recalcula o menu da pessoa (permissões e módulos liberados, como o layout) e só aceita chave dele. Chave fora do menu, repetida, malformada, lista de mais de quatro ou que não é lista recusa o pedido inteiro; lista vazia volta ao padrão. Parceiro suspenso não impede: é a barra da pessoa, não um dado do parceiro.
+4. **Trocar logo da marca:** no seletor da marca do cabeçalho, depois das marcas, "Trocar logo da marca · Altera a imagem de X" abre uma janela com o MESMO editor da Identidade visual (prévia, Salvar logo, Cancelar), na rota da marca selecionada. Só aparece para quem pode alterar a logo (`logoBase`: `lojas.gerir` e parceiro desbloqueado, a regra da tela de Lojas); a rota confere de novo. A marca da janela fica presa ao abrir; foto pessoal e outras marcas não mudam; o foco volta ao seletor. No celular a logo continua fora do cabeçalho (decisão 535).
+5. **Expansão** no painel do seletor da marca: a segunda janela que já existia a receber o movimento, como pede o plano antes da adoção gradual.
+
+**Verificação:**
+- **Testes:** `erp-atalhos-barra.db.test.ts` (Postgres real: padrão sem linha; vale para a pessoa no parceiro e em outro aparelho, não para outra pessoa nem para ela em outro parceiro; recusas sem gravar pela metade; lista vazia; sem sessão; CHECK; cascata; portal e `erp_tenant`), `erp-atalhos-barra-acao.test.ts` (o permitido sai do menu real, nunca o "Em breve"), `erp-abas-celular` (escolha, opções, padrão, rótulos, editor) e `erp-cabecalho-identidade`/`erp-cabecalho-linha` (quem vê o atalho da logo, o mesmo editor, a Expansão).
+- **Navegador (local, Chromium, banco e conta sintéticos):** editar, repetir (alerta e salvar travado), cancelar sem efeito, salvar, recarregar e continuar, voltar ao padrão; trocar a logo com prévia e ver a nova no cabeçalho do desktop, sem ela no celular.
+
+**Limites:**
+- Não testado em Safari/iPhone físico nem com leitor de tela real.
+- O botão vermelho "Módulos" no menu lateral do desktop (prévia) não entrou: ele trocaria o seletor de área, que hoje diz em que área a pessoa está, e isso é decisão de navegação, não de estilo.
+- O nível 1 (`/rodolfo`) não tem a barra; o "Editar barra" é só do ERP do parceiro.
+
+**Reversão:** reverter os commits desta decisão; a migration é aditiva (a tabela pode ficar sem uso ou ser apagada por uma migration própria).
+
+### 537. 2026-11-24 · Barra e cabeçalho, terceira fatia: a janela de Módulos no desktop e a Expansão na barra do topo
+
+**Fonte e recorte:** o formato desktop da prévia final aprovada em 23/11/2026 ("Um modal, três formatos": no computador, "menu lateral · modal central na área de trabalho", quatro colunas) e o passo seguinte do movimento padrão ("depois reutilizar a mesma regra nos componentes compartilhados e migrar as demais janelas por partes"). Pedido de Rodolfo em 24/11/2026: executar as recomendações e continuar o plano. Sem regra, permissão, rota, schema, migration ou dado.
+
+1. **Janela central no computador:** o seletor de área da lateral (a partir de 900 px) abre a MESMA janela de Módulos da barra do celular, no formato `central`: entre o fim da lateral e a borda direita, 16 px abaixo da barra presa do topo (as duas medidas ao abrir, inclusive com a página rolada e o menu recolhido), até 760 px, quatro colunas, busca e sem "Editar barra" (no computador não há barra).
+   - Ela vai para o fim do `.ff-app` (portal): dentro da lateral, a barra presa do topo, que vem depois no HTML com a mesma camada, passaria por cima. Por isso o foco entra na busca ao abrir (no computador não há teclado virtual a abrir).
+   - Mesmo comportamento de antes: não bloqueia a página, Escape devolve o foco ao seletor, clique fora e o foco que sai fecham, trocar de tela fecha.
+   - O seletor continua dizendo em que área a pessoa está. O botão vermelho "Módulos" da prévia, que tomaria o lugar dele, fica para decisão de Rodolfo.
+   - A gaveta do celular segue com o painel preso ao seletor (o celular abre Módulos pela barra).
+2. **Expansão nos painéis da barra do topo:** visão, parceiro, notificações, conta e os níveis da trilha ("…") passam a nascer do botão. O `Popover` fixo também calcula a origem (da posição que ele mesmo calcula para o painel).
+
+**Verificação:** testes em `erp-abas-celular` (formato central, portal, foco, só a lateral abre a central) e `erp-padrao-visual` (todo `Popover` do shell usa a Expansão; a origem do fixo). Navegador local (Chromium, banco e conta sintéticos) a 900, 1024, 1280 (menu recolhido) e 1440 px, claro e escuro: à direita da lateral, centrada na área, abaixo da barra com a página rolada, dentro da tela, quatro colunas, foco na busca, Escape devolve ao seletor, escolher uma área navega e fecha; conta e notificações com a Expansão; sem erros de página.
+
+**Limites:** não testado em Safari/iPhone físico nem com leitor de tela real. As folhas e gavetas (`Dialogo`) ficam com a entrada de hoje: a A5 (PR #80) está mexendo nelas.
+
+**Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+**Revisão independente** (revisor só de leitura, sobre 46543e6..3320628): **aprovado com ressalvas**, sem bloqueante e sem problema de segurança, dados ou migration. Tratados no commit seguinte:
+- **Importantes:** (1) o bloco e o atalho Início tinham nome visível "Início" e nome acessível "Áreas da Rede" (WCAG 2.5.3): agora os dois são "Início", também no editor; (2) a janela central perdeu o teclado do painel: as setas voltaram (a regra mora em `grade-teclado.ts`, a mesma do seletor) e o Tab que sai pelas pontas fecha a janela e segue como seguiria se ela estivesse logo depois do seletor (antes, o foco saía do documento e a janela ficava aberta); (3) "Salvar barra" sem `try/finally` prendia o editor em "Salvando…" numa falha de rede: agora diz o erro e devolve os controles.
+- **Menores:** "Voltar ao padrão" grava lista vazia (a pessoa segue o padrão quando o menu mudar); o "Em breve" mostra o nome inteiro (dois "Pedidos…" ficavam iguais); entre 640 e 899 px a coluna do meio do cabeçalho encolhe para 240 px (a 640 px a palavra FlowFoods entrava 15 px sob a pílula); no nível 1 a janela "Trocar logo" guarda a rota e o parceiro e não some quando o layout recarrega ao salvar; `--ff-lateral` (a COR da lateral) deixou de ser reaproveitado como medida (`--ff-fim-da-lateral`); as regiões de estado ficam montadas e só o texto muda; com toque (tablet deitado acima de 900 px) o foco vai para o título, não para a busca; a gravação recusa se a sessão trocou de parceiro entre o menu conferido e a escrita; `system.md` atualizado.
+- **Confirmação** (o mesmo revisor, em f737bf2): **aprovado**, os 12 itens resolvidos e nenhum problema novo de peso. Duas ressalvas pequenas de foco, tratadas no commit seguinte: Shift+Tab a partir do título da janela central (foco inicial com toque) não era interceptado; e, no nível 1, ao fechar a janela "Trocar logo" depois de salvar, o foco ia para o `body` (o seletor é desenhado de novo na recarga): o `voltarPara` agora procura o seletor que estiver na tela.

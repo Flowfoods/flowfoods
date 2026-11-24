@@ -10,16 +10,29 @@
 @media screen {
   .ff-cabecalho-identidade { border-bottom: 2px solid rgb(var(--ff-acao)); }
 }
-.ff-cabecalho-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 250px) minmax(0, 1fr); align-items: center; gap: 22px; padding: 12px 26px; }
-.ff-assinatura-central { display: flex; flex-direction: column; align-items: center; justify-self: start; gap: 18px; border-radius: 5px; }
+.ff-cabecalho-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px) minmax(0, 1fr); align-items: center; gap: 22px; padding: 12px 26px; }
+.ff-assinatura-central { display: flex; justify-content: center; justify-self: start; border-radius: 5px; }
 @media (min-width: 900px) {
   /* Centro da coluna lateral de 232 px: desconta os 26 px de respiro de cada lado.
-     Na lateral recolhida (68 px) preserva a logo legível de 96 px, à esquerda. */
+     Na lateral recolhida (68 px), a assinatura fica à esquerda, sem encolher. */
   .ff-cabecalho-identidade[data-menu='expandido'] .ff-assinatura-central { width: calc(232px - 52px); }
 }
-.ff-logo-janela { position: relative; display: block; width: 96px; aspect-ratio: 780 / 500; overflow: hidden; }
-.ff-logo-janela img { position: absolute; width: 138.46154%; max-width: none; height: auto; left: -19.23077%; top: -56%; }
-.ff-logo-janela .ff-logo-escuro { display: none; }
+/* FlowFoods numa linha (prévia aprovada em 23/11/2026, decisão 535) e BARNEY OS logo abaixo, alinhado à esquerda dele. */
+.ff-assinatura-pilha { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+/*
+ * As duas palavras saem da mesma imagem oficial transparente (1080 × 1080): "Flow" ocupa as colunas 228–851 e as linhas
+ * 290–513; "Foods", as colunas 160–919 e as linhas 551–773 (medido nos dois temas; 1 px de folga em volta). Cada palavra é
+ * uma janela do tamanho dela sobre a imagem inteira, na escala `--ff-logo-escala` (a altura da palavra em px ÷ 227). As duas
+ * têm a mesma altura e terminam na base: lado a lado, leem-se como uma palavra só. O vão entre elas é o espaço entre letras.
+ */
+.ff-logo-linha { --ff-logo-escala: calc(24 / 227); display: flex; align-items: flex-end; gap: calc(14px * var(--ff-logo-escala)); }
+.ff-logo-palavra { position: relative; display: block; flex: none; height: calc(227px * var(--ff-logo-escala)); overflow: hidden; }
+.ff-logo-palavra img { position: absolute; width: calc(1080px * var(--ff-logo-escala)); max-width: none; height: auto; }
+.ff-logo-flow { width: calc(628px * var(--ff-logo-escala)); }
+.ff-logo-flow img { left: calc(-226px * var(--ff-logo-escala)); top: calc(-289px * var(--ff-logo-escala)); }
+.ff-logo-foods { width: calc(764px * var(--ff-logo-escala)); }
+.ff-logo-foods img { left: calc(-158px * var(--ff-logo-escala)); top: calc(-549px * var(--ff-logo-escala)); }
+.ff-logo-palavra .ff-logo-escuro { display: none; }
 .ff-app[data-tema='escuro'] .ff-logo-claro { display: none; }
 .ff-app[data-tema='escuro'] .ff-logo-escuro { display: block; }
 /* A escolha manual prevalece sobre o aparelho. Em sistema, muda sem JS/flash. */
@@ -29,18 +42,33 @@
 }
 .ff-barney-os { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; font-weight: 650; letter-spacing: .17em; line-height: 1.4; }
 .ff-barney-os span { font-size: 10px; line-height: 1; letter-spacing: .08em; padding: 4px 5px; background: rgb(var(--ff-acao)); color: rgb(var(--ff-sobre-acao)); border-radius: 4px; }
-.ff-cabecalho-marca { width: 100%; max-width: 250px; min-width: 0; justify-self: center; }
-.ff-marca-selecionada { display: flex; position: relative; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 100%; min-height: 96px; padding: 6px 24px; border: 1px solid transparent; border-radius: 12px; text-align: center; }
-.ff-marca-selecionada:hover, .ff-marca-selecionada[aria-expanded='true'] { background: rgb(var(--ff-painel)); border-color: var(--ff-linha); }
-.ff-marca-imagem { display: grid; place-items: center; width: 128px; height: 64px; overflow: hidden; border-radius: 8px; background: rgb(var(--ff-forte)); font-size: 28px; }
-.ff-marca-nome { overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.3; }
-.ff-marca-seta { position: absolute; right: 6px; top: calc(50% - 7px); }
+/* Seletor da marca (decisão 535, prévia aprovada em 23/11/2026): a logo cadastrada AO LADO do nome, numa pílula no centro do
+   cabeçalho (tablet e desktop). A caixa da logo é 2:1 (72 × 36 px) e a imagem cabe inteira nela, sem filtro nem recorte. */
+.ff-cabecalho-marca { width: 100%; max-width: 320px; min-width: 0; justify-self: center; }
+.ff-marca-selecionada { display: flex; position: relative; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 7px 36px 7px 7px; border: 1px solid var(--ff-linha); border-radius: 12px; background: rgb(var(--ff-painel)); text-align: left; }
+.ff-marca-selecionada:hover, .ff-marca-selecionada[aria-expanded='true'] { background: rgb(var(--ff-forte)); border-color: var(--ff-linha-forte); }
+.ff-marca-imagem { display: grid; flex: none; place-items: center; width: 72px; height: 36px; overflow: hidden; border-radius: 8px; background: rgb(var(--ff-forte)); font-size: 15px; font-weight: 600; }
+.ff-marca-nome { min-width: 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.3; }
+.ff-marca-seta { position: absolute; right: 12px; top: calc(50% - 7.5px); }
 .ff-cabecalho-conta { justify-self: end; min-width: 0; }
 .ff-cabecalho-conta .ff-conta-foto { width: 42px; height: 42px; }
 .ff-conta-barra .ff-conta-nome { display: none; }
-@container (max-width: 540px) {
+/* Tablet estreito (640 a 899 px): a coluna do meio encolhe para a palavra FlowFoods (149 px a 24 px de altura) caber ao
+   lado sem passar por baixo da pílula da marca (a 640 px, com 320 px no meio, entrava 15 px nela). */
+@container (max-width: 899px) {
+  .ff-cabecalho-grade { grid-template-columns: minmax(0, 1fr) minmax(0, 240px) minmax(0, 1fr); gap: 14px; }
+}
+/* Celular (abaixo de 640 px): FlowFoods + BARNEY OS e a foto na primeira linha; na segunda, uma faixa única com o nome e a
+   seta, que abre o mesmo seletor. Sem a logo da marca, sem iniciais e sem lugar guardado para ela (decisão de 23/11/2026):
+   o cadastro da logo não muda, ela só não aparece aqui. */
+@container (max-width: 639px) {
+  .ff-logo-linha { --ff-logo-escala: calc(20 / 227); }
   .ff-cabecalho-grade { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; padding: 12px 18px; }
   .ff-assinatura-central { grid-column: 1; grid-row: 1; }
   .ff-cabecalho-conta { grid-column: 3; grid-row: 1; }
-  .ff-cabecalho-marca { grid-column: 1 / -1; grid-row: 2; }
+  .ff-cabecalho-marca { grid-column: 1 / -1; grid-row: 2; max-width: none; }
+  .ff-marca-selecionada { min-height: 44px; padding: 8px 40px 8px 14px; border-color: transparent; border-radius: 10px; background: var(--ff-preenchimento); }
+  .ff-marca-selecionada:hover, .ff-marca-selecionada[aria-expanded='true'] { background: var(--ff-preenchimento-forte); border-color: transparent; }
+  .ff-marca-imagem { display: none; }
+  .ff-marca-nome { font-size: 15px; }
 }

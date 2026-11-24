@@ -11,6 +11,9 @@
  * 0,98, 220 ms) e fecha na hora, sem animação de saída. Fica sempre dentro da
  * tela: se o painel ancorado passaria da borda, ele desliza para caber; o
  * botão não se move. Abrir e fechar não consultam nem gravam nada.
+ *
+ * Com `expansao` (decisão 535), a entrada é a Expansão aprovada em 23/11/2026: o painel nasce do centro do botão e cresce até
+ * o lugar dele (a origem é medida antes da pintura, junto com o deslize para caber).
  */
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -54,6 +57,7 @@ export function Popover({
   classeDoWrapper = '',
   fixo = false,
   larguraFixaPx = 256,
+  expansao = false,
 }: {
   /** Nome acessível do botão. */
   rotulo: string;
@@ -72,10 +76,13 @@ export function Popover({
   fixo?: boolean;
   /** Largura do painel fixo em px (a mesma de `largura`), para não passar da borda direita. */
   larguraFixaPx?: number;
+  /** Entrada pela Expansão (do centro do botão) no lugar da padrão, no painel ancorado e no fixo. */
+  expansao?: boolean;
 }) {
   const [aberto, setAberto] = useState(false);
   const [posicao, setPosicao] = useState<{ top: number; left: number } | null>(null);
   const [ajuste, setAjuste] = useState(0);
+  const [origem, setOrigem] = useState<string | undefined>(undefined);
   const caixa = useRef<HTMLDivElement>(null);
   const botao = useRef<HTMLButtonElement>(null);
   const painel = useRef<HTMLDivElement>(null);
@@ -93,12 +100,19 @@ export function Popover({
       const largura = painel.current?.offsetWidth;
       if (!c || !largura) return;
       const esquerda = alinhar === 'direita' ? c.right - largura : c.left;
-      setAjuste(ajusteParaCaber({ esquerda, direita: esquerda + largura }, document.documentElement.clientWidth));
+      const deslize = ajusteParaCaber({ esquerda, direita: esquerda + largura }, document.documentElement.clientWidth);
+      setAjuste(deslize);
+      // Expansão: o centro do botão visto do canto do painel já deslizado (`offset*` ignora o `transform` da animação).
+      const b = botao.current;
+      const p = painel.current;
+      if (expansao && b && p) {
+        setOrigem(`${Math.round(b.offsetLeft + b.offsetWidth / 2 - (p.offsetLeft + deslize))}px ${Math.round(b.offsetTop + b.offsetHeight / 2 - p.offsetTop)}px`);
+      }
     };
     medir();
     window.addEventListener('resize', medir);
     return () => window.removeEventListener('resize', medir);
-  }, [aberto, fixo, alinhar]);
+  }, [aberto, fixo, alinhar, expansao]);
 
   useEffect(() => {
     if (!aberto) return;
@@ -146,7 +160,13 @@ export function Popover({
         aria-expanded={aberto}
         aria-controls={id}
         onClick={() => {
-          if (fixo && botao.current) setPosicao(posicaoDoPainelFixo(botao.current.getBoundingClientRect(), larguraFixaPx, window.innerWidth));
+          if (fixo && botao.current) {
+            const b = botao.current.getBoundingClientRect();
+            const p = posicaoDoPainelFixo(b, larguraFixaPx, window.innerWidth);
+            setPosicao(p);
+            // Fixo: o painel abre onde `posicaoDoPainelFixo` disse; a origem é o centro do botão visto desse canto.
+            if (expansao) setOrigem(`${Math.round(b.left + b.width / 2 - p.left)}px ${Math.round(b.top + b.height / 2 - p.top)}px`);
+          }
           setAberto((v) => !v);
         }}
         className={classeDoBotao}
@@ -157,8 +177,8 @@ export function Popover({
         <div
           ref={painel}
           id={id}
-          style={fixo ? (posicao ? { top: posicao.top, left: posicao.left } : undefined) : ajuste ? { translate: `${ajuste}px 0` } : undefined}
-          className={`ff-popover ${fixo ? 'fixed origin-top-left' : `absolute ${acima ? 'bottom-full mb-2' : 'top-full mt-2'} ${alinhar === 'direita' ? 'right-0' : 'left-0'} ${acima ? 'origin-bottom' : alinhar === 'direita' ? 'origin-top-right' : 'origin-top-left'}`} z-40 ${largura} max-w-[calc(100vw-24px)] border border-linha bg-painel p-1.5 shadow-[var(--ff-sombra)]`}
+          style={fixo ? (posicao ? { top: posicao.top, left: posicao.left, ...(origem ? { transformOrigin: origem } : {}) } : undefined) : ajuste || origem ? { ...(ajuste ? { translate: `${ajuste}px 0` } : {}), ...(origem ? { transformOrigin: origem } : {}) } : undefined}
+          className={`ff-popover${expansao ? ' ff-expansao' : ''} ${fixo ? 'fixed origin-top-left' : `absolute ${acima ? 'bottom-full mb-2' : 'top-full mt-2'} ${alinhar === 'direita' ? 'right-0' : 'left-0'} ${acima ? 'origin-bottom' : alinhar === 'direita' ? 'origin-top-right' : 'origin-top-left'}`} z-40 ${largura} max-w-[calc(100vw-24px)] border border-linha bg-painel p-1.5 shadow-[var(--ff-sombra)]`}
         >
           {children(() => {
             setAberto(false);

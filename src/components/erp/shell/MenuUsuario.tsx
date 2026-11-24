@@ -46,6 +46,8 @@ export function MenuUsuario({
 
   return (
     <Popover
+      // Nasce do botão (Expansão, decisão 537), como os outros painéis da barra.
+      expansao
       rotulo={`Conta de ${usuario.nome}`}
       largura="w-72"
       classeDoBotao="group ff-transicao flex min-h-11 items-center gap-2.5 rounded-botao pl-1 pr-1 hover:bg-texto/5 aria-expanded:bg-texto/5 lg:pr-2.5"

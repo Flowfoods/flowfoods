@@ -116,14 +116,20 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   nome na dica e para o leitor de tela. Seletor de área no topo; fase no
   rodapé. < 900 px: gaveta com a mesma lista.
 - **Seletor de áreas** abre a **grade de módulos** (referência de 12/11/2026):
-  painel flutuante de 620 px sob o seletor, com um bloco por área em uso,
+  no computador, desde a decisão 537, a **janela de Módulos central** (a da
+  barra do celular no formato `central`: na área de trabalho, abaixo da barra
+  do topo, até 760 px, quatro colunas e busca com o foco); na gaveta do
+  celular, painel flutuante sob o seletor, que nasce dele pela Expansão
+  (decisão 535), com um bloco por área em uso,
   sem cartão nem borda: ícone de cor cheia (a cor da área, desenho claro,
-  44 px), nome em 14/600 e função curta em 12 px, centralizados. Quatro
-  colunas na barra do desktop e duas na gaveta do celular (coluna mínima de
-  120 px; só 320 px com barra de rolagem clássica cai para uma). Área atual =
+  44 px), nome em 14/600 e função curta em 12 px, centralizados, em duas
+  colunas na gaveta (coluna mínima de 120 px; só 320 px com barra de
+  rolagem clássica cai para uma). A janela central usa os blocos compactos
+  da janela de Módulos; o Tab que sai pelas pontas dela segue como se ela
+  estivesse logo depois do seletor. Área atual =
   bloco preenchido no tom da área, contorno na tinta dela, nome em 700 e
   `aria-current`; não clareia sob o ponteiro. Setas sem modificador andam
-  pela grade; o anel de foco fica por dentro do bloco (a grade rola). Escape
+  pela grade (na gaveta e na janela de Módulos, `grade-teclado.ts`); o anel de foco fica por dentro do bloco (a grade rola). Escape
   fecha e devolve o foco ao seletor; clique fora fecha; o foco que sai pelo
   Tab fecha e fica onde foi (vale para todo `Popover`). A altura desconta o
   que fica acima do painel (mais na gaveta), com piso de 200 px: em tela
@@ -241,15 +247,38 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   depois de aberto do insumo), na ponta da linha; 51 × 31, ligado no `ok`,
   desligado com contorno no `suave`; foco é o anel neutro dos campos; cores
   forçadas voltam à caixa do sistema.
-- **Barra de abas do celular** (decisão 532), abaixo de 640 px: Início, as
-  três primeiras áreas da pessoa (na ordem do menu; o nome é a primeira
-  palavra da área) e Mais, que abre a gaveta do menu. Fixa no pé, 49 px mais
-  a área segura, no material translúcido; ícone 24 e nome 10,5/500 em
-  `suave`; a atual em 600 na cor do texto, com o ícone na tinta da área.
-  Some nas telas com barra fixa de ações (`data-barra-fixa`, obrigatório em
-  toda barra fixa no pé) e com um campo de texto em foco; sem `:has()`, não
-  aparece. O conteúdo reserva o espaço dela (padding e `scroll-padding`).
-  Só no ERP do parceiro (`/erp`); no nível 1 (`/rodolfo`), não.
+- **Barra de Módulos** (decisão 535; substitui a barra de abas da 532),
+  abaixo de 900 px, onde não há menu lateral: cinco posições, o **Módulos**
+  fixo no centro (quadrado 48 × 32 no `acao` com o desenho claro, nome na
+  tinta do `acento`, em 600) e quatro atalhos laterais, as quatro primeiras
+  áreas da pessoa na ordem do menu (com menos de quatro, o Início entra
+  primeiro; o Módulos não sai do centro). Lista de 58 px no material
+  translúcido; ícone 24 sempre na tinta da área (a Cápsula não recolore),
+  nome 10,5/500 em `suave`; o atual em 600 na cor do texto, com
+  `aria-current`. **Cápsula**: um único fundo de 56 × 32, raio 11, no tom
+  da área (16 % sobre o painel), que desliza de coluna em coluna
+  (`transform` e opacidade, 220 ms); fora dos atalhos ela some; o Módulos
+  nunca a recebe. No celular, em largura cheia no pé; no tablet (640 a
+  899 px), flutuante no centro, 480 px, raio 20, 12 px acima do pé, sem
+  `transform`. Some nas telas com barra fixa de ações (`data-barra-fixa`,
+  obrigatório em toda barra fixa no pé) e com um campo de texto em foco,
+  menos a busca da janela de Módulos (`data-mantem-barra`); sem `:has()`,
+  não aparece. O conteúdo reserva o espaço dela (`--ff-reserva-da-barra`:
+  59 px no celular, 72 no tablet). Só no ERP do parceiro (`/erp`); no nível
+  1 (`/rodolfo`), não. O menu inteiro segue na gaveta do botão de menu.
+  **Editar barra** (decisão 536): no rodapé da janela de Módulos, um
+  seletor por posição (rótulo "1º atalho · à esquerda do Módulos"), com
+  "Voltar ao padrão" (fantasma), "Cancelar" (fantasma) e "Salvar barra"
+  (primário); repetição dita em `erro` e salvar travado. A escolha é por
+  vínculo pessoa × parceiro e nunca abre destino fora do menu.
+- **Janela de Módulos** (decisão 535): abre acima da barra pela Expansão,
+  painel com raio 19 e sombra: título "Módulos" em Gelasio 20, fechar,
+  "Buscar módulo" e a grade compacta (Início, áreas com tela, "Em breve"
+  como texto), duas colunas no celular e três no tablet. Bloco compacto:
+  ícone cheio de 28, nome curto 14/600 (13 abaixo de 360 px), fundo e borda
+  tonais da área; a atual com contorno de 2 px na tinta, 700 e
+  `aria-current`. Comporta-se como o painel do seletor (não bloqueia,
+  Escape e fechar devolvem o foco, toque fora e foco que sai fecham).
 - **Hub** grade 4 (≥ 1280) e 2 no tablet e no celular; card com ícone, nome
   15/600, subtítulo 13; no celular, compacto (nome 14, descrição em até 3
   linhas, sem os links das abas). O catálogo **"Em breve"** (só para quem o
@@ -283,7 +312,11 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
   número na lista; no detalhe, o parcial com "sem contar X (sem preço)".
 - **Foco** anel 3 px `acento`, folga 4 px (campo: 1 px).
 - **Movimento** um token de 220 ms. Entrada de modal e popover: opacidade +
-  `translateY(-7px) scale(.98)`, `cubic-bezier(.2,.8,.2,1)`; gaveta de detalhes:
+  `translateY(-7px) scale(.98)`, `cubic-bezier(.2,.8,.2,1)`; **Expansão**
+  (decisão 535, padrão aprovado em 23/11 para janelas e painéis): opacidade
+  + `scale(.3)` a partir do centro do acionador (`transform-origin` medido
+  ao abrir), hoje na janela de Módulos, na grade do seletor de áreas e em
+  todo painel da barra do topo (decisão 537); as folhas e gavetas ainda não; gaveta de detalhes:
   opacidade + `translateX(28px)` pela direita (o menu do celular espelha, pela
   esquerda); fundo de bloqueio: só opacidade, `ease`; botões e navegação: cor,
   fundo e borda. **Fechar é imediato**, sem animação de saída. Sem laço,
@@ -326,6 +359,8 @@ popover 13, linha do menu 12, botão 10, campo 9. Ficam 7 (selo) e 10
 | Menu lateral em lista, ativo na cor cheia da área (decisão 531); substitui a grade de duas colunas | barra lateral do iPad, do protótipo aprovado; a seleção cheia tem nome claro ≥ 4,5:1 e contorno ≥ 3:1 no escuro | 2026-11-18 |
 | Título grande (Gelasio 34 px, sem o quadrado da área) e barra de abas no celular (decisão 532) | protótipo aprovado; a aba repete entradas do menu, some com barra fixa de ações e com o teclado | 2026-11-18 |
 | Listas agrupadas no celular (insumos, fichas, notas) e interruptor para o que liga e desliga (decisão 533) | protótipo aprovado; o desligado com contorno no `suave` para 3:1; o formulário manda o mesmo de antes | 2026-11-19 |
+| Barra de Módulos de cinco posições, Cápsula, janela de Módulos e Expansão; FlowFoods numa linha (recorte da imagem oficial); logo da marca ao lado do nome, e sem ela no celular (decisão 535) | prévia final aprovada em 23/11; a Cápsula no tom da área a 16 % deixa o ícone ≥ 3:1 e o nome ≥ 4,5:1 em toda a paleta | 2026-11-24 |
+| "Editar barra" (seletores por posição, salvo por vínculo) e "Trocar logo da marca" no seletor (o editor da Identidade visual numa janela); Expansão no painel da marca (decisão 536) | prévia final aprovada em 23/11; seletor nativo em vez de arrastar: funciona com teclado, leitor de tela e toque sem gesto escondido | 2026-11-24 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
   `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,

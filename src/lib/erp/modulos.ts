@@ -909,18 +909,26 @@ export function itemAtivo(nav: Navegacao, caminho: string): { modulo: ModuloNav;
   return melhor;
 }
 
-/** Uma aba da barra do celular (decisão 532). */
-export interface AbaDoCelular {
+/** Um atalho lateral da barra de Módulos (decisão 535). */
+export interface AtalhoDaBarra {
+  chave: string;
   href: string;
+  /** O nome curto, que cabe a 320 px ("Cadastros e Cardápio" → "Cadastros"). */
   rotulo: string;
+  /** O nome inteiro da área, para o leitor de tela. */
+  nome: string;
   icone: ChaveIcone;
   cor: string;
+  /** Coluna na barra (0 a 4): a 2 é sempre o botão Módulos. */
+  coluna: number;
   /** A tela atual está nesta área (ou é o Início). */
-  ativa: boolean;
+  ativo: boolean;
 }
 
-/** Quantas áreas entram na barra do celular, além do Início e do Mais: cinco abas ao todo, como no iPhone. */
-export const AREAS_NA_BARRA_DO_CELULAR = 3;
+/** Quantos atalhos laterais a barra tem: dois de cada lado do botão Módulos, que fica no centro (cinco posições ao todo). */
+export const ATALHOS_DA_BARRA = 4;
+/** A coluna do botão Módulos: o centro das cinco. */
+export const COLUNA_DE_MODULOS = 2;
 
 /** O nome da área na aba: a primeira palavra ("Cadastros e Cardápio" → "Cadastros"), que cabe a 320 px. */
 export function rotuloDaAba(nome: string): string {
@@ -928,19 +936,101 @@ export function rotuloDaAba(nome: string): string {
 }
 
 /**
- * A3 (decisão 532): a barra de abas do celular, como no protótipo aprovado (Início · Cadastros · Compras · Estoque · Mais).
- * Início, as primeiras áreas da pessoa que têm tela, na ordem do menu (já filtradas por permissão e liberação em
- * `modulosDoParceiro`: o "Em breve" não entra), e Mais, que abre a gaveta com o menu inteiro. Não cria destino nem libera
- * nada: só repete entradas que o menu já tem. `maisAtiva`: a tela atual é de uma área que ficou fora da barra.
+ * O nome do bloco na grade de Módulos e no atalho da barra (prévia aprovada em 23/11/2026): o nome inteiro quando ele cabe
+ * numa coluna de 320 px ("Produção", "Rede e Equipe"), senão a primeira palavra, a mesma da aba ("Estoque e Movimentações" →
+ * "Estoque"). O nome inteiro continua no nome acessível.
  */
-export function abasDoCelular(nav: Navegacao, caminho: string): { abas: AbaDoCelular[]; maisAtiva: boolean } {
-  const ativo = itemAtivo(nav, caminho);
-  const areas = nav.modulos.filter((m) => m.href !== null).slice(0, AREAS_NA_BARRA_DO_CELULAR);
-  const abas: AbaDoCelular[] = [
-    { href: nav.inicio.href, rotulo: 'Início', icone: 'inicio', cor: COR.inicio, ativa: caminho === nav.inicio.href },
-    ...areas.map((m) => ({ href: m.href!, rotulo: rotuloDaAba(m.nome), icone: m.icone, cor: m.cor, ativa: ativo?.modulo.chave === m.chave })),
+export function nomeCurtoDoModulo(nome: string): string {
+  const limpo = nome.trim().replace(/\s+/g, ' ');
+  return limpo.length <= 14 ? limpo : rotuloDaAba(limpo);
+}
+
+/**
+ * Em que coluna fica cada atalho: até dois à esquerda do Módulos e o resto à direita, sempre encostados nele. Módulos não
+ * sai do centro quando a pessoa tem menos de quatro atalhos.
+ */
+export function colunaDoAtalho(indice: number, total: number): number {
+  const aEsquerda = Math.ceil(Math.min(total, ATALHOS_DA_BARRA) / 2);
+  return indice < aEsquerda ? COLUNA_DE_MODULOS - aEsquerda + indice : COLUNA_DE_MODULOS + 1 + (indice - aEsquerda);
+}
+
+/**
+ * O Início como atalho: a entrada do menu (o hub), com a chave fixa "inicio". O nome é "Início", o mesmo que aparece: o título
+ * da tela ("Áreas da Rede") como nome acessível não conteria o texto visível (WCAG 2.5.3).
+ */
+function inicioComoAtalho(nav: Navegacao) {
+  return { chave: 'inicio', href: nav.inicio.href, rotulo: 'Início', nome: 'Início', icone: 'inicio' as ChaveIcone, cor: COR.inicio };
+}
+
+/**
+ * Decisão 536 · o que pode ir para a barra: o Início e as áreas da pessoa que têm tela, na ordem do menu (já filtradas por
+ * permissão e liberação em `modulosDoParceiro`: o "Em breve" nunca entra). É a mesma lista que o servidor aceita ao salvar.
+ */
+export function opcoesDaBarra(nav: Navegacao): Omit<AtalhoDaBarra, 'coluna' | 'ativo'>[] {
+  return [
+    inicioComoAtalho(nav),
+    ...nav.modulos.filter((m) => m.href !== null).map((m) => ({ chave: m.chave, href: m.href!, rotulo: rotuloDaAba(m.nome), nome: m.nome, icone: m.icone, cor: m.cor })),
   ];
-  return { abas, maisAtiva: !!ativo && !areas.some((m) => m.chave === ativo.modulo.chave) };
+}
+
+/** Quantas posições laterais a barra tem para esta pessoa: quatro, ou menos quando ela tem menos opções. */
+export function vagasDaBarra(nav: Navegacao): number {
+  return Math.min(ATALHOS_DA_BARRA, opcoesDaBarra(nav).length);
+}
+
+/** O padrão (decisão 535): as quatro primeiras áreas; com menos de quatro, o Início entra primeiro. */
+export function padraoDaBarra(nav: Navegacao): string[] {
+  const areas = nav.modulos.filter((m) => m.href !== null).slice(0, ATALHOS_DA_BARRA).map((m) => m.chave);
+  return areas.length < ATALHOS_DA_BARRA ? ['inicio', ...areas] : areas;
+}
+
+/**
+ * Decisão 536 · as chaves que a barra mostra, na ordem da tela: primeiro as que a pessoa escolheu ("Editar barra") e que
+ * ainda estão no menu dela, sem repetir; o que faltar vem do padrão e, por fim, da ordem do menu. Área que a pessoa perdeu
+ * (permissão, liberação) sai sozinha; a escolha salva nunca abre destino que o menu não tem.
+ */
+export function chavesDaBarra(nav: Navegacao, escolhidos: readonly string[] = []): string[] {
+  const opcoes = opcoesDaBarra(nav).map((o) => o.chave);
+  const vagas = vagasDaBarra(nav);
+  const lista: string[] = [];
+  for (const c of [...escolhidos, ...padraoDaBarra(nav), ...opcoes]) {
+    if (lista.length >= vagas) break;
+    if (opcoes.includes(c) && !lista.includes(c)) lista.push(c);
+  }
+  return lista;
+}
+
+/**
+ * A barra de Módulos do celular e do tablet (decisão 535, prévia aprovada em 23/11/2026): cinco posições, o botão Módulos
+ * fixo no centro e quatro atalhos laterais (`chavesDaBarra`: a escolha da pessoa, decisão 536, ou o padrão). Não cria
+ * destino nem libera nada: só repete entradas que o menu já tem. `ativo` é a coluna do atalho da área atual (onde a Cápsula
+ * fica); fora dos atalhos, null: o Módulos não recebe o estado da seção.
+ */
+export function atalhosDaBarra(nav: Navegacao, caminho: string, escolhidos: readonly string[] = []): { atalhos: AtalhoDaBarra[]; ativo: number | null } {
+  const atual = itemAtivo(nav, caminho);
+  const porChave = new Map(opcoesDaBarra(nav).map((o) => [o.chave, o]));
+  const chaves = chavesDaBarra(nav, escolhidos);
+  const atalhos = chaves.map((c, i) => {
+    const o = porChave.get(c)!;
+    return { ...o, coluna: colunaDoAtalho(i, chaves.length), ativo: c === 'inicio' ? caminho === nav.inicio.href : atual?.modulo.chave === c };
+  });
+  return { atalhos, ativo: atalhos.find((a) => a.ativo)?.coluna ?? null };
+}
+
+/**
+ * A busca da janela de Módulos: pelo nome, pelo resumo e pela função da área, sem acento e sem diferença de maiúsculas; e
+ * pelos nomes curtos e sinônimos das abas dela (decisão 527), pelo começo de uma palavra ("fin" acha Faturamento e DRE).
+ * Vazia, todas. Não cria destino: só filtra as áreas que a pessoa já vê.
+ */
+export function filtrarModulos<T extends Pick<ModuloNav, 'nome' | 'subtitulo' | 'resumo' | 'grupos'>>(modulos: readonly T[], q: string): T[] {
+  const sem = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ');
+  const termo = sem(q.trim());
+  if (!termo) return [...modulos];
+  return modulos.filter((m) => {
+    if (sem(`${m.nome} ${m.resumo ?? ''} ${m.subtitulo}`).includes(termo)) return true;
+    const termos = m.grupos.flatMap((g) => g.itens.flatMap((i) => i.termos ?? []));
+    return termos.some((t) => ` ${sem(t)}`.includes(` ${termo}`));
+  });
 }
 
 /** Um passo da trilha do topo (o "Início" vem de fora). */

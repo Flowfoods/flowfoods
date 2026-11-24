@@ -194,6 +194,7 @@ describe('ERP 0.4 · escopo de lojas e a checagem única', () => {
       perfilRotulo: 'Operador',
       setores: [],
       ajuda: { dicasLigadas: true, escolhida: false, fechadas: [], pontos: [] },
+      atalhosDaBarra: [],
     };
     expect(contextoDaSessao({ ...base, alcance: daLojaX }).alcance).toBe(daLojaX);
     expect(() => contextoDaSessao({ ...base, alcance: null })).toThrow(/sem alcance/);
@@ -377,6 +378,9 @@ describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', 
     'acaoAjudaPontoNunca',
     // Sequência guiada (decisão 479): os passos de uma vez, com a mesma regra.
     'acaoAjudaPontosVistos',
+    // Decisão 536 · "Editar barra": os atalhos da barra são preferência da própria pessoa (vínculo da sessão, nunca do
+    // formulário); o que pode ir para a barra sai do menu dela, recalculado no servidor pelo alcance e pelos módulos liberados.
+    'acaoSalvarAtalhosDaBarra',
   ]);
 
   it('páginas chamam exigirPermissaoNaPagina', () => {

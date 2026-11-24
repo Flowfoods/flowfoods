@@ -8,6 +8,12 @@ export interface IdentidadeDoCabecalho {
   marcas: MarcaDoCabecalho[];
   selecionada: string | null;
   perfilHref: string | null;
+  /**
+   * Decisão 536: de onde o atalho "Trocar logo da marca" do cabeçalho envia a imagem (`${logoBase}/${id}/logo`, a MESMA rota
+   * da Identidade visual). Null = quem está vendo não pode alterar a logo (sem `lojas.gerir` ou parceiro bloqueado): o atalho
+   * nem aparece. Só esconde; quem decide de novo é a rota, que confere sessão, origem e permissão antes de ler o arquivo.
+   */
+  logoBase: string | null;
 }
 
 export function escolherMarcaDoCookie(valor: string | undefined, escopo: string, marcas: MarcaDoCabecalho[]): string | null {

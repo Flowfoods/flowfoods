@@ -15,6 +15,8 @@ export function Notificacoes({ itens }: { itens: Notificacao[] }) {
   const n = itens.length;
   return (
     <Popover
+      // Nasce do botão (Expansão, decisão 537), como os outros painéis da barra.
+      expansao
       rotulo={n ? `Notificações: ${n} nova${n === 1 ? '' : 's'}` : 'Notificações: nada novo'}
       classeDoBotao={BOTAO_ICONE}
       largura="w-80"

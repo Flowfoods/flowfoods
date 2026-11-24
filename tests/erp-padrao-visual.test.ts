@@ -328,6 +328,27 @@ describe('padrão visual · movimento das camadas', () => {
     expect(regra('.ff-app dialog.ff-gaveta[open]')).toContain('animation: ff-gaveta var(--ff-movimento) var(--ff-curva-entrada);');
   });
 
+  it('Expansão (decisão 535): opacidade 0→1 e escala 0,3→1 a partir do botão, com a mesma curva e os mesmos 220 ms', () => {
+    expect(quadros('ff-expansao')).toContain('from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: none; }');
+    expect(regra('.ff-app .ff-expansao')).toContain('animation: ff-expansao var(--ff-movimento) var(--ff-curva-entrada);');
+    // Vem depois da entrada padrão do popover, com a mesma especificidade: no painel que a usa, vale a Expansão.
+    expect(css.indexOf('.ff-app .ff-expansao {')).toBeGreaterThan(css.indexOf('.ff-app .ff-popover {'));
+    // Usam a Expansão: a janela de Módulos e a grade do seletor de áreas (só o painel ancorado; o fixo segue com a padrão).
+    expect(readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8')).toContain("className={`ff-janela-modulos ff-expansao${central ? ' ff-janela-modulos-central' : ''}`}");
+    const popover = readFileSync('src/components/erp/shell/Popover.tsx', 'utf8');
+    expect(popover).toContain("className={`ff-popover${expansao ? ' ff-expansao' : ''} ");
+    // Fixo também: a origem sai da posição calculada para o painel (decisão 537).
+    expect(popover).toMatch(/if \(expansao\) setOrigem\(`\$\{Math\.round\(b\.left \+ b\.width \/ 2 - p\.left\)\}px \$\{Math\.round\(b\.top \+ b\.height \/ 2 - p\.top\)\}px`\);/);
+    // Decisão 537: todos os painéis da barra do topo nascem do botão (visão, parceiro, notificações, conta e os níveis da trilha).
+    const usos = ['SeletorVisao', 'Notificacoes', 'MenuUsuario', 'Shell', 'CabecalhoIdentidade', 'NavLateral'].flatMap((n) => {
+      const f = readFileSync(`src/components/erp/shell/${n}.tsx`, 'utf8');
+      return [...f.matchAll(/<Popover\n([\s\S]*?)>/g)].map((m) => [n, /\n\s*expansao\n/.test(m[1])] as const);
+    });
+    expect(usos.length).toBeGreaterThanOrEqual(8);
+    expect(usos.filter(([, tem]) => !tem)).toEqual([]);
+    expect(readFileSync('src/components/erp/shell/NavLateral.tsx', 'utf8')).toMatch(/largura="w-\[620px\] max-\[899px\]:w-full"\s*\/\/[^\n]*\n\s*expansao\n/);
+  });
+
   it('fundo de bloqueio: só opacidade, 220 ms ease, e a página continua reconhecível atrás', () => {
     const fundo = regra('.ff-app dialog.ff-dialogo::backdrop');
     expect(fundo).toContain('animation: ff-fundo var(--ff-movimento, 220ms) ease;');
@@ -349,6 +370,8 @@ describe('padrão visual · movimento das camadas', () => {
     expect(comAnimacao.sort()).toEqual(
       [
         '.ff-app .ff-popover',
+        // Expansão (decisão 535): a janela de Módulos da barra e a grade do seletor de áreas nascem do botão que as abriu.
+        '.ff-app .ff-expansao',
         '.ff-app dialog.ff-dialogo::backdrop',
         '.ff-app dialog.ff-dialogo[open]',
         '.ff-app dialog.ff-gaveta.ff-gaveta-direita[open]',
@@ -356,10 +379,10 @@ describe('padrão visual · movimento das camadas', () => {
         '.ff-veu-ajuda',
       ].sort(),
     );
-    expect([...css.matchAll(/@keyframes ([\w-]+)/g)].map((m) => m[1]).sort()).toEqual(['ff-camada', 'ff-fundo', 'ff-gaveta', 'ff-gaveta-direita', 'ff-veu']);
+    expect([...css.matchAll(/@keyframes ([\w-]+)/g)].map((m) => m[1]).sort()).toEqual(['ff-camada', 'ff-expansao', 'ff-fundo', 'ff-gaveta', 'ff-gaveta-direita', 'ff-veu']);
     expect(css).not.toMatch(/infinite|alternate|animation-delay|transition-delay|:not\(\[open\]\)|bounce|overshoot/);
     // Os componentes fecham na hora: sem esperar animação nem temporizador.
-    for (const arquivo of ['src/components/erp/ui/Dialogo.tsx', 'src/components/erp/shell/Popover.tsx']) {
+    for (const arquivo of ['src/components/erp/ui/Dialogo.tsx', 'src/components/erp/shell/Popover.tsx', 'src/components/erp/shell/JanelaDeModulos.tsx']) {
       expect(readFileSync(arquivo, 'utf8'), arquivo).not.toMatch(/animationend|transitionend|setTimeout|requestAnimationFrame/);
     }
     expect(readFileSync('src/components/erp/ui/Dialogo.tsx', 'utf8')).toMatch(/if \(el\.open\) el\.close\(\);/);
@@ -515,7 +538,10 @@ describe('padrão visual · grade de módulos do seletor de áreas', () => {
     expect(vizinhoNaGrade(-1, 8, 4, 'ArrowRight')).toBeNull();
     for (const t of ['Tab', 'Escape', 'Enter', ' ', 'Home', 'a']) expect(vizinhoNaGrade(1, 8, 4, t)).toBeNull();
     // Alt, Ctrl, Cmd e Shift com seta são do navegador (voltar, avançar, seleção): o tratador sai antes de qualquer conta.
-    expect(navLateral).toMatch(/function andarPelaGrade\([^)]*\) \{\s*if \(e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey \|\| e\.shiftKey\) return;/);
+    // A regra das setas mora em `grade-teclado.ts` (a janela de Módulos usa a mesma, decisão 537).
+    expect(readFileSync('src/components/erp/shell/grade-teclado.ts', 'utf8')).toMatch(/return \(e: KeyboardEvent<HTMLElement>\) => \{\s*if \(e\.altKey \|\| e\.ctrlKey \|\| e\.metaKey \|\| e\.shiftKey\) return;/);
+    expect(navLateral).toContain("const andarPelaGradeDoSeletor = andarPelaGrade('a.ff-bloco-modulo');");
+    expect(readFileSync('src/components/erp/shell/JanelaDeModulos.tsx', 'utf8')).toContain("const andarPelosBlocos = andarPelaGrade('a.ff-bloco-compacto');");
   });
 
   it('ícone de cor cheia: o desenho claro fica ≥ 3:1 sobre toda a paleta das áreas; o futuro não usa cor de área', () => {

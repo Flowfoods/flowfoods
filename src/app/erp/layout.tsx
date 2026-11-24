@@ -24,7 +24,7 @@ import { escolherMarcaDaSessao, identidadeDaSessao } from '@/components/erp/shel
 import { EscopoDoRascunho } from '@/components/erp/telas/cadastro/rascunho';
 import { Aviso } from '@/components/erp/ui/superficies';
 import { acaoSair } from '../entrar/actions';
-import { acaoAjudaDicas, acaoAjudaFechar, acaoAjudaPontoNunca, acaoAjudaPontosVistos, acaoBuscarNoErp, acaoEscolherVisao } from './actions';
+import { acaoAjudaDicas, acaoAjudaFechar, acaoAjudaPontoNunca, acaoAjudaPontosVistos, acaoBuscarNoErp, acaoEscolherVisao, acaoSalvarAtalhosDaBarra } from './actions';
 
 export const metadata: Metadata = {
   title: 'FlowFoods ERP',
@@ -69,6 +69,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       links={links}
       sair={acaoSair}
       buscarInsumos={acaoBuscarNoErp}
+      barra={{ escolhidos: pessoa.atalhosDaBarra, salvar: acaoSalvarAtalhosDaBarra }}
       ajuda={{
         entradas: ajudaParaATela(alcance),
         preferencia: pessoa.ajuda,

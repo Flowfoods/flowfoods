@@ -62,7 +62,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
   const [gaveta, setGaveta] = useState(false);
   const botaoMenu = useRef<HTMLButtonElement>(null);
   // Para onde vai o foco quando a gaveta fecha: vazio = quem a abriu (Escape, clique no fundo, X). Ao fechar porque a pessoa
-  // escolheu um destino, o botão de menu do topo: o Mais da barra de abas é a última parada do Tab da página nova.
+  // escolheu um destino, o botão de menu do topo, que é por onde a gaveta abre (a barra de Módulos fica no fim do Tab).
   const retornoDaGaveta = useRef<HTMLElement | null>(null);
   const abrirGaveta = useCallback(() => {
     retornoDaGaveta.current = null;
@@ -248,6 +248,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
             versao={props.versao}
             recolhido={recolhido}
             aoRecolher={alternarMenu}
+            janelaCentral
           />
         </aside>
 
@@ -284,6 +285,8 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
                     <li className="flex shrink-0 items-center gap-1.5 text-suave xl:hidden">
                       <ChevronRight size={14} aria-hidden className="shrink-0" />
                       <Popover
+                        // Nasce do botão (Expansão, decisão 537), como os outros painéis da barra.
+                        expansao
                         fixo
                         alinhar="esquerda"
                         largura="w-64"
@@ -382,9 +385,10 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           </main>
         </div>
 
-        {/* Abas do celular (A3, decisão 532): depois do conteúdo na ordem do Tab; só abaixo de 640 px (regras em tokens.css). Só no
-            ERP do parceiro: no nível 1 (/rodolfo) o menu é o dos fluxos comerciais internos, fora deste plano. */}
-        {nav.rotuloDaArea === 'ERP' && <BarraDeAbas nav={nav} caminho={caminho} gavetaAberta={gaveta} aoAbrirMais={abrirGaveta} />}
+        {/* Barra de Módulos do celular e do tablet (decisão 535; antes, as abas da A3): depois do conteúdo na ordem do Tab; só
+            abaixo de 900 px, onde não há menu lateral (regras em tokens.css). Só no ERP do parceiro: no nível 1 (/rodolfo) o
+            menu é o dos fluxos comerciais internos, fora deste plano. O menu inteiro segue na gaveta do botão de menu do topo. */}
+        {nav.rotuloDaArea === 'ERP' && <BarraDeAbas nav={nav} caminho={caminho} barra={props.barra} />}
 
         {entradaDaTela && ajuda && (
           <GavetaDeAjuda
