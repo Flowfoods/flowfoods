@@ -40,7 +40,7 @@ export function CabecalhoDaLista({
   return (
     <PageHeader
       icone="insumo"
-      cor={COR.insumo}
+      cor={COR.estoque}
       titulo="Insumos"
       subtitulo={subtitulo}
       acao={
@@ -129,7 +129,7 @@ export function TelaFormInsumo({
       <Voltar href={paraVoltar} recarregar={!insumo && !!volta}>{insumo ? (origemLista ? 'Voltar para a lista' : `Voltar para ${insumo.nome}`) : volta ? `Voltar para ${rotuloDaVolta(volta)}` : 'Voltar para a lista'}</Voltar>
       <PageHeader
         icone="insumo"
-        cor={COR.insumo}
+        cor={COR.estoque}
         titulo={insumo ? 'Editar insumo' : 'Novo insumo'}
         subtitulo={insumo ? `${contexto} · ${insumo.nome}` : volta ? `${contexto} · depois de salvar, você volta para ${rotuloDaVolta(volta)}` : `${contexto} · cadastro da rede, vale para todas as lojas`}
       />
@@ -189,7 +189,7 @@ export function TelaEmbalagem({
       <Voltar href={volta}>Voltar para {insumo.nome}</Voltar>
       <PageHeader
         icone="insumo"
-        cor={COR.insumo}
+        cor={COR.estoque}
         titulo={v ? v.nome : 'Nova embalagem'}
         subtitulo={`${insumo.nome} · ${TIPOS[insumo.tipo]} · medido em ${u.nome.toLowerCase()}`}
       />

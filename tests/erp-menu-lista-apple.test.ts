@@ -28,7 +28,10 @@ const linhas = (h: string) => [...h.matchAll(/<a\b[^>]*class="([^"]*ff-nav-item[
 
 describe('menu lateral em lista (A2)', () => {
   it('cada tela é uma linha: ícone à esquerda, nome alinhado à esquerda, 44 px de altura mínima, nada empilhado', () => {
-    const area = emUso.find((m) => m.grupos.some((g) => g.itens.length > 1))!;
+    // Uma área com um grupo de várias telas e um grupo de uma tela só com o mesmo nome ("Insumos › Insumos"): era a de
+    // Cadastros e Cardápio; desde a decisão 539, é a de Estoque, para onde os Insumos foram.
+    const area = emUso.find((m) => m.grupos.some((g) => g.itens.length > 1) && m.grupos.some((g) => g.itens.length === 1 && g.itens[0].rotulo === g.rotulo))!;
+    expect(area.chave).toBe('estoque');
     const h = menu(area, area.grupos[0].itens[0].href);
     const itens = linhas(h);
     expect(itens.length).toBeGreaterThan(2);

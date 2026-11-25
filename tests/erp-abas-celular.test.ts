@@ -65,7 +65,8 @@ describe('barra de Módulos · quais atalhos', () => {
     const { atalhos, ativo } = atalhosDaBarra(NAV_DONO, '/erp');
     expect(ATALHOS_DA_BARRA).toBe(4);
     expect(COLUNA_DE_MODULOS).toBe(2);
-    expect(atalhos.map((a) => a.rotulo)).toEqual(['Cadastros', 'Compras', 'Estoque', 'Produção']);
+    // Decisão 539: a primeira área é a Ficha Técnica (ex-Cadastros e Cardápio), com a mesma chave na barra.
+    expect(atalhos.map((a) => a.rotulo)).toEqual(['Ficha', 'Compras', 'Estoque', 'Produção']);
     expect(atalhos.map((a) => a.coluna)).toEqual([0, 1, 3, 4]);
     // No Início nenhum atalho acende: as quatro posições são áreas.
     expect(ativo).toBeNull();
@@ -82,7 +83,7 @@ describe('barra de Módulos · quais atalhos', () => {
     const cadastros = NAV_DONO.modulos[0];
     const tela = cadastros.grupos.at(-1)!.itens.at(-1)!.href;
     let r = atalhosDaBarra(NAV_DONO, `${tela}/um-detalhe`);
-    expect(r.atalhos.filter((a) => a.ativo).map((a) => a.rotulo)).toEqual(['Cadastros']);
+    expect(r.atalhos.filter((a) => a.ativo).map((a) => a.rotulo)).toEqual(['Ficha']);
     expect(r.ativo).toBe(0);
     r = atalhosDaBarra(NAV_DONO, NAV_DONO.modulos[3].href!);
     expect(r.ativo).toBe(4);
@@ -124,7 +125,7 @@ describe('barra de Módulos · quais atalhos', () => {
     const navFin = navegacaoDoParceiro(proprio(['faturamento.ver']), NENHUM_MODULO_LIBERADO);
     const fin = atalhosDaBarra(navFin, '/erp');
     expect(fin.atalhos.map((a) => a.rotulo)).toContain('Faturamento');
-    expect(fin.atalhos.map((a) => a.rotulo)).not.toContain('Cadastros');
+    expect(fin.atalhos.map((a) => a.rotulo)).not.toContain('Ficha');
     const n1 = navegacaoDoParceiro(ALCANCE_FLOWFOODS, NENHUM_MODULO_LIBERADO);
     expect(n1.modulos.some((m) => m.href === null)).toBe(true);
     expect(atalhosDaBarra(n1, '/erp').atalhos.every((a) => typeof a.href === 'string' && a.href.length > 0)).toBe(true);
@@ -132,10 +133,10 @@ describe('barra de Módulos · quais atalhos', () => {
 
   it('o nome no atalho é a primeira palavra da área, curto para 320 px; na grade, o nome inteiro quando cabe', () => {
     const nomes = NAV_DONO.modulos.map((m) => rotuloDaAba(m.nome));
-    expect(nomes).toEqual(['Cadastros', 'Compras', 'Estoque', 'Produção', 'Etiquetas', 'Faturamento', 'Rede']);
+    expect(nomes).toEqual(['Ficha', 'Compras', 'Estoque', 'Produção', 'Etiquetas', 'Faturamento', 'Rede']);
     for (const n of nomes) expect(n.length, n).toBeLessThanOrEqual(11);
     // Os nomes da prévia aprovada: o inteiro até 14 letras ("Rede e Equipe"), senão o da aba.
-    expect(NAV_DONO.modulos.map((m) => nomeCurtoDoModulo(m.nome))).toEqual(['Cadastros', 'Compras', 'Estoque', 'Produção', 'Etiquetas', 'Faturamento', 'Rede e Equipe']);
+    expect(NAV_DONO.modulos.map((m) => nomeCurtoDoModulo(m.nome))).toEqual(['Ficha Técnica', 'Compras', 'Estoque', 'Produção', 'Etiquetas', 'Faturamento', 'Rede e Equipe']);
   });
 
   it('a busca da janela: nome, resumo, função e os sinônimos das abas, sem acento e pelo começo da palavra', () => {

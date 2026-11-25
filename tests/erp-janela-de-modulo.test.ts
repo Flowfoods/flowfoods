@@ -80,10 +80,11 @@ describe('janela de módulo · o que ela mostra', () => {
     const doMenu = modulosDoParceiro(ALCANCE_FLOWFOODS, BASE, TODOS_OS_MODULOS_COM_LIBERACAO).find((m) => m.chave === 'rede')!;
     expect(area).toMatchObject({ nome: doMenu.nome, icone: doMenu.icone, cor: doMenu.cor });
     const itens = doMenu.grupos.flatMap((g) => g.itens).map(({ href, rotulo }) => ({ href, rotulo }));
-    // As mesmas telas do menu (nome e endereço), na ordem dele; Integrações só leva à Central, então fica fora da janela.
+    // As mesmas telas do menu (nome e endereço), na ordem dele. Integrações, que só leva à Central, saiu de Rede e Equipe
+    // (decisão 539: é área própria) e continua fora da janela.
     expect(area.abas).toEqual(itens.filter((i) => TELAS_DA_JANELA.some((t) => i.href === `${BASE}/${t}`)));
     expect(area.abas.map((a) => a.href)).toEqual([`${BASE}/lojas`, `${BASE}/equipe`, `${BASE}/historico`]);
-    expect(itens.some((i) => i.href === `${BASE}/integracoes`)).toBe(true);
+    expect(itens.some((i) => i.href === `${BASE}/integracoes`)).toBe(false);
     expect(area.abas.some((a) => a.href.endsWith('/integracoes'))).toBe(false);
   });
 });

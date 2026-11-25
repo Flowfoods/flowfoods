@@ -87,8 +87,9 @@ const NOMES_EM_BREVE = [
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
   it('Dono: as abas de cada área (UX.9), as ações fora do menu; nenhum módulo futuro para o parceiro (Etiquetas é área desde a 3.4)', () => {
     const a = alcance({ perfilBase: 'DONO' });
+    // Decisão 539: Ficha Técnica (ex-Cadastros e Cardápio), Insumos no Estoque; Integração só com o módulo liberado.
     expect(modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => m.href).map((m) => m.nome)).toEqual([
-      'Cadastros e Cardápio',
+      'Ficha Técnica',
       'Compras e Fornecedores',
       'Estoque e Movimentações',
       'Produção',
@@ -97,8 +98,6 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       'Rede e Equipe',
     ]);
     expect(hrefs(a)).toEqual([
-      '/erp/insumos',
-      // I.1a: as categorias e a classificação dos que já existiam moram ao lado dos insumos.
       '/erp/fichas',
       '/erp/fichas/canais',
       '/erp/compras',
@@ -110,6 +109,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/compras/relatorios/comparar-fornecedores',
       '/erp/compras/relatorios/comparar-periodos',
       '/erp/estoque',
+      // I.1a: as categorias e a classificação dos que já existiam moram ao lado dos insumos (decisão 539: no Estoque).
+      '/erp/insumos',
       '/erp/estoque/contagens',
       '/erp/estoque/requisicoes',
       '/erp/estoque/divergencias',
@@ -136,12 +137,12 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/acesso',
     ]);
     expect(hrefsDasAcoes(a)).toEqual([
-      '/erp/insumos/novo',
       '/erp/fichas/nova',
       '/erp/fichas/importar',
       '/erp/compras/nova',
       '/erp/compras/recebidas/importar',
       '/erp/compras/fornecedores/novo',
+      '/erp/insumos/novo',
       '/erp/producao/nova',
       '/erp/faturamento/lancar',
       '/erp/faturamento/importar',
@@ -171,7 +172,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     // 3.3: as tarefas da cozinha e o histórico da produção; os indicadores por pessoa são da gerência.
     // 3.4: ele imprime a etiqueta do lote e registra a embalagem aberta (etiquetas.imprimir).
     expect(hrefs(a)).toEqual([
-      '/erp/insumos', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/estoque/relatorios/consumo',
+      '/erp/fichas', '/erp/estoque', '/erp/insumos', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/estoque/relatorios/consumo',
       '/erp/producao/lista', '/erp/producao/tarefas', '/erp/producao', '/erp/producao/historico',
       '/erp/etiquetas', '/erp/etiquetas/abrir', '/erp/etiquetas/historico', '/erp/etiquetas/impressora',
       '/erp/lojas', '/erp/acesso',
@@ -201,7 +202,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     expect(itemAtivo(nav, '/erp/estoque/l1')?.item.rotulo).toBe('Visão geral');
   });
 
-  it('perfil sem "ver insumos" nem "ver fichas": a área Cadastros e Cardápio nem aparece; Seu acesso sempre aparece', () => {
+  it('perfil sem "ver insumos" nem "ver fichas": a área Ficha Técnica nem aparece; Seu acesso sempre aparece', () => {
     const a = alcance({ perfilBase: null, perfilProprio: ['lojas.ver'] });
     const mods = modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO);
     expect(mods.map((m) => m.chave)).not.toContain('cadastros');
@@ -270,7 +271,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     }
   });
 
-  it('"Em breve" não duplica nem rebatiza área em uso; Integração segue como aba de Rede e Equipe, sob liberação', () => {
+  it('"Em breve" não duplica nem rebatiza área em uso; Integração é área própria (decisão 539), sob liberação', () => {
     const dono = alcance({ perfilBase: 'DONO' });
     const emUso = modulosDoParceiro(dono, '/erp', TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => m.href);
     const nomesEmUso = [...emUso.map((m) => m.nome), ...emUso.flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.rotulo)))];
@@ -279,7 +280,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     // "Equipe e RH" (futuro) não substitui a aba Equipe; "CRM Time" não é a gestão de acessos.
     expect(hrefs(dono)).toContain('/erp/equipe');
     expect(hrefs(dono)).toContain('/erp/acesso');
-    // Integração: nem no catálogo "Em breve", nem liberada por ele. Continua aba de Rede e Equipe só com o módulo liberado.
+    // Integração: nem no catálogo "Em breve", nem liberada por ele. É área própria e só aparece com o módulo liberado.
     expect(NOMES_EM_BREVE.some((n) => /integra/i.test(n))).toBe(false);
     expect(hrefs(dono)).not.toContain('/erp/integracoes');
     expect(hrefs(dono, '/erp', TODOS_OS_MODULOS_COM_LIBERACAO)).toContain('/erp/integracoes');
@@ -317,7 +318,6 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     // O nível 1 vê as abas de módulo com liberação em todo parceiro (INT-1.8: Integrações leva à Central dele).
     const h = hrefs(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins', TODOS_OS_MODULOS_COM_LIBERACAO);
     expect(h).toEqual([
-      '/rodolfo/erp/valentins/insumos',
       '/rodolfo/erp/valentins/fichas',
       '/rodolfo/erp/valentins/fichas/canais',
       '/rodolfo/erp/valentins/compras',
@@ -329,6 +329,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/compras/relatorios/comparar-fornecedores',
       '/rodolfo/erp/valentins/compras/relatorios/comparar-periodos',
       '/rodolfo/erp/valentins/estoque',
+      '/rodolfo/erp/valentins/insumos',
       '/rodolfo/erp/valentins/estoque/contagens',
       '/rodolfo/erp/valentins/estoque/requisicoes',
       '/rodolfo/erp/valentins/estoque/divergencias',
@@ -349,8 +350,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/dre/periodos',
       '/rodolfo/erp/valentins/dre/plano',
       '/rodolfo/erp/valentins/dre/metas-categorias',
-      '/rodolfo/erp/valentins/lojas',
       '/rodolfo/erp/valentins/integracoes',
+      '/rodolfo/erp/valentins/lojas',
       '/rodolfo/erp/valentins/equipe',
       '/rodolfo/erp/valentins/historico',
       '/rodolfo/erp/valentins/cadastro',
@@ -402,16 +403,19 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
     expect(grupos.map((g) => g.rotulo)).toEqual([
       'Parceiros',
       "Grupo Valentin's",
-      'Cadastros e Cardápio',
+      'Ficha Técnica',
       'Compras e Fornecedores',
       'Estoque e Movimentações',
       'Produção',
       'Etiquetas',
       'Faturamento e DRE',
+      'Integração',
       'Rede e Equipe',
     ]);
     expect(grupos[1].itens.map((i) => i.rotulo)).toEqual(['Áreas da Rede']);
-    expect(grupos[8].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
+    // Decisão 539: no nível 1, a área Integração leva à Central do parceiro (a rota do espelho redireciona para ela).
+    expect(grupos[8].itens.map((i) => i.href)).toEqual(['/rodolfo/erp/valentins/integracoes']);
+    expect(grupos[9].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
     // As ações das áreas vão junto (o ⌘K do nível 1 as acha), sob a base do parceiro.
     expect(acoesDaNavegacao(dentro).map((a) => a.href)).toContain('/rodolfo/erp/valentins/compras/nova');
     expect(comParceiroAtual(nav, '/rodolfo/erp/outro/insumos', parceiros)).toBe(nav);

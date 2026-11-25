@@ -16,8 +16,8 @@ import { modulosDoParceiro, type ChaveIcone } from './modulos';
 export const AREA_DA_JANELA = 'rede';
 
 /**
- * Telas da área que abrem na janela (o nome da pasta da rota). Integrações fica fora: no nível 1 ela só leva à Central de
- * Integrações, que é outra área; se abrisse na janela, a janela piscaria e sairia.
+ * Telas da área que abrem na janela (o nome da pasta da rota). Integrações não é desta área desde a decisão 539 (é área
+ * própria); mesmo antes ficava fora: no nível 1 ela só leva à Central de Integrações, e na janela piscaria e sairia.
  */
 export const TELAS_DA_JANELA = ['lojas', 'equipe', 'historico'] as const;
 export type TelaDaJanela = (typeof TELAS_DA_JANELA)[number];

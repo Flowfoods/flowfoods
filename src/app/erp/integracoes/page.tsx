@@ -39,7 +39,7 @@ export default async function ErpIntegracoesPage(props: { searchParams?: Promise
     <div className="space-y-6">
       <PageHeader
         icone="canais"
-        cor={COR.rede}
+        cor={COR.integracao}
         titulo="Integrações"
         subtitulo={`${ctx.alcance.lojas === 'todas' ? 'Rede Completa' : 'Suas lojas'} · ${integracoes.length} ${integracoes.length === 1 ? 'loja do iFood ligada' : 'lojas do iFood ligadas'}`}
       />

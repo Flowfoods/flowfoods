@@ -115,7 +115,7 @@ export async function TelaConferenciaFinancial({ ctx, central, busca, permitirEn
   const hrefDaCentral = consulta.ok && consulta.loja ? `${central}?loja=${encodeURIComponent(consulta.loja.id)}` : central;
   return <div className="min-w-0 space-y-5">
     <Voltar href={exemplo ? retorno : hrefDaCentral}>{exemplo ? 'Voltar à consulta da loja' : 'Voltar para Integrações'}</Voltar>
-    <PageHeader icone="canais" cor={ctx.alcance.nivel === 'FLOWFOODS' ? COR.parceiros : COR.rede}
+    <PageHeader icone="canais" cor={ctx.alcance.nivel === 'FLOWFOODS' ? COR.parceiros : COR.integracao}
       titulo={exemplo ? 'Exemplo de conferência Financial' : 'Conferência financeira do iFood'}
       subtitulo={exemplo ? `${exemplo.nomeLoja} · ${formatarCompetenciaFinancial(exemplo.competencia)}` : 'Repasses, taxas e antecipações por loja e competência'} />
     {!consulta.ok ? <>

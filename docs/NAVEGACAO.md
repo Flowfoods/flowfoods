@@ -4,17 +4,20 @@ Entrega 1 da "Revisão aprofundada iFood — reorganização visual e estrutural
 Mapa do que existe, proposta e inventário do que reaproveitar. **A proposta é hipótese a validar com operador e gestor do
 Valentin's antes de mexer no menu.** Nenhuma URL muda; regra de estoque, custo, preço e permissão não muda.
 
-## 1. Estado atual (lido de `src/lib/erp/modulos.ts`)
+## 1. Estado atual (lido de `src/lib/erp/modulos.ts`; atualizado em 25/11/2026, decisão 539)
 
 | Área (seletor do menu e card do hub) | Abas | Ações (cabeçalho e ⌘K) | Operador vê |
 |---|---|---|---|
-| Cadastros e Cardápio | Insumos · Fichas técnicas · Precificação | Novo insumo, Nova ficha, Importar planilha | Insumos, Fichas técnicas |
+| Ficha Técnica (até 25/11: Cadastros e Cardápio) | Fichas técnicas · Precificação | Nova ficha, Importar planilha | Fichas técnicas |
 | Compras e Fornecedores | Compras · Notas recebidas · Orçamento · Fornecedores · Histórico do insumo · Compras do período · Comparar fornecedores · Comparar períodos | Lançar nota, Importar XML, Novo fornecedor | — |
-| Estoque e Movimentações | Visão geral · Contagens · Requisições · Divergências · Consumo e conciliação | — | sem Divergências |
+| Estoque e Movimentações | Visão geral · Insumos · Contagens · Requisições · Divergências · Consumo e conciliação | Novo insumo | sem Divergências |
 | Produção | Lista do dia · Tarefas · Lotes · Histórico · Indicadores | Nova produção | sem Indicadores |
 | Etiquetas | Imprimir · Abrir embalagem · Histórico · Impressora | — | tudo |
 | Faturamento e DRE | Faturamento · Despesas · DRE · CMV por categoria · Períodos · Plano e metas · Metas por categoria | Lançar o dia, Importar faturamento, Lançar despesa | — |
+| Integração (só com "ver integrações" e o módulo liberado) | Integrações (a Central) | — | — |
 | Rede e Equipe | Lojas e marcas · Equipe · Histórico · Seu acesso (nível 1: Cadastro do parceiro, Custo médio por loja) | — | Lojas e marcas, Seu acesso |
+
+As seções abaixo são a análise e a proposta de 24/10/2026, preservadas como histórico; os nomes delas são os da época.
 
 **Camadas de navegação hoje:** hub (um card por área) → seletor de área no menu → itens do menu (= abas) → abas no alto da
 tela → ações no cabeçalho. Menu, abas e hub saem da mesma estrutura (não divergem), mas a mesma lista aparece em dois lugares

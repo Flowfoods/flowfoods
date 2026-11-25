@@ -113,7 +113,7 @@ export function TelaClassificar({
       <Voltar href={base}>Voltar para os insumos</Voltar>
       <PageHeader
         icone="classificar"
-        cor={COR.insumo}
+        cor={COR.estoque}
         titulo="Classificar insumos"
         subtitulo={`${contexto ? `${contexto} · ` : ''}${faltam.total === 0 ? 'todos os insumos ativos têm categoria' : `${plural(faltam.total, 'insumo ainda sem categoria definitiva', 'insumos ainda sem categoria definitiva')}`}`}
         aviso={feito ? <Aviso tom={feito.tom} titulo={feito.titulo} /> : undefined}

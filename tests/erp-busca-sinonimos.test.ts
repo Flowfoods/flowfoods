@@ -144,6 +144,21 @@ describe('busca ⌘K · nomes curtos do plano', () => {
     expect(filtrarLocais(doNivel1ForaDoParceiro(), 'analytics')).toEqual([]);
   });
 
+  it('decisão 539: o nome antigo continua achando — "Cadastros" acha Fichas técnicas e Insumos, "Cardápio" acha a Ficha Técnica', () => {
+    for (const locais of [doParceiro('DONO'), doNivel1()]) {
+      const cadastros = filtrarLocais(locais, 'cadastros');
+      expect(rotulos(cadastros), 'cadastros').toEqual(expect.arrayContaining(['Fichas técnicas', 'Precificação', 'Insumos']));
+      // Os Insumos moram no Estoque; a busca diz a área nova.
+      expect(cadastros.find((r) => r.rotulo === 'Insumos')!.detalhe.startsWith('Estoque e Movimentações · ')).toBe(true);
+      expect(cadastros.find((r) => r.rotulo === 'Fichas técnicas')!.detalhe.startsWith('Ficha Técnica · ')).toBe(true);
+      const cardapio = filtrarLocais(locais, 'cardápio');
+      expect(rotulos(cardapio)).toEqual(expect.arrayContaining(['Fichas técnicas', 'Precificação']));
+      expect(rotulos(cardapio)).not.toContain('Insumos');
+    }
+    // Quem não vê fichas nem insumos não acha nada pelo nome antigo.
+    expect(filtrarLocais(doParceiro('OPERADOR'), 'cadastros').map((r) => r.rotulo)).not.toContain('Precificação');
+  });
+
   it('Analytics acha o hub, onde mora a Home analítica', () => {
     expect(hrefs(filtrarLocais(doParceiro('DONO'), 'analytics'))).toEqual(['/erp']);
     expect(hrefs(filtrarLocais(doNivel1(), 'analytics'))).toEqual(['/rodolfo/erp/alfa']);
@@ -157,8 +172,9 @@ describe('busca ⌘K · nomes curtos do plano', () => {
     expect(filtrarLocais(locais, '')).toEqual(locais.filter((l) => l.tipo === 'tela'));
     expect(filtrarLocais(locais, '   ')).toEqual(locais.filter((l) => l.tipo === 'tela'));
     const integracoes = locais.find((l) => l.rotulo === 'Integrações')!;
-    expect(integracoes.detalhe).toBe('Rede e Equipe · Lojas do iFood ligadas e o que está ativo');
-    expect(integracoes.termos).toBe('Gestão · iFood · Integração · Configurações · Configuração');
+    // Decisão 539: Integrações é a aba da área Integração; "Gestão" (o nome curto de Rede e Equipe) não vem mais junto.
+    expect(integracoes.detalhe).toBe('Integração · Lojas do iFood ligadas e o que está ativo');
+    expect(integracoes.termos).toBe('iFood · Integração · Configurações · Configuração');
   });
 
   it('quem não vê a tela não a acha: o Operador e o parceiro sem Integração liberada', () => {
