@@ -371,10 +371,11 @@ export function TelaDoMes({
   // Decisão 538: sem nenhum lançamento no recorte, os cartões dizem "Sem dados" (não R$ 0,00); com falta, o total diz que é parcial.
   const cobertura = lojaAberta ? coberturaDaLoja(lojaAberta) : coberturaDaRede(m);
   const semDados = cobertura.total === 0;
-  // Loja desativada não cobra lançamento (a mesma regra da falta): não entra na conta.
-  const lojasSemLancamento = lojaAberta ? 0 : m.lojas.filter((l) => l.loja.ativa && coberturaDaLoja(l).total === 0).length;
+  // Só a loja ativa que NUNCA lançou: a falta começa no 1º lançamento, então só ela some da conta. Quem já lançou alguma vez
+  // aparece nas faltas (sem contar duas vezes), e o mês anterior ao 1º lançamento não fica "incompleto". Desativada não cobra.
+  const lojasSemLancamento = lojaAberta ? 0 : m.lojas.filter((l) => l.loja.ativa && l.primeiraData === null).length;
   const detalheDoTotal =
-    [fraseDeParcial(faltas), lojasSemLancamento > 0 ? `${lojasSemLancamento} ${lojasSemLancamento === 1 ? 'loja sem lançamento' : 'lojas sem lançamento'}` : null].filter(Boolean).join(' · ') ||
+    [fraseDeParcial(faltas), lojasSemLancamento > 0 ? `${lojasSemLancamento} ${lojasSemLancamento === 1 ? 'loja ainda sem lançamento' : 'lojas ainda sem lançamento'}` : null].filter(Boolean).join(' · ') ||
     'venda dos pedidos concluídos';
   return (
     <div className="ff-faturamento-mes space-y-6">

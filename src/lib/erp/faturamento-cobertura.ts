@@ -16,7 +16,7 @@ export interface CoberturaDoRecorte {
   porCanal: Record<CanalVenda, number>;
   /** Soma dos lançamentos de todos os canais. */
   total: number;
-  /** A loja vende o canal (na rede: alguma loja do recorte vende). */
+  /** A loja vende o canal (na rede: alguma loja ATIVA do recorte vende). */
   vende: Record<CanalVenda, boolean>;
 }
 
@@ -33,10 +33,11 @@ export function coberturaDaLoja(l: LojaNoMes): CoberturaDoRecorte {
   return { porCanal: lancamentos, total: somar(lancamentos), vende: porCanal((c) => l.loja.canais.includes(c)) };
 }
 
+/** Na rede, "vende" é de alguma loja ATIVA: canal que só uma loja desativada vendia é "não vende" na soma. */
 export function coberturaDaRede(m: MesDoFaturamento): CoberturaDoRecorte {
-  const lojas = m.lojas.map(coberturaDaLoja);
-  const lancamentos = porCanal((c) => lojas.reduce((s, l) => s + l.porCanal[c], 0));
-  return { porCanal: lancamentos, total: somar(lancamentos), vende: porCanal((c) => lojas.some((l) => l.vende[c])) };
+  const lojas = m.lojas.map((l) => ({ ativa: l.loja.ativa, c: coberturaDaLoja(l) }));
+  const lancamentos = porCanal((c) => lojas.reduce((s, l) => s + l.c.porCanal[c], 0));
+  return { porCanal: lancamentos, total: somar(lancamentos), vende: porCanal((c) => lojas.some((l) => l.ativa && l.c.vende[c])) };
 }
 
 /** Havendo lançamento, vale o número (zero declarado mostra R$ 0,00). Sem nenhum, "não vende" ou "sem lançamento". */

@@ -156,9 +156,9 @@ describe('decisão 538 · a tela do mês da rede', () => {
     expect(contar(rede, '>sem lançamento<')).toBe(1); // iFood: ninguém lançou
   });
 
-  it('o total da rede diz o que falta: o lançamento em branco e as lojas sem lançamento nenhum', () => {
+  it('o total da rede diz o que falta: o lançamento em branco e as lojas que nunca lançaram', () => {
     const h = html(mes([penhaComDia(), loja(PENHA_DELIVERY), loja(MEIER)]));
-    expect(h).toContain('Parcial · 1 lançamento faltando · 2 lojas sem lançamento');
+    expect(h).toContain('Parcial · 1 lançamento faltando · 2 lojas ainda sem lançamento');
   });
 
   it('no celular, o cartão de cada loja usa as mesmas palavras', () => {
@@ -186,6 +186,30 @@ describe('decisão 538 · revisão', () => {
     const desativada = loja({ ...PENHA_DELIVERY, ativa: false });
     const h = html(mes([penhaComDia(), desativada]));
     expect(h).toContain('Parcial · 1 lançamento faltando');
-    expect(h).not.toContain('loja sem lançamento');
+    expect(h).not.toContain('ainda sem lançamento');
+  });
+
+  it('loja que já lançou antes (ou só depois deste mês) não entra em "ainda sem lançamento": as faltas já a mostram, ou o mês é anterior a ela', () => {
+    const jaLancou = { ...loja(PENHA_DELIVERY), primeiraData: '2026-10-03' };
+    const comecouDepois = { ...loja(MEIER), primeiraData: '2026-12-01' };
+    const h = html(mes([penhaComDia(), jaLancou, comecouDepois]));
+    expect(h).toContain('Parcial · 1 lançamento faltando');
+    expect(h).not.toContain('ainda sem lançamento');
+  });
+
+  it('canal que só uma loja desativada vende é "não vende" na linha Rede', () => {
+    const r = coberturaDaRede(mes([loja(MEIER), loja({ ...PENHA_DELIVERY, ativa: false })]));
+    expect(estadoDoCanal('IFOOD', r)).toBe('nao-vende');
+    expect(estadoDoCanal('DELIVERY_PROPRIO', r)).toBe('sem-lancamento');
+  });
+
+  it('grão da integração conta como lançamento, igual ao humano (inclusive com zero)', () => {
+    const integ = (v: number, p: number): GraoLido => ({ ...grao(v, p), fonte: 'INTEGRACAO', fonteClientes: 'SEM_DADO', clientes: null });
+    const l = loja(PENHA, { [`${MES}-24`]: { IFOOD: integ(0, 0), LOJA: integ(50_000, 5) } });
+    const c = coberturaDaLoja(l);
+    expect(estadoDoCanal('IFOOD', c)).toBe('valor');
+    const porCanal = secao(html(mes([l]), l), 'Por canal', '</table>');
+    expect(linha(porCanal, 'iFood')).toContain(R0);
+    expect(linha(porCanal, 'Delivery próprio')).toContain('sem lançamento');
   });
 });
