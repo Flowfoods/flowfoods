@@ -18,6 +18,8 @@
     "worker": "tsx worker/index.ts",
     "worker:estado": "tsx worker/index.ts --estado",
     "erp:seed-teste": "tsx scripts/erp-seed-teste.ts",
+    "e2e:semear": "tsx scripts/erp-seed-teste.ts && tsx scripts/e2e-semear.ts",
+    "e2e": "playwright test",
     "erp:conferir-migracao": "tsx scripts/erp-conferir-migracao.ts",
     "erp:semear-categorias": "tsx scripts/erp-semear-categorias.ts",
     "erp:classificar-insumos": "tsx scripts/erp-classificar-insumos.ts",
@@ -47,6 +49,7 @@
     "zod": "^4.6.6"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/luxon": "^3.7.5",
     "@types/node": "^20",

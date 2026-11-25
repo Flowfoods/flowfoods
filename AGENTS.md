@@ -31,7 +31,7 @@ Infraestrutura compartilhada não amplia escopo. Consultoria, landing, dados de 
 
 - Leia efeitos e pré-condições dos scripts. Testes usam fixtures sintéticas e banco local descartável, nunca produção.
 - Comandos existentes: `npm run lint`, `npm run gate`, `npm run typecheck`, `npm test`, `npm run build`.
-- Portão completo: `.github/workflows/deploy.yml`, PostgreSQL 16 efêmero, três perfis, migrations de teste, suíte sem paralelismo, build e fontes. Testes de banco pulados não aprovam o portão.
+- Portão completo: `.github/workflows/deploy.yml`, PostgreSQL 16 efêmero, três perfis, migrations de teste, suíte sem paralelismo, build, fontes e permissões no navegador (`npm run e2e`, massa `npm run e2e:semear`). Testes de banco pulados não aprovam o portão.
 - `npm run ai:check` e `npm run ai:test` verificam o piloto, sem substituir o portão ERP. `npm run ai:generate` gera CURRENT e distribuição Claude.
 - Registre SHA, ambiente, comando, resultado, falhas e skips. Planejado, implementado, testado, revisado, integrado, publicado e validado na operação são estados distintos.
 - Revisão independente exige outro revisor realmente acionado, com parecer/evidência. Sem ele, aceite pendente; avance só trabalho que não depende desse aceite.

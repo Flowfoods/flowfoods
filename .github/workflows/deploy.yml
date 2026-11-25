@@ -114,6 +114,20 @@ jobs:
         run: npm run build
       - name: Fontes locais do build
         run: node scripts/verificar-fontes-build.mjs
+      # P-05 (decisão 540): permissões por loja no navegador, com o build acima, o mesmo Postgres descartável e massa
+      # sintética (`npm run e2e:semear`). Três larguras × quatro perfis (Dono, Gerente de uma loja, Operador de outro
+      # parceiro e perfil próprio), impressão e planilhas. Só leitura; uma falha aqui bloqueia o deploy, que depende
+      # deste job. O segredo abaixo é fixture pública do teste, nunca o da aplicação.
+      - name: Navegador dos testes de permissão
+        run: npx playwright install --with-deps chromium
+      - name: Permissões por loja no navegador (P-05)
+        env:
+          DATABASE_URL: postgresql://ff:ff@localhost:5432/ff?schema=public
+          NEXTAUTH_SECRET: e2e-fixture-publica-nao-secreta
+          NEXTAUTH_URL: http://localhost:3100
+        run: |
+          npm run e2e:semear
+          npx playwright test
 
   deploy:
     name: Deploy no Dokploy
