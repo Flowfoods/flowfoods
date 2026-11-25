@@ -29,3 +29,6 @@ tsconfig.tsbuildinfo
 /clientes/**
 !/clientes/**/
 !/clientes/**/*.md
+
+# P-05: estado e resultados dos testes de permissão no navegador (massa local, sessões e capturas)
+/e2e/.estado/
