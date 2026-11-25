@@ -106,7 +106,8 @@ async function main() {
   await notaDeCompra(a, lojaDelivery.id, 'E2E-DELIVERY-1', 'E2E Hortifruti Delivery', cebola.id, '81,53');
 
   // Integração liberada SÓ neste banco sintético, para a Alfa: assim a URL direta de quem não tem "ver integrações" prova a
-  // trava da permissão (sem-acesso), e não a do módulo. A Beta fica sem, para o caso do módulo não liberado.
+  // trava da permissão (sem-acesso), e não a do módulo. A Beta fica sem o módulo; o caso "sem-modulo" (alguém com a
+  // permissão num parceiro sem o módulo) não é coberto por estes testes.
   const lib = await mudarLiberacao(a, 'integracao', true, AUTOR);
   if (!lib.ok) throw new Error(`liberação da Integração na Alfa: ${JSON.stringify(lib)}`);
   await notaDeCompra(b, lojaBeta.id, 'E2E-BETA-1', 'E2E Distribuidora Beta', acai.id, '189,00');
