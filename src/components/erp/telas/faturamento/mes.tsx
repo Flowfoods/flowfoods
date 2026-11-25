@@ -16,6 +16,7 @@ import type { DiaDaLojaNoMes, LojaNoMes, MesDoFaturamento } from '@/lib/erp/fatu
 import { CANAIS } from '@/lib/erp/canal-campos';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { CANAIS_EM_ORDEM, diaDaSemana, mesVizinho, rotuloDoMes, textoDoTicket, type CanalVenda, type TotaisDoRecorte } from '@/lib/erp/faturamento-campos';
+import { coberturaDaLoja, coberturaDaRede, estadoDoCanal, fraseDeParcial, type CoberturaDoRecorte, type EstadoDoCanal } from '@/lib/erp/faturamento-cobertura';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
@@ -42,13 +43,34 @@ function frasesDeFalta(faltam: readonly CanalVenda[]): string {
   return nomes.length === 1 ? `falta ${nomes[0]}` : `faltam ${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`;
 }
 
+// ------------------------------------------------------------------ sem lançamento × zero declarado (decisão 538)
+
+/** O que fica no lugar do número quando o canal não tem lançamento nenhum no recorte. */
+const SEM_NUMERO: Record<Exclude<EstadoDoCanal, 'valor'>, string> = { 'sem-lancamento': 'sem lançamento', 'nao-vende': 'não vende' };
+
+/** O valor do canal (zero declarado mostra R$ 0,00) ou, sem lançamento, o porquê. Nunca um R$ 0,00 que ninguém lançou. */
+function textoDoCanal(c: CanalVenda, cobertura: CoberturaDoRecorte, t: TotaisDoRecorte): string {
+  const e = estadoDoCanal(c, cobertura);
+  return e === 'valor' ? formatarDinheiro(t.valorCentavos) : SEM_NUMERO[e];
+}
+
+function ValorDoCanal({ c, cobertura, t }: { c: CanalVenda; cobertura: CoberturaDoRecorte; t: TotaisDoRecorte }) {
+  const e = estadoDoCanal(c, cobertura);
+  return e === 'valor' ? <>{formatarDinheiro(t.valorCentavos)}</> : <span className="font-normal text-suave">{SEM_NUMERO[e]}</span>;
+}
+
+function ValorDoTotal({ cobertura, t }: { cobertura: CoberturaDoRecorte; t: TotaisDoRecorte }) {
+  return cobertura.total > 0 ? <>{formatarDinheiro(t.valorCentavos)}</> : <span className="font-normal text-suave">{SEM_NUMERO['sem-lancamento']}</span>;
+}
+
 // ------------------------------------------------------------------ totais
 
-function Totais({ por, total }: { por: Record<CanalVenda, TotaisDoRecorte>; total: TotaisDoRecorte }) {
-  const linhas: { chave: string; rotulo: string; t: TotaisDoRecorte; destaque?: boolean }[] = [
-    ...CANAIS_EM_ORDEM.map((c) => ({ chave: c, rotulo: CANAIS[c].rotulo, t: por[c] })),
-    { chave: 'total', rotulo: 'Total', t: total, destaque: true },
+function Totais({ por, total, cobertura }: { por: Record<CanalVenda, TotaisDoRecorte>; total: TotaisDoRecorte; cobertura: CoberturaDoRecorte }) {
+  const linhas: { chave: string; rotulo: string; t: TotaisDoRecorte; estado: EstadoDoCanal; destaque?: boolean }[] = [
+    ...CANAIS_EM_ORDEM.map((c) => ({ chave: c, rotulo: CANAIS[c].rotulo, t: por[c], estado: estadoDoCanal(c, cobertura) })),
+    { chave: 'total', rotulo: 'Total', t: total, estado: cobertura.total > 0 ? 'valor' : 'sem-lancamento', destaque: true },
   ];
+  const traco = <span className="font-normal text-suave">—</span>;
   return (
     // Decisão 519: "o ticket médio é a conta" mora no ponto "numeros" (com o que entra e o que não entra no número).
     <PainelComPonto
@@ -81,15 +103,28 @@ function Totais({ por, total }: { por: Record<CanalVenda, TotaisDoRecorte>; tota
             </tr>
           </thead>
           <tbody className="tabular-nums">
-            {linhas.map(({ chave, rotulo, t, destaque }) => (
+            {linhas.map(({ chave, rotulo, t, estado, destaque }) => (
               <tr key={chave} className={`border-t ${destaque ? 'border-linha-forte font-semibold' : 'border-linha'}`}>
                 <th scope="row" className="h-11 px-3 text-left font-medium text-texto sm:px-5">
                   {rotulo}
                 </th>
-                <td className="px-3 text-right">{t.pedidos === 0 && t.valorCentavos === 0 ? <span className="font-normal text-suave">—</span> : formatarDinheiro(t.valorCentavos)}</td>
-                <td className="px-3 text-right">{inteiro(t.pedidos)}</td>
-                <td className="hidden px-3 text-right sm:table-cell">{inteiro(t.clientes)}</td>
-                <td className="px-3 text-right sm:px-5">{textoDoTicket(t.ticketMedioCentavos)}</td>
+                {estado === 'valor' ? (
+                  <>
+                    <td className="px-3 text-right">{formatarDinheiro(t.valorCentavos)}</td>
+                    <td className="px-3 text-right">{inteiro(t.pedidos)}</td>
+                    <td className="hidden px-3 text-right sm:table-cell">{inteiro(t.clientes)}</td>
+                    <td className="px-3 text-right sm:px-5">{textoDoTicket(t.ticketMedioCentavos)}</td>
+                  </>
+                ) : (
+                  <>
+                    <td className="px-3 text-right">
+                      <span className="font-normal text-suave">{SEM_NUMERO[estado]}</span>
+                    </td>
+                    <td className="px-3 text-right">{traco}</td>
+                    <td className="hidden px-3 text-right sm:table-cell">{traco}</td>
+                    <td className="px-3 text-right sm:px-5">{traco}</td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
@@ -204,6 +239,8 @@ function Calendario({ l, base, mes, volta }: { l: LojaNoMes; base: string; mes: 
 
 function TabelaDaRede({ m, base, volta }: { m: MesDoFaturamento; base: string; volta: VoltaDaHome }) {
   const faltas = (n: number) => (n > 0 ? <span className="font-semibold text-erro">{n} {n === 1 ? 'falta' : 'faltas'}</span> : <span className="text-suave">0 faltas</span>);
+  const rede = coberturaDaRede(m);
+  const lojas = m.lojas.map((l) => ({ l, cobertura: coberturaDaLoja(l) }));
   return (
     // Decisão 519: o que é falta (e a conta de um por canal em cada dia) mora no ponto "falta".
     <PainelComPonto
@@ -216,16 +253,18 @@ function TabelaDaRede({ m, base, volta }: { m: MesDoFaturamento; base: string; v
     >
       {/* No celular: um cartão por loja (nome, total, faltas e o que cada canal fez). */}
       <ul className="divide-y divide-linha sm:hidden">
-        {m.lojas.map((l) => (
+        {lojas.map(({ l, cobertura }) => (
           <li key={l.loja.id} className="px-4 py-3">
             <div className="flex items-baseline justify-between gap-3">
               <Link href={comVoltaParaAHome(`${base}?mes=${m.mes}&loja=${l.loja.id}`, volta)} className={`${LINK_DE_TEXTO} ff-toque min-w-0 truncate font-medium`}>
                 {l.loja.nome}
               </Link>
-              <span className="shrink-0 text-[15px] font-semibold tabular-nums">{formatarDinheiro(l.total.valorCentavos)}</span>
+              <span className="shrink-0 text-[15px] font-semibold tabular-nums">
+                <ValorDoTotal cobertura={cobertura} t={l.total} />
+              </span>
             </div>
             <p className="mt-1 text-[12px] leading-snug tabular-nums text-suave">
-              {CANAIS_EM_ORDEM.map((c) => `${CANAIS[c].curto} ${!l.loja.canais.includes(c) && l.porCanal[c].pedidos === 0 ? 'não vende' : l.porCanal[c].pedidos === 0 && l.porCanal[c].valorCentavos === 0 ? '—' : formatarDinheiro(l.porCanal[c].valorCentavos)}`).join(' · ')}
+              {CANAIS_EM_ORDEM.map((c) => `${CANAIS[c].curto} ${textoDoCanal(c, cobertura, l.porCanal[c])}`).join(' · ')}
             </p>
             <p className="mt-0.5 text-[12px]">{faltas(l.faltas)}</p>
           </li>
@@ -233,7 +272,7 @@ function TabelaDaRede({ m, base, volta }: { m: MesDoFaturamento; base: string; v
         <li className="flex items-baseline justify-between gap-3 border-t border-linha-forte px-4 py-3 font-semibold">
           <span>Rede</span>
           <span className="tabular-nums">
-            {formatarDinheiro(m.total.valorCentavos)} <span className="text-[12px] font-normal text-suave">· {m.faltas} {m.faltas === 1 ? 'falta' : 'faltas'}</span>
+            <ValorDoTotal cobertura={rede} t={m.total} /> <span className="text-[12px] font-normal text-suave">· {m.faltas} {m.faltas === 1 ? 'falta' : 'faltas'}</span>
           </span>
         </li>
       </ul>
@@ -258,7 +297,7 @@ function TabelaDaRede({ m, base, volta }: { m: MesDoFaturamento; base: string; v
             </tr>
           </thead>
           <tbody className="tabular-nums">
-            {m.lojas.map((l) => (
+            {lojas.map(({ l, cobertura }) => (
               <tr key={l.loja.id} className="border-t border-linha">
                 <th scope="row" className="h-11 max-w-[14rem] px-4 text-left font-medium text-texto sm:px-5">
                   <Link href={comVoltaParaAHome(`${base}?mes=${m.mes}&loja=${l.loja.id}`, volta)} className={`${LINK_DE_TEXTO} block truncate py-3`}>
@@ -267,10 +306,12 @@ function TabelaDaRede({ m, base, volta }: { m: MesDoFaturamento; base: string; v
                 </th>
                 {CANAIS_EM_ORDEM.map((c) => (
                   <td key={c} className="px-3 text-right">
-                    {!l.loja.canais.includes(c) && l.porCanal[c].pedidos === 0 ? <span className="text-suave">não vende</span> : l.porCanal[c].pedidos === 0 && l.porCanal[c].valorCentavos === 0 ? <span className="text-suave">—</span> : formatarDinheiro(l.porCanal[c].valorCentavos)}
+                    <ValorDoCanal c={c} cobertura={cobertura} t={l.porCanal[c]} />
                   </td>
                 ))}
-                <td className="px-3 text-right font-semibold">{formatarDinheiro(l.total.valorCentavos)}</td>
+                <td className="px-3 text-right font-semibold">
+                  <ValorDoTotal cobertura={cobertura} t={l.total} />
+                </td>
                 <td className="px-4 text-right sm:px-5">{l.faltas > 0 ? faltas(l.faltas) : <span className="text-suave">0</span>}</td>
               </tr>
             ))}
@@ -282,10 +323,12 @@ function TabelaDaRede({ m, base, volta }: { m: MesDoFaturamento; base: string; v
               </th>
               {CANAIS_EM_ORDEM.map((c) => (
                 <td key={c} className="px-3 text-right">
-                  {formatarDinheiro(m.porCanal[c].valorCentavos)}
+                  <ValorDoCanal c={c} cobertura={rede} t={m.porCanal[c]} />
                 </td>
               ))}
-              <td className="px-3 text-right">{formatarDinheiro(m.total.valorCentavos)}</td>
+              <td className="px-3 text-right">
+                <ValorDoTotal cobertura={rede} t={m.total} />
+              </td>
               <td className="px-4 text-right sm:px-5">{m.faltas}</td>
             </tr>
           </tfoot>
@@ -325,6 +368,13 @@ export function TelaDoMes({
   const noMesAtual = m.mes === m.hoje.slice(0, 7);
   const lojaQuery = lojaAberta ? `&loja=${lojaAberta.loja.id}` : '';
   const faltas = lojaAberta ? lojaAberta.faltas : m.faltas;
+  // Decisão 538: sem nenhum lançamento no recorte, os cartões dizem "Sem dados" (não R$ 0,00); com falta, o total diz que é parcial.
+  const cobertura = lojaAberta ? coberturaDaLoja(lojaAberta) : coberturaDaRede(m);
+  const semDados = cobertura.total === 0;
+  const lojasSemLancamento = lojaAberta ? 0 : m.lojas.filter((l) => coberturaDaLoja(l).total === 0).length;
+  const detalheDoTotal =
+    [fraseDeParcial(faltas), lojasSemLancamento > 0 ? `${lojasSemLancamento} ${lojasSemLancamento === 1 ? 'loja sem lançamento' : 'lojas sem lançamento'}` : null].filter(Boolean).join(' · ') ||
+    'venda dos pedidos concluídos';
   return (
     <div className="ff-faturamento-mes space-y-6">
       {/* Leitura nova da Home (e não a guardada pelo roteador): a pendência só muda com a consulta seguinte à fonte. */}
@@ -400,23 +450,33 @@ export function TelaDoMes({
               {lojaAberta ? 'Os dias marcados em vermelho têm canal que a loja vende e ninguém lançou. Cada canal conta um por dia.' : 'Cada canal conta um por dia. Abra a loja para ver os dias marcados em vermelho.'}
             </Aviso>
           )}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {/* Quatro colunas só a partir de 1280 px: a 1024 px, ao lado do menu, o valor do Faturamento era cortado ("R$ 1.250,…"). */}
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {(() => {
               const t = lojaAberta ? lojaAberta.total : m.total;
               return (
                 <>
-                  <div className="col-span-2 flex lg:col-span-1 [&>div]:w-full">
-                    <Metrica rotulo="Faturamento" valor={formatarDinheiro(t.valorCentavos)} detalhe="venda dos pedidos concluídos" />
+                  <div className="col-span-2 flex xl:col-span-1 [&>div]:w-full">
+                    {/* A frase do parcial quebra a linha: cortada ("… 1 loja s…"), o cartão esconderia justamente o que falta. */}
+                    <Metrica
+                      rotulo="Faturamento"
+                      valor={semDados ? 'Sem dados' : formatarDinheiro(t.valorCentavos)}
+                      detalhe={<span className="block whitespace-normal">{semDados ? 'nenhum lançamento neste mês' : detalheDoTotal}</span>}
+                    />
                   </div>
-                  <Metrica rotulo="Pedidos" valor={inteiro(t.pedidos)} detalhe={frasePedidos(t.pedidos)} />
-                  <Metrica rotulo="Clientes atendidos" valor={inteiro(t.clientes)} detalhe={t.clientes === null ? 'há lançamentos sem essa informação' : 'atendimentos, não pessoas diferentes'} />
+                  <Metrica rotulo="Pedidos" valor={semDados ? 'Sem dados' : inteiro(t.pedidos)} detalhe={semDados ? 'sem lançamento' : frasePedidos(t.pedidos)} />
+                  <Metrica
+                    rotulo="Clientes atendidos"
+                    valor={semDados ? 'Sem dados' : inteiro(t.clientes)}
+                    detalhe={semDados ? 'sem lançamento' : t.clientes === null ? 'há lançamentos sem essa informação' : 'atendimentos, não pessoas diferentes'}
+                  />
                   <Metrica rotulo="Ticket médio" valor={textoDoTicket(t.ticketMedioCentavos)} detalhe="faturamento ÷ pedidos" />
                 </>
               );
             })()}
           </div>
           <GraficoDoMes m={m} lojaAberta={lojaAberta} contexto={rotuloDoEscopo(lojaAberta?.loja.nome)} />
-          <Totais por={lojaAberta ? lojaAberta.porCanal : m.porCanal} total={lojaAberta ? lojaAberta.total : m.total} />
+          <Totais por={lojaAberta ? lojaAberta.porCanal : m.porCanal} total={lojaAberta ? lojaAberta.total : m.total} cobertura={cobertura} />
           {lojaAberta ? (
             // Decisão 519: "falta é canal sem lançamento até ontem; hoje está em aberto" mora no ponto "falta"; fica a data de início.
             <PainelComPonto
