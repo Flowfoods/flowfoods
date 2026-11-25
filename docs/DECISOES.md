@@ -4705,6 +4705,8 @@ A revisão independente dessa mudança fez duas rodadas e uma confirmação:
 
 **Verificação:** 11 testes novos em `erp-faturamento-mes-estados-ui` (regra e tela da loja e da rede: loja sem nada, o dia do QA com Loja, "Não vendeu" e iFood em branco, loja só com "Não vendeu", rede mista e rede vazia). Os 7 de tela falham na versão anterior. QA no navegador (Chromium, banco e contas sintéticos) a 390, 820, 1024, 1180, 1280 e 1440 px, claro e escuro: estados certos, nenhum valor cortado, sem rolagem lateral.
 
-**Limites:** não testado em Safari/iPhone físico nem com leitor de tela real. Ficam como estavam: o detalhe "atendimentos, não pessoas diferentes" cortado no cartão Clientes a 390 e 1280 px, e o calendário de uma loja, que já separava o dia (o "—" do dia sem lançamento tem rótulo acessível "sem lançamento"). A origem do número (fonte, atualização e cobertura por indicador) é a P-02.
+**Limites:** não testado em Safari/iPhone físico nem com leitor de tela real. Fica como estava o calendário de uma loja, que já separava o dia (o "—" do dia sem lançamento tem rótulo acessível "sem lançamento"). A origem do número (fonte, atualização e cobertura por indicador) é a P-02.
 
 **Reversão:** reverter os commits desta decisão. Não há migration nem dado.
+
+**Revisão** (passada de revisão de código sobre e7d7368..d7503f8, sem subagente independente): dois achados, tratados no commit seguinte. Loja desativada sem lançamento deixou de contar em "lojas sem lançamento" (mesma regra da falta; teste novo). O detalhe do cartão Clientes também quebra a linha em vez de ser cortado (defeito anterior).

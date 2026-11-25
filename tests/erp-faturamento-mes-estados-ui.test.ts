@@ -180,3 +180,12 @@ describe('decisão 538 · a tela do mês da rede', () => {
     expect(html(m)).toContain(n(formatarDinheiro(m.total.valorCentavos)));
   });
 });
+
+describe('decisão 538 · revisão', () => {
+  it('loja desativada sem lançamento não entra em "lojas sem lançamento" do total da rede', () => {
+    const desativada = loja({ ...PENHA_DELIVERY, ativa: false });
+    const h = html(mes([penhaComDia(), desativada]));
+    expect(h).toContain('Parcial · 1 lançamento faltando');
+    expect(h).not.toContain('loja sem lançamento');
+  });
+});

@@ -371,7 +371,8 @@ export function TelaDoMes({
   // Decisão 538: sem nenhum lançamento no recorte, os cartões dizem "Sem dados" (não R$ 0,00); com falta, o total diz que é parcial.
   const cobertura = lojaAberta ? coberturaDaLoja(lojaAberta) : coberturaDaRede(m);
   const semDados = cobertura.total === 0;
-  const lojasSemLancamento = lojaAberta ? 0 : m.lojas.filter((l) => coberturaDaLoja(l).total === 0).length;
+  // Loja desativada não cobra lançamento (a mesma regra da falta): não entra na conta.
+  const lojasSemLancamento = lojaAberta ? 0 : m.lojas.filter((l) => l.loja.ativa && coberturaDaLoja(l).total === 0).length;
   const detalheDoTotal =
     [fraseDeParcial(faltas), lojasSemLancamento > 0 ? `${lojasSemLancamento} ${lojasSemLancamento === 1 ? 'loja sem lançamento' : 'lojas sem lançamento'}` : null].filter(Boolean).join(' · ') ||
     'venda dos pedidos concluídos';
@@ -468,7 +469,7 @@ export function TelaDoMes({
                   <Metrica
                     rotulo="Clientes atendidos"
                     valor={semDados ? 'Sem dados' : inteiro(t.clientes)}
-                    detalhe={semDados ? 'sem lançamento' : t.clientes === null ? 'há lançamentos sem essa informação' : 'atendimentos, não pessoas diferentes'}
+                    detalhe={<span className="block whitespace-normal">{semDados ? 'sem lançamento' : t.clientes === null ? 'há lançamentos sem essa informação' : 'atendimentos, não pessoas diferentes'}</span>}
                   />
                   <Metrica rotulo="Ticket médio" valor={textoDoTicket(t.ticketMedioCentavos)} detalhe="faturamento ÷ pedidos" />
                 </>
