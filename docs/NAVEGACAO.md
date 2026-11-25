@@ -10,7 +10,7 @@ Valentin's antes de mexer no menu.** Nenhuma URL muda; regra de estoque, custo, 
 |---|---|---|---|
 | Ficha Técnica (até 25/11: Cadastros e Cardápio) | Fichas técnicas · Precificação | Nova ficha, Importar planilha | Fichas técnicas |
 | Compras e Fornecedores | Compras · Notas recebidas · Orçamento · Fornecedores · Histórico do insumo · Compras do período · Comparar fornecedores · Comparar períodos | Lançar nota, Importar XML, Novo fornecedor | — |
-| Estoque e Movimentações | Visão geral · Insumos · Contagens · Requisições · Divergências · Consumo e conciliação | Novo insumo | sem Divergências |
+| Estoque e Movimentações | Visão geral · Contagens · Requisições · Divergências · Insumos · Consumo e conciliação | Novo insumo | sem Divergências |
 | Produção | Lista do dia · Tarefas · Lotes · Histórico · Indicadores | Nova produção | sem Indicadores |
 | Etiquetas | Imprimir · Abrir embalagem · Histórico · Impressora | — | tudo |
 | Faturamento e DRE | Faturamento · Despesas · DRE · CMV por categoria · Períodos · Plano e metas · Metas por categoria | Lançar o dia, Importar faturamento, Lançar despesa | — |

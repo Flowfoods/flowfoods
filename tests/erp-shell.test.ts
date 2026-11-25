@@ -109,11 +109,11 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/compras/relatorios/comparar-fornecedores',
       '/erp/compras/relatorios/comparar-periodos',
       '/erp/estoque',
-      // I.1a: as categorias e a classificação dos que já existiam moram ao lado dos insumos (decisão 539: no Estoque).
-      '/erp/insumos',
       '/erp/estoque/contagens',
       '/erp/estoque/requisicoes',
       '/erp/estoque/divergencias',
+      // I.1a: as categorias e a classificação dos que já existiam moram ao lado dos insumos (decisão 539: no Estoque).
+      '/erp/insumos',
       '/erp/estoque/relatorios/consumo',
       '/erp/producao/lista',
       '/erp/producao/tarefas',
@@ -153,7 +153,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     expect(futuros(a)).toEqual([]);
     // Para o nível 1 ele vem inteiro e não acrescenta aba nem ação a nenhuma área.
     expect(futuros(ALCANCE_FLOWFOODS)).toEqual(CATALOGO_EM_BREVE);
-    for (const chave of ['cadastros', 'compras', 'estoque', 'producao', 'etiquetas', 'dre', 'rede']) expect(futuros(ALCANCE_FLOWFOODS)).not.toContain(chave);
+    for (const chave of ['cadastros', 'compras', 'estoque', 'producao', 'etiquetas', 'dre', 'integracao', 'rede']) expect(futuros(ALCANCE_FLOWFOODS)).not.toContain(chave);
   });
 
   it('Gerente: sem Equipe (não cuida da equipe); com Histórico (rede inteira)', () => {
@@ -172,7 +172,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     // 3.3: as tarefas da cozinha e o histórico da produção; os indicadores por pessoa são da gerência.
     // 3.4: ele imprime a etiqueta do lote e registra a embalagem aberta (etiquetas.imprimir).
     expect(hrefs(a)).toEqual([
-      '/erp/fichas', '/erp/estoque', '/erp/insumos', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/estoque/relatorios/consumo',
+      '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/insumos', '/erp/estoque/relatorios/consumo',
       '/erp/producao/lista', '/erp/producao/tarefas', '/erp/producao', '/erp/producao/historico',
       '/erp/etiquetas', '/erp/etiquetas/abrir', '/erp/etiquetas/historico', '/erp/etiquetas/impressora',
       '/erp/lojas', '/erp/acesso',
@@ -329,10 +329,10 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/compras/relatorios/comparar-fornecedores',
       '/rodolfo/erp/valentins/compras/relatorios/comparar-periodos',
       '/rodolfo/erp/valentins/estoque',
-      '/rodolfo/erp/valentins/insumos',
       '/rodolfo/erp/valentins/estoque/contagens',
       '/rodolfo/erp/valentins/estoque/requisicoes',
       '/rodolfo/erp/valentins/estoque/divergencias',
+      '/rodolfo/erp/valentins/insumos',
       '/rodolfo/erp/valentins/estoque/relatorios/consumo',
       '/rodolfo/erp/valentins/producao/lista',
       '/rodolfo/erp/valentins/producao/tarefas',

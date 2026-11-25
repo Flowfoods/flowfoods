@@ -121,6 +121,21 @@ describe('barra de Módulos · quais atalhos', () => {
     }
   });
 
+  it('decisão 539: Integração vira atalho só com o módulo liberado; acende em qualquer tela da Central', () => {
+    const liberado = navegacaoDoParceiro(DONO, new Set(['integracao']) as typeof NENHUM_MODULO_LIBERADO);
+    const opcao = opcoesDaBarra(liberado).find((o) => o.chave === 'integracao');
+    expect(opcao).toMatchObject({ href: '/erp/integracoes', rotulo: 'Integração', nome: 'Integração', icone: 'canais', cor: COR.integracao });
+    // Fora do padrão (as quatro primeiras áreas continuam as mesmas), mas a pessoa pode escolher.
+    expect(padraoDaBarra(liberado)).toEqual(padraoDaBarra(NAV_DONO));
+    for (const tela of ['/erp/integracoes', '/erp/integracoes/analytics', '/erp/integracoes/financial']) {
+      const r = atalhosDaBarra(liberado, tela, ['integracao']);
+      expect(r.atalhos.filter((a) => a.ativo).map((a) => a.chave), tela).toEqual(['integracao']);
+    }
+    // Sem o módulo liberado, a escolha salva sai sozinha (nunca abre destino que o menu não tem).
+    expect(opcoesDaBarra(NAV_DONO).map((o) => o.chave)).not.toContain('integracao');
+    expect(chavesDaBarra(NAV_DONO, ['integracao'])).not.toContain('integracao');
+  });
+
   it('pessoa com menos áreas: só as dela; o catálogo "Em breve" (sem tela) nunca vira atalho', () => {
     const navFin = navegacaoDoParceiro(proprio(['faturamento.ver']), NENHUM_MODULO_LIBERADO);
     const fin = atalhosDaBarra(navFin, '/erp');

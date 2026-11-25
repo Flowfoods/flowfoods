@@ -439,25 +439,6 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           ],
         },
         {
-          // Decisão 539: toda a área Insumos mora aqui, com as mesmas telas, rotas e permissões (`/insumos`, "ver insumos").
-          // Fica depois da Visão geral, para a entrada de quem já usava o Estoque não mudar; quem só vê insumos entra por ela.
-          rotulo: 'Insumos',
-          icone: 'insumo',
-          telas: [
-            {
-              href: `${base}/insumos`,
-              rotulo: 'Insumos',
-              icone: 'insumo',
-              subtitulo: 'Lista, embalagem e custo por unidade',
-              // A área em que os insumos moravam até 25/11/2026: o nome antigo continua achando a aba na busca.
-              termos: ['Cadastros'],
-              permissao: 'insumos.ver',
-            },
-            // F4: Categorias e Classificar saíram do menu (destinos redundantes): as categorias abrem num painel ao lado da
-            // lista e a classificação assistida pelo aviso e pelo painel. As páginas continuam no ar (links antigos valem).
-          ],
-        },
-        {
           rotulo: 'Movimentações',
           icone: 'estoque',
           telas: [
@@ -486,6 +467,27 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               permissao: 'estoque.ajustar',
               ativoEm: `^${base}/estoque/[^/]+/divergencias(/|$)`,
             },
+          ],
+        },
+        {
+          // Decisão 539: toda a área Insumos mora aqui, com as mesmas telas, rotas e permissões (`/insumos`, "ver insumos").
+          // Fica depois das Movimentações, para a entrada de quem já usava o Estoque não mudar em nenhum perfil (Visão geral
+          // para quem vê o estoque; Requisições ou Divergências para quem só pede, atende ou ajusta); quem só vê insumos entra
+          // por ela.
+          rotulo: 'Insumos',
+          icone: 'insumo',
+          telas: [
+            {
+              href: `${base}/insumos`,
+              rotulo: 'Insumos',
+              icone: 'insumo',
+              subtitulo: 'Lista, embalagem e custo por unidade',
+              // A área em que os insumos moravam até 25/11/2026: o nome antigo continua achando a aba na busca.
+              termos: ['Cadastros'],
+              permissao: 'insumos.ver',
+            },
+            // F4: Categorias e Classificar saíram do menu (destinos redundantes): as categorias abrem num painel ao lado da
+            // lista e a classificação assistida pelo aviso e pelo painel. As páginas continuam no ar (links antigos valem).
           ],
         },
         {
@@ -737,7 +739,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       cor: COR.integracao,
       grupos: [
         {
-          rotulo: 'Integração',
+          // O mesmo nome da aba: grupo de uma tela só com o nome dela não repete o cabeçalho no menu (como Insumos › Insumos).
+          rotulo: 'Integrações',
           icone: 'canais',
           telas: [
             {
@@ -948,7 +951,7 @@ export function itemAtivo(nav: Navegacao, caminho: string): { modulo: ModuloNav;
 export interface AtalhoDaBarra {
   chave: string;
   href: string;
-  /** O nome curto, que cabe a 320 px ("Cadastros e Cardápio" → "Cadastros"). */
+  /** O nome curto, que cabe a 320 px ("Estoque e Movimentações" → "Estoque"). */
   rotulo: string;
   /** O nome inteiro da área, para o leitor de tela. */
   nome: string;
@@ -965,7 +968,7 @@ export const ATALHOS_DA_BARRA = 4;
 /** A coluna do botão Módulos: o centro das cinco. */
 export const COLUNA_DE_MODULOS = 2;
 
-/** O nome da área na aba: a primeira palavra ("Cadastros e Cardápio" → "Cadastros"), que cabe a 320 px. */
+/** O nome da área na aba: a primeira palavra ("Estoque e Movimentações" → "Estoque"), que cabe a 320 px. */
 export function rotuloDaAba(nome: string): string {
   return nome.trim().split(/\s+/)[0] ?? nome;
 }

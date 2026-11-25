@@ -30,7 +30,7 @@ import {
   type Navegacao,
 } from '@/lib/erp/modulos';
 import { comParceiroAtual, navegacaoDoNivel1 } from '@/lib/rodolfo/modulos';
-import { MODULOS_COM_LIBERACAO, NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
+import { MODULOS_COM_LIBERACAO, NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO } from '@/lib/erp/liberacao';
 import { HubDoParceiro } from '@/components/erp/telas/hub-do-parceiro';
 import { Abas } from '@/components/erp/ui/abas';
 
@@ -75,7 +75,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(abasPorArea(DONO)).toEqual({
       'Ficha Técnica': ['Fichas técnicas', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Notas recebidas', 'Orçamento', 'Fornecedores', 'Histórico do insumo', 'Compras do período', 'Comparar fornecedores', 'Comparar períodos'],
-      'Estoque e Movimentações': ['Visão geral', 'Insumos', 'Contagens', 'Requisições', 'Divergências', 'Consumo e conciliação'],
+      'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências', 'Insumos', 'Consumo e conciliação'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       Etiquetas: ['Imprimir', 'Abrir embalagem', 'Histórico', 'Impressora'],
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'CMV por categoria', 'Períodos', 'Plano e metas', 'Metas por categoria'],
@@ -99,7 +99,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(abasPorArea(GERENTE)).toEqual({
       'Ficha Técnica': ['Fichas técnicas', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Notas recebidas', 'Orçamento', 'Fornecedores', 'Histórico do insumo', 'Compras do período', 'Comparar fornecedores', 'Comparar períodos'],
-      'Estoque e Movimentações': ['Visão geral', 'Insumos', 'Contagens', 'Requisições', 'Divergências', 'Consumo e conciliação'],
+      'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências', 'Insumos', 'Consumo e conciliação'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       Etiquetas: ['Imprimir', 'Abrir embalagem', 'Histórico', 'Impressora'],
       // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
@@ -113,14 +113,14 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Gerente de loja (N3): igual ao gerente, sem Histórico (exige a rede inteira)', () => {
     const r = abasPorArea(GERENTE_N3);
     expect(r['Rede e Equipe']).toEqual(['Lojas e marcas', 'Seu acesso']);
-    expect(r['Estoque e Movimentações']).toEqual(['Visão geral', 'Insumos', 'Contagens', 'Requisições', 'Divergências', 'Consumo e conciliação']);
+    expect(r['Estoque e Movimentações']).toEqual(['Visão geral', 'Contagens', 'Requisições', 'Divergências', 'Insumos', 'Consumo e conciliação']);
   });
 
   it('Operador: sem a área Compras, sem Precificação, sem Divergências, e a única ação dele é planejar a produção', () => {
     expect(emUso(OPERADOR).map((m) => m.nome)).toEqual(['Ficha Técnica', 'Estoque e Movimentações', 'Produção', 'Etiquetas', 'Rede e Equipe']);
     expect(abasPorArea(OPERADOR)).toEqual({
       'Ficha Técnica': ['Fichas técnicas'],
-      'Estoque e Movimentações': ['Visão geral', 'Insumos', 'Contagens', 'Requisições', 'Consumo e conciliação'],
+      'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Insumos', 'Consumo e conciliação'],
       // 3.3: a cozinha pega as tarefas e lê o histórico; os indicadores por pessoa são da gerência.
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico'],
       // 3.4: a cozinha imprime a etiqueta e registra a embalagem aberta (etiquetas.imprimir, por loja).
@@ -273,6 +273,26 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     expect(texto(cartoes(secao(html(proprio(['insumos.ver'])), 'Em uso'))[0])).toContain('Estoque e Movimentações');
   });
 
+  it('decisão 539: a entrada do Estoque não muda para nenhum perfil que já o via; os Insumos só são entrada de quem não via nada dele', () => {
+    const entrada = (p: string[]) => modulosDoParceiro(proprio(p), '/erp', NENHUM_MODULO_LIBERADO).find((m) => m.chave === 'estoque')?.href;
+    expect(entrada(['insumos.ver', 'estoque.ver'])).toBe('/erp/estoque');
+    expect(entrada(['insumos.ver', 'requisicao.pedir'])).toBe('/erp/estoque/requisicoes');
+    expect(entrada(['insumos.ver', 'requisicao.atender'])).toBe('/erp/estoque/requisicoes');
+    expect(entrada(['insumos.ver', 'estoque.ajustar'])).toBe('/erp/estoque/divergencias');
+    expect(entrada(['insumos.ver'])).toBe('/erp/insumos');
+    for (const a of [DONO, GERENTE, GERENTE_N3, OPERADOR]) {
+      expect(modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO).find((m) => m.chave === 'estoque')!.href).toBe('/erp/estoque');
+    }
+  });
+
+  it('decisão 539: no hub real do nível 1 (todos os módulos de liberação), oito áreas, com Integração antes de Rede e Equipe', () => {
+    const base = '/rodolfo/erp/valentins';
+    const areas = modulosDoParceiro(ALCANCE_FLOWFOODS, base, TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => m.href);
+    expect(areas.map((m) => m.nome)).toEqual([...AREAS.slice(0, -1), 'Integração', 'Rede e Equipe']);
+    // No nível 1, a área leva à rota do espelho, que redireciona para a Central de Integrações do parceiro.
+    expect(areas.find((m) => m.chave === 'integracao')!.href).toBe(`${base}/integracoes`);
+  });
+
   it('nenhum card, em nenhum papel, tem rótulo de ação ou de aba solta como NOME', () => {
     const proibidos = [...ACOES, 'Fornecedores', 'Contagens', 'Requisições'];
     for (const a of [DONO, GERENTE, GERENTE_N3, OPERADOR]) {
@@ -292,7 +312,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     expect(t[0]).toContain('Ficha Técnica');
     expect(t[0]).toContain('Receita, custo por porção e preço de venda');
     expect(abasDoCartao(uso[0]).map((a) => a.rotulo)).toEqual(['Fichas técnicas']);
-    expect(abasDoCartao(uso[1]).map((a) => a.rotulo)).toEqual(['Visão geral', 'Insumos', 'Contagens', 'Requisições', 'Consumo e conciliação']);
+    expect(abasDoCartao(uso[1]).map((a) => a.rotulo)).toEqual(['Visão geral', 'Contagens', 'Requisições', 'Insumos', 'Consumo e conciliação']);
     expect(t[0]).not.toContain('Precificação');
     expect(t[1]).not.toContain('Divergências');
     for (const x of cartoes(secao(html(DONO), 'Em uso')).map(texto)) expect(x).not.toMatch(/R\$|%|\d/);
@@ -303,10 +323,10 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     const estoque = uso[2];
     expect(abasDoCartao(estoque)).toEqual([
       { rotulo: 'Visão geral', href: '/erp/estoque' },
-      { rotulo: 'Insumos', href: '/erp/insumos' },
       { rotulo: 'Contagens', href: '/erp/estoque/contagens' },
       { rotulo: 'Requisições', href: '/erp/estoque/requisicoes' },
       { rotulo: 'Divergências', href: '/erp/estoque/divergencias' },
+      { rotulo: 'Insumos', href: '/erp/insumos' },
       { rotulo: 'Consumo e conciliação', href: '/erp/estoque/relatorios/consumo' },
     ]);
     expect(/href="([^"]+)"/.exec(estoque)![1]).toBe('/erp/estoque');
