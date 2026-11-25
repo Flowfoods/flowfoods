@@ -121,7 +121,7 @@ export function TelaDetalheInsumo({
       <Voltar href={voltar}>Voltar para a lista</Voltar>
       <PageHeader
         icone="insumo"
-        cor={COR.insumo}
+        cor={COR.estoque}
         titulo={i.nome}
         aviso={
           salvo ? (

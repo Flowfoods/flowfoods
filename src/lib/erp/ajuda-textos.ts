@@ -134,7 +134,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'insumos',
-    area: 'cadastros',
+    area: 'estoque',
     rotas: ['insumos'],
     titulo: 'Insumos',
     versao: 5,
@@ -170,7 +170,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'insumo-novo',
-    area: 'cadastros',
+    area: 'estoque',
     rotas: ['insumos/novo', 'insumos/[id]/editar'],
     titulo: 'Cadastrar insumo',
     versao: 8,
@@ -268,7 +268,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'insumo',
-    area: 'cadastros',
+    area: 'estoque',
     rotas: ['insumos/[id]'],
     titulo: 'Detalhe do insumo',
     versao: 5,
@@ -290,7 +290,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'insumo-remover',
-    area: 'cadastros',
+    area: 'estoque',
     rotas: ['insumos/[id]/remover'],
     titulo: 'Remover insumo',
     versao: 1,
@@ -326,7 +326,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'insumo-categorias',
-    area: 'cadastros',
+    area: 'estoque',
     rotas: ['insumos/categorias'],
     titulo: 'Categorias de insumo',
     versao: 2,
@@ -340,7 +340,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'insumo-classificar',
-    area: 'cadastros',
+    area: 'estoque',
     rotas: ['insumos/classificar'],
     titulo: 'Classificar insumos',
     versao: 2,
@@ -354,7 +354,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'insumo-embalagem',
-    area: 'cadastros',
+    area: 'estoque',
     rotas: ['insumos/[id]/embalagens/[varianteId]'],
     titulo: 'Outra embalagem',
     versao: 2,
@@ -1941,7 +1941,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'integracoes',
-    area: 'rede',
+    area: 'integracao',
     rotas: ['integracoes'],
     titulo: 'Integrações',
     versao: 5,
@@ -1967,7 +1967,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'integracoes-analytics',
-    area: 'rede',
+    area: 'integracao',
     rotas: ['integracoes/analytics'],
     titulo: 'Painel iFood',
     versao: 3,
@@ -2010,7 +2010,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'integracoes-financial',
-    area: 'rede',
+    area: 'integracao',
     rotas: ['integracoes/financial'],
     titulo: 'Conferência financeira do iFood',
     versao: 2,

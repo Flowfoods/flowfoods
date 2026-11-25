@@ -23,7 +23,7 @@ export default async function ErpPainelAnalyticsPage(props: {
     { lojaId: filtro.loja, inicio: filtro.inicio, fim: filtro.fim, merchants: filtro.merchant });
   return <div className="space-y-6">
     <Voltar href="/erp/integracoes">Voltar para Integrações</Voltar>
-    <PageHeader icone="canais" cor={COR.rede} titulo="Painel iFood" subtitulo="Números de venda por loja e período" />
+    <PageHeader icone="canais" cor={COR.integracao} titulo="Painel iFood" subtitulo="Números de venda por loja e período" />
     <PainelAnalytics resultado={resultado} base="/erp/integracoes/analytics" baseSituacao="/erp/integracoes" teste={ctx.parceiro.homologacaoDeIntegracao} />
   </div>;
 }

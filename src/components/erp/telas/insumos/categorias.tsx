@@ -49,7 +49,7 @@ export function TelaCategorias({
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         icone="categorias"
-        cor={COR.insumo}
+        cor={COR.estoque}
         titulo="Categorias de insumo"
         subtitulo={`${contexto ? `${contexto} · ` : ''}cadastro da rede, vale para todas as lojas · ${ativas} ${ativas === 1 ? 'ativa' : 'ativas'}`}
         aviso={frase ? <Aviso tom="ok" titulo={frase} /> : undefined}

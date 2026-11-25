@@ -47,7 +47,7 @@ export function TelaRemoverInsumo({
       <Voltar href={lista}>Voltar para a lista</Voltar>
       <PageHeader
         icone="insumo"
-        cor={COR.insumo}
+        cor={COR.estoque}
         titulo="Remover insumo"
         subtitulo={[contexto, i.nome, TIPOS[i.tipo as TipoInsumo] ?? i.tipo, i.categoria ?? 'sem categoria', i.ativo ? null : 'desativado'].filter(Boolean).join(' · ')}
       />

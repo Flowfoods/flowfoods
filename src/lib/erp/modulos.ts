@@ -161,6 +161,8 @@ export const COR = {
   etiquetas: '#57534E',
   dre: '#4D7C0F',
   rede: '#7E3A6B',
+  // Decisão 539: Integração virou área própria e ganha cor própria (decisão de 29/10: uma cor por módulo), fora do vermelho.
+  integracao: '#6E56CF',
   comercial: '#2563A8',
   clientes: '#A16207',
   parceiros: '#57534E',
@@ -261,28 +263,19 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
   }
   return [
     {
+      // Decisão 539 (reorganização aprovada em 25/11/2026): "Cadastros e Cardápio" passa a se chamar Ficha Técnica e os
+      // Insumos vão para Estoque. A chave continua `cadastros`: é a que a barra de Módulos guarda (decisão 536), e a
+      // escolha salva de quem já tinha a área na barra não se perde. A ficha usa os mesmos insumos e custos, do mesmo
+      // cadastro: nada foi copiado, recadastrado ou recalculado.
       chave: 'cadastros',
-      nome: 'Cadastros e Cardápio',
-      subtitulo: 'Do insumo à ficha técnica e ao preço de venda',
-      resumo: 'Insumos e fichas',
-      icone: 'insumo',
-      cor: COR.insumo,
+      nome: 'Ficha Técnica',
+      subtitulo: 'Receita, custo por porção e preço de venda',
+      resumo: 'Fichas e preços',
+      // O nome antigo continua achando a área na busca (⌘K e janela de Módulos).
+      termos: ['Cadastros', 'Cardápio'],
+      icone: 'fichas',
+      cor: COR.fichas,
       grupos: [
-        {
-          rotulo: 'Insumos',
-          icone: 'insumo',
-          telas: [
-            {
-              href: `${base}/insumos`,
-              rotulo: 'Insumos',
-              icone: 'insumo',
-              subtitulo: 'Lista, embalagem e custo por unidade',
-              permissao: 'insumos.ver',
-            },
-            // F4: Categorias e Classificar saíram do menu (destinos redundantes): as categorias abrem num painel ao lado da
-            // lista e a classificação assistida pelo aviso e pelo painel. As páginas continuam no ar (links antigos valem).
-          ],
-        },
         {
           rotulo: 'Cardápio',
           icone: 'fichas',
@@ -306,13 +299,6 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
         },
       ],
       acoes: [
-        {
-          href: `${base}/insumos/novo`,
-          rotulo: 'Novo insumo',
-          icone: 'novo',
-          subtitulo: 'Cadastrar com embalagem, preço e frete',
-          permissao: 'insumos.editar',
-        },
         {
           href: `${base}/fichas/nova`,
           rotulo: 'Nova ficha',
@@ -434,8 +420,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
     {
       chave: 'estoque',
       nome: 'Estoque e Movimentações',
-      subtitulo: 'Saldo por loja, contagem, requisição e divergência',
-      resumo: 'Saldo e contagem',
+      subtitulo: 'Insumos, saldo por loja, contagem, requisição e divergência',
+      resumo: 'Insumos e saldo',
       icone: 'estoque',
       cor: COR.estoque,
       grupos: [
@@ -484,6 +470,27 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           ],
         },
         {
+          // Decisão 539: toda a área Insumos mora aqui, com as mesmas telas, rotas e permissões (`/insumos`, "ver insumos").
+          // Fica depois das Movimentações, para a entrada de quem já usava o Estoque não mudar em nenhum perfil (Visão geral
+          // para quem vê o estoque; Requisições ou Divergências para quem só pede, atende ou ajusta); quem só vê insumos entra
+          // por ela.
+          rotulo: 'Insumos',
+          icone: 'insumo',
+          telas: [
+            {
+              href: `${base}/insumos`,
+              rotulo: 'Insumos',
+              icone: 'insumo',
+              subtitulo: 'Lista, embalagem e custo por unidade',
+              // A área em que os insumos moravam até 25/11/2026: o nome antigo continua achando a aba na busca.
+              termos: ['Cadastros'],
+              permissao: 'insumos.ver',
+            },
+            // F4: Categorias e Classificar saíram do menu (destinos redundantes): as categorias abrem num painel ao lado da
+            // lista e a classificação assistida pelo aviso e pelo painel. As páginas continuam no ar (links antigos valem).
+          ],
+        },
+        {
           // L.4: a leitura do livro do estoque (nada aqui dá baixa, lança ou conta).
           rotulo: 'Relatórios',
           icone: 'relatorio',
@@ -498,8 +505,17 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           ],
         },
       ],
-      // Nova requisição, Planejar contagem e Abrir estoque são da loja (já estão nas telas dela).
-      acoes: [],
+      // Nova requisição, Planejar contagem e Abrir estoque são da loja (já estão nas telas dela). Novo insumo veio com os
+      // Insumos (decisão 539).
+      acoes: [
+        {
+          href: `${base}/insumos/novo`,
+          rotulo: 'Novo insumo',
+          icone: 'novo',
+          subtitulo: 'Cadastrar com embalagem, preço e frete',
+          permissao: 'insumos.editar',
+        },
+      ],
     },
     {
       chave: 'producao',
@@ -711,12 +727,43 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       ],
     },
     {
+      // Decisão 539: Integração é área própria no menu e abre direto a Central de Integrações (no nível 1, a rota leva à
+      // Central do parceiro). A aba é a mesma de antes, com a mesma permissão ("ver integrações") e a mesma liberação do
+      // módulo por parceiro (decisão 491): sem as duas, a área nem aparece. Estar no menu não liga nenhuma API; autorização,
+      // ativação e validação continuam por loja e por API.
+      chave: 'integracao',
+      nome: 'Integração',
+      subtitulo: 'A Central de Integrações: lojas do iFood ligadas e o que está ativo',
+      resumo: 'iFood e conexões',
+      icone: 'canais',
+      cor: COR.integracao,
+      grupos: [
+        {
+          // O mesmo nome da aba: grupo de uma tela só com o nome dela não repete o cabeçalho no menu (como Insumos › Insumos).
+          rotulo: 'Integrações',
+          icone: 'canais',
+          telas: [
+            {
+              href: `${base}/integracoes`,
+              rotulo: 'Integrações',
+              icone: 'canais',
+              subtitulo: 'Lojas do iFood ligadas e o que está ativo',
+              termos: ['iFood', 'Integração', 'Configurações', 'Configuração'],
+              permissao: 'integracao.ver',
+              modulo: 'integracao',
+            },
+          ],
+        },
+      ],
+      acoes: [],
+    },
+    {
       chave: 'rede',
       nome: 'Rede e Equipe',
       subtitulo: 'Lojas, marcas, pessoas, perfis, histórico e acessos',
       resumo: 'Lojas e pessoas',
-      // Gestão (lojas e decisões), nome curto do plano para a área. "Configurações" (integrações, permissões e configuração da
-      // rede) fica só nas abas de Lojas e marcas, Integrações e Equipe.
+      // Gestão (lojas e decisões), nome curto do plano para a área. "Configurações" (permissões e configuração da rede) fica
+      // só nas abas de Lojas e marcas e Equipe (e na de Integrações, que desde a decisão 539 é área própria).
       termos: ['Gestão'],
       icone: 'rede',
       cor: COR.rede,
@@ -733,15 +780,6 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               termos: ['Configurações', 'Configuração'],
               permissao: 'lojas.ver',
             },
-            {
-              href: `${base}/integracoes`,
-              rotulo: 'Integrações',
-              icone: 'canais',
-              subtitulo: 'Lojas do iFood ligadas e o que está ativo',
-              termos: ['iFood', 'Integração', 'Configurações', 'Configuração'],
-              permissao: 'integracao.ver',
-              modulo: 'integracao',
-            },
           ],
         },
         { rotulo: 'Pessoas', icone: 'equipe', telas: pessoas },
@@ -753,7 +791,7 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
 
 /**
  * Catálogo "Em breve" conferido em 10/11/2026: os 18 módulos do plano ainda sem tela, na ordem do catálogo. Integração NÃO
- * entra aqui: já tem aba em Rede e Equipe, sujeita à liberação por parceiro (`liberacao.ts`). "Equipe e RH" é outro módulo,
+ * entra aqui: já tem área própria (decisão 539), sujeita à liberação por parceiro (`liberacao.ts`). "Equipe e RH" é outro módulo,
  * não a aba Equipe que já existe; "CRM Time" não é a gestão de acessos.
  */
 export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
@@ -913,7 +951,7 @@ export function itemAtivo(nav: Navegacao, caminho: string): { modulo: ModuloNav;
 export interface AtalhoDaBarra {
   chave: string;
   href: string;
-  /** O nome curto, que cabe a 320 px ("Cadastros e Cardápio" → "Cadastros"). */
+  /** O nome curto, que cabe a 320 px ("Estoque e Movimentações" → "Estoque"). */
   rotulo: string;
   /** O nome inteiro da área, para o leitor de tela. */
   nome: string;
@@ -930,7 +968,7 @@ export const ATALHOS_DA_BARRA = 4;
 /** A coluna do botão Módulos: o centro das cinco. */
 export const COLUNA_DE_MODULOS = 2;
 
-/** O nome da área na aba: a primeira palavra ("Cadastros e Cardápio" → "Cadastros"), que cabe a 320 px. */
+/** O nome da área na aba: a primeira palavra ("Estoque e Movimentações" → "Estoque"), que cabe a 320 px. */
 export function rotuloDaAba(nome: string): string {
   return nome.trim().split(/\s+/)[0] ?? nome;
 }

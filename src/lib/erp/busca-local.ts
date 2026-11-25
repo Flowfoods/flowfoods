@@ -4,7 +4,8 @@
  *
  * Os nomes curtos e sinônimos (`termos` das áreas e abas, plano de módulos de 11/11/2026: "Financeiro" para Faturamento e
  * DRE, "Gestão" para Rede e Equipe, "Configurações" para Lojas e marcas, Integrações e Equipe, "iFood" e "Integração" para
- * Integrações, "Analytics" para o hub) só ajudam a ACHAR: não aparecem na lista nem criam destino, e vêm depois do que já
+ * Integrações, "Analytics" para o hub; desde a decisão 539, "Cadastros" e "Cardápio" para a Ficha Técnica e "Cadastros"
+ * para os Insumos, os nomes da área antiga) só ajudam a ACHAR: não aparecem na lista nem criam destino, e vêm depois do que já
  * casava pelo nome. Os resultados saem do menu da pessoa, então quem não vê a tela no menu não a acha pela busca, e módulo
  * sem tela ("Em breve") não vira resultado.
  */
