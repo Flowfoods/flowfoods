@@ -23,6 +23,7 @@ import { cadastrarFicha } from '@/lib/erp/fichas';
 import { cadastrarFornecedor, lancarNota } from '@/lib/erp/compras';
 import { resolverAlcance } from '@/lib/erp/permissoes';
 import { PREFIXO_PERFIL_PROPRIO } from '@/lib/erp/equipe';
+import { mudarLiberacao } from '@/lib/erp/liberacao';
 
 export const SENHA_E2E = 'permissoes p05 sintetico';
 const AUTOR = 'Teste E2E P-05';
@@ -99,9 +100,15 @@ async function main() {
     ficha = { id: r.id, nome: r.nome };
   }
 
-  // Um fornecedor por loja, com nomes que só existem nela: a planilha de quem vê uma loja não pode ter o da outra.
-  await notaDeCompra(a, lojaPenha.id, 'E2E-PENHA-1', 'E2E Hortifruti Penha', cebola.id, '79,90');
-  await notaDeCompra(a, lojaDelivery.id, 'E2E-DELIVERY-1', 'E2E Hortifruti Delivery', cebola.id, '81,50');
+  // Um fornecedor por loja, com nomes e valores que só existem nela (nenhum preço da massa base): a tela e a planilha de quem
+  // vê uma loja não podem ter os da outra.
+  await notaDeCompra(a, lojaPenha.id, 'E2E-PENHA-1', 'E2E Hortifruti Penha', cebola.id, '79,37');
+  await notaDeCompra(a, lojaDelivery.id, 'E2E-DELIVERY-1', 'E2E Hortifruti Delivery', cebola.id, '81,53');
+
+  // Integração liberada SÓ neste banco sintético, para a Alfa: assim a URL direta de quem não tem "ver integrações" prova a
+  // trava da permissão (sem-acesso), e não a do módulo. A Beta fica sem, para o caso do módulo não liberado.
+  const lib = await mudarLiberacao(a, 'integracao', true, AUTOR);
+  if (!lib.ok) throw new Error(`liberação da Integração na Alfa: ${JSON.stringify(lib)}`);
   await notaDeCompra(b, lojaBeta.id, 'E2E-BETA-1', 'E2E Distribuidora Beta', acai.id, '189,00');
 
   const dados = {
@@ -109,7 +116,7 @@ async function main() {
     emails,
     alfa: {
       lojaPenha, lojaDelivery, insumo: cebola, ficha,
-      fornecedorPenha: 'E2E Hortifruti Penha', fornecedorDelivery: 'E2E Hortifruti Delivery', valorPenha: '79,90', valorDelivery: '81,50',
+      fornecedorPenha: 'E2E Hortifruti Penha', fornecedorDelivery: 'E2E Hortifruti Delivery', valorPenha: '79,37', valorDelivery: '81,53',
     },
     beta: { loja: lojaBeta, insumo: acai, fornecedor: 'E2E Distribuidora Beta' },
     periodo: { de: '2026-11-01', ate: '2026-11-30' },

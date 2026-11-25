@@ -25,16 +25,20 @@ test.describe('Gerente de uma loja (cenário F)', () => {
   test.use({ storageState: sessaoDe('gerente') });
 
   test('entra já na própria loja, sem seletor de visão nem a outra loja', async ({ page }) => {
-    await abrir(page, '/erp');
-    const texto = await textoDaPagina(page);
-    expect(texto).toContain(d.alfa.lojaPenha.nome);
-    expect(texto).not.toContain(d.alfa.lojaDelivery.nome);
-    expect(texto).not.toContain('Rede Completa');
+    const r = await abrir(page, '/erp');
+    expect(await textoDaPagina(page)).toContain(d.alfa.lojaPenha.nome);
+    // Sem o botão de troca de visão, que é por onde se escolhe a rede ou outra loja (o Dono tem: ver o controle positivo).
+    // "Rede Completa" não serve de marca: o texto de ajuda da tela fala dela para todos.
+    await expect(page.getByRole('button', { name: /^Visão:/ })).toHaveCount(0);
+    // O HTML inteiro (inclui os dados que o servidor manda para os componentes, como as opções de um seletor fechado) não
+    // traz a outra loja.
+    expect(await r!.text()).not.toContain(d.alfa.lojaDelivery.nome);
   });
 
-  test('URL direta de Equipe e Integrações volta ao Início', async ({ page }) => {
+  test('URL direta de Equipe e Integrações volta ao Início, pela falta de permissão', async ({ page }) => {
     await recusadaNoServidor(page, '/erp/equipe');
-    await recusadaNoServidor(page, '/erp/integracoes');
+    // A Integração está liberada para a Alfa na massa: a recusa só pode vir da permissão ("ver integrações").
+    await recusadaNoServidor(page, '/erp/integracoes', 'sem-acesso');
   });
 
   test('compras: a tela e a planilha só trazem a loja dele, mesmo pedindo a outra pela URL', async ({ page }) => {
@@ -55,7 +59,9 @@ test.describe('Gerente de uma loja (cenário F)', () => {
 
     const outra = await page.request.get(planilhaDeCompras(`&loja=${d.alfa.lojaDelivery.id}`));
     expect(outra.status()).toBeLessThan(500);
-    expect(await outra.text()).not.toContain(d.alfa.fornecedorDelivery);
+    const csvOutra = await outra.text();
+    expect(csvOutra).not.toContain(d.alfa.fornecedorDelivery);
+    expect(csvOutra).not.toContain(d.alfa.valorDelivery);
   });
 
   test('imprime a ficha do próprio parceiro', async ({ page }) => {
@@ -77,17 +83,19 @@ test.describe('Operador de outro parceiro (cenário G)', () => {
   test('URL direta de um insumo da Alfa não revela o registro', async ({ page }) => {
     const r = await page.goto(`/erp/insumos/${d.alfa.insumo.id}`);
     expect(r?.status()).toBe(404);
-    expect(await textoDaPagina(page)).not.toContain(d.alfa.insumo.nome);
+    expect(await r!.text()).not.toContain(d.alfa.insumo.nome);
   });
 
   test('URL direta de Faturamento, DRE e Equipe volta ao Início', async ({ page }) => {
     for (const caminho of ['/erp/faturamento', '/erp/dre', '/erp/equipe']) await recusadaNoServidor(page, caminho);
+    // Integrações: a Beta não tem o módulo liberado, e o Operador nem a permissão; a permissão é conferida primeiro.
+    await recusadaNoServidor(page, '/erp/integracoes', 'sem-acesso');
   });
 
   test('impressão da ficha da Alfa não revela a ficha', async ({ page }) => {
     const r = await page.goto(impressaoDaFicha);
     expect(r?.status()).toBe(404);
-    expect(await textoDaPagina(page)).not.toContain(d.alfa.ficha.nome);
+    expect(await r!.text()).not.toContain(d.alfa.ficha.nome);
   });
 
   test('planilhas: sem ver compras, 403; a do estoque não traz nada da Alfa', async ({ page }) => {
@@ -98,6 +106,8 @@ test.describe('Operador de outro parceiro (cenário G)', () => {
     const consumo = await page.request.get(planilhaDeConsumo);
     expect(consumo.status()).toBe(200);
     const csv = await consumo.text();
+    // Controle positivo: a planilha é a da loja dele (sem isso, uma resposta vazia passaria).
+    expect(csv).toContain(d.beta.loja.nome);
     expect(csv).not.toContain(d.alfa.insumo.nome);
     expect(csv).not.toContain(d.alfa.lojaPenha.nome);
   });
@@ -144,7 +154,15 @@ test.describe('Dono: controle positivo', () => {
     expect(await textoDaPagina(page)).toContain(d.alfa.ficha.nome);
     const r = await page.goto(`/erp/insumos/${d.beta.insumo.id}`);
     expect(r?.status()).toBe(404);
-    expect(await textoDaPagina(page)).not.toContain(d.beta.insumo.nome);
+    expect(await r!.text()).not.toContain(d.beta.insumo.nome);
+  });
+
+  test('tem o seletor de visão (as duas lojas) e abre a Central de Integrações', async ({ page }) => {
+    const r = await abrir(page, '/erp');
+    await expect(page.getByRole('button', { name: /^Visão:/ }).first()).toBeVisible();
+    expect(await r!.text()).toContain(d.alfa.lojaDelivery.nome);
+    await abrir(page, '/erp/integracoes');
+    expect(new URL(page.url()).pathname).toBe('/erp/integracoes');
   });
 });
 

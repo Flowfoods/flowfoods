@@ -46,14 +46,18 @@ export async function abrir(page: Page, caminho: string) {
 }
 
 /**
- * URL direta para uma tela sem permissão: o servidor recusa e devolve a pessoa ao Início (`/erp`, com o aviso), sem mostrar
- * nada da tela pedida. Vale também para o módulo não liberado (`sem-modulo`).
+ * URL direta para uma tela sem permissão: o SERVIDOR recusa (a primeira resposta já é o redirecionamento, sem a tela) e a
+ * pessoa volta ao Início (`/erp`) com o aviso do motivo esperado: `sem-acesso` (falta permissão) ou `sem-modulo` (módulo não
+ * liberado para o parceiro). Aceitar os dois esconderia a falta de uma das travas.
  */
-export async function recusadaNoServidor(page: Page, caminho: string) {
+export async function recusadaNoServidor(page: Page, caminho: string, motivo: 'sem-acesso' | 'sem-modulo' = 'sem-acesso') {
+  const primeira = await page.request.get(caminho, { maxRedirects: 0 });
+  expect([302, 303, 307, 308], `${caminho}: o servidor redireciona`).toContain(primeira.status());
+  expect(primeira.headers().location ?? '', `${caminho}: para o Início com o motivo`).toMatch(new RegExp(`^(https?://[^/]+)?/erp\\?${motivo}=`));
   await page.goto(caminho);
   const url = new URL(page.url());
   expect(url.pathname, `${caminho}: volta ao Início`).toBe('/erp');
-  expect(url.search, `${caminho}: com o aviso de acesso`).toMatch(/sem-(acesso|modulo)=/);
+  expect(url.searchParams.has(motivo), `${caminho}: com o aviso ${motivo}`).toBe(true);
 }
 
 /** O texto visível da página (sem marcação), para conferir o que aparece e o que não pode aparecer. */
