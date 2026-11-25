@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // `next dev` não escreve bloco próprio no AGENTS.md (fonte comum das regras).
+  agentRules: false,
   // Server actions no limite padrão do Next (1 MB). A foto da ficha técnica
   // (até 8 MB) vai pela rota própria `/erp/fichas/fotos`, que confere a
   // sessão ANTES de ler o corpo (1.3; antes era um limite global de 9 MB).
