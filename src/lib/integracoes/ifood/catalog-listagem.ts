@@ -13,7 +13,7 @@ const respostaSchema = z.array(z.object({
   catalogId: texto,
   context: z.array(texto),
   status: texto,
-  modifiedAt: z.number(),
+  modifiedAt: z.union([z.number(), z.iso.datetime({ offset: true })]),
 }));
 const categoriasSchema = z.array(z.object({
   id: texto,

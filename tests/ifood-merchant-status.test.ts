@@ -49,6 +49,16 @@ describe('Merchant · status por operação e canal', () => {
     });
   });
 
+  it('reconhece o canal do app iFood retornado em TEST com entrega em minúsculas', () => {
+    const canalDoApp = status({ operation: 'delivery', salesChannel: 'ifood-app', available: false, state: 'ERROR' });
+    expect(conferirStatusMerchant(consulta, [canalDoApp])).toMatchObject({
+      situacao: 'observada', ...canal, available: false, state: 'ERROR',
+    });
+    expect(conferirStatusMerchant(consulta, [status(), canalDoApp])).toMatchObject({
+      situacao: 'inconclusiva', motivo: 'canal-duplicado',
+    });
+  });
+
   it.each([
     { state: 'WARNING', available: true, validations: [{ code: 'is-connected', state: 'OK' }] },
     { state: 'WARNING', available: false, validations: [{ code: 'validacao-sintetica', state: 'WARNING' }] },

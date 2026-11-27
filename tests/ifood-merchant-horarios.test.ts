@@ -48,8 +48,23 @@ describe('Merchant · horários configurados', () => {
     });
   });
 
+  it('lê o objeto de horários TEST quando o identificador confirma a loja', () => {
+    expect(conferirHorariosMerchant(consulta, { storeId: loja.toUpperCase(), shifts: [turno] }))
+      .toEqual(conferirHorariosMerchant(consulta, [{ shifts: [turno] }]));
+    expect(conferirHorariosMerchant(consulta, { storeId: loja, shifts: [] }))
+      .toMatchObject({ estado: 'sem-turnos-informados', grupos: [{ turnos: [] }] });
+  });
+
+  it('recusa o identificador de outra loja nos dois formatos de horários', () => {
+    const outroGrupo = { storeId: outraLoja, shifts: [turno] };
+    for (const resposta of [outroGrupo, [{ shifts: [] }, outroGrupo]]) {
+      expect(() => conferirHorariosMerchant(consulta, resposta))
+        .toThrow(expect.objectContaining({ codigo: 'IDENTIDADE' }));
+    }
+  });
+
   it.each([
-    [null], [{ errorType: 'FORBIDDEN' }], [[{}]], [[turno]],
+    [null], [{ errorType: 'FORBIDDEN' }], [[{}]], [[turno]], [{ shifts: [turno] }], [{ storeId: loja }],
     [[{ shifts: [{ ...turno, dayOfWeek: 'INVALIDO' }] }]],
     [[{ shifts: [{ ...turno, start: '24:00:00' }] }]],
     [[{ shifts: [{ ...turno, start: '09:00:00-03:00' }] }]],
