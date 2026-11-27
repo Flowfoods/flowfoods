@@ -16,7 +16,7 @@ function dados(): ComplementaresDoPainelAnalytics {
     cobertura: { completa: true, diasEsperados: 1, diasCompletos: 1, fontesSelecionadas: 1, paresEsperados: 1, paresCobertos: 1,
       dias: [{ dia: '2026-11-05', completo: true, fontes: [{ chave: CHAVE, estado: 'publicado', publicadaEm: '2026-11-06T12:00:00Z', revisaoPendente: true }] }] },
     horarios: { total: { estado: 'disponivel', valor: '15' }, distribuicao: { estado: 'disponivel', valor: [
-      { termo: '2', ocorrencias: '4' }, { termo: '10', ocorrencias: '6' }, { termo: '23', ocorrencias: '0' }, { termo: 'sem-hora', ocorrencias: '5' },
+      { termo: '2', ocorrencias: '4' }, { termo: '10:00', ocorrencias: '6' }, { termo: '23', ocorrencias: '0' }, { termo: 'sem-hora', ocorrencias: '5' },
     ] } },
     primeirosPedidos: { total: { estado: 'disponivel', valor: '10' }, distribuicao: { estado: 'disponivel', valor: [
       { termo: 'true', ocorrencias: '2' }, { termo: 'false', ocorrencias: '3' }, { termo: 'OUTRO', ocorrencias: '5' },
