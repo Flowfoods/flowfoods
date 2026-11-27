@@ -15,7 +15,7 @@ import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
  * passos; cancelar devolve o foco ao botão que abriu. Depois de um envio com erro, o foco vai ao primeiro campo com erro (ou à
  * resposta); depois de um cadastro certo, o formulário limpa.
  */
-import { useEffect, useRef, useState, type RefObject, useActionState } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject, useActionState } from 'react';
 
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO, Resultado, type EstadoForm } from '@/components/erp/ui/campos';
@@ -24,6 +24,7 @@ import { Confirmacao } from '@/components/erp/telas/equipe/escolhas';
 import type { PedidoReleituraAnalytics } from '@/lib/integracoes/core/situacao-analytics-campos';
 import {
   acaoDesligarConexao,
+  acaoIncluirAvaliacoesNoAppDeTeste,
   acaoIncluirFinanceiroNoAppDeTeste,
   acaoLigarConexao,
   acaoMarcarHomologacao,
@@ -89,14 +90,30 @@ function useConfirmacao() {
   return { aberta, abrir: () => setAberta(true), cancelar, abridor };
 }
 
-export function FormIncluirFinanceiro({ appId, nome, cadastrado }: { appId: string; nome: string; cadastrado: boolean }) {
-  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoIncluirFinanceiroNoAppDeTeste.bind(null, appId), null);
+export function FormIncluirModuloNoAppDeTeste({ appId, nome, modulo, cadastrado }: {
+  appId: string; nome: string; modulo: 'FINANCIAL' | 'REVIEW'; cadastrado: boolean;
+}) {
+  const ehReview = modulo === 'REVIEW';
+  const rotulo = ehReview ? 'Avaliações' : 'Financeiro';
+  const acao = ehReview ? acaoIncluirAvaliacoesNoAppDeTeste : acaoIncluirFinanceiroNoAppDeTeste;
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acao.bind(null, appId), null);
   const form = useRef<HTMLFormElement>(null);
+  const confirmacaoErroId = useId();
+  const erro = estado?.erros?.conferido;
   useFocoDoEnvio(estado, form);
   if (cadastrado && !estado) return null;
   return (
-    <FormularioComAcao ref={form} action={enviar} aria-label={`Incluir Financeiro no cadastro de ${nome}`} className="space-y-2">
-      {!cadastrado && <BotaoEnviar variante="secundario" pendente="Incluindo…">Incluir Financeiro no cadastro</BotaoEnviar>}
+    <FormularioComAcao ref={form} action={enviar} aria-label={`Incluir ${rotulo} no cadastro de ${nome}`} className="space-y-2">
+      {!cadastrado && ehReview && (
+        <div>
+          <label className="flex min-h-11 items-center gap-2 text-sm">
+            <input type="checkbox" className={MARCAR} name="conferido" value="sim" aria-invalid={!!erro} aria-describedby={erro ? confirmacaoErroId : undefined} />
+            <span>Conferi que este app TEST tem Avaliações no iFood Developer.</span>
+          </label>
+          <Erro id={confirmacaoErroId} texto={erro} />
+        </div>
+      )}
+      {!cadastrado && <BotaoEnviar variante="secundario" pendente="Incluindo…">Incluir {rotulo} no cadastro</BotaoEnviar>}
       <Resposta estado={estado} />
     </FormularioComAcao>
   );

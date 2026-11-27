@@ -20,7 +20,7 @@ import { ultimasLeiturasDeTeste, validadeDosTokens } from '@/lib/integracoes/cor
 import { conexoesDoParceiro } from '@/lib/integracoes/core/conexoes';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { Aviso, Contagem, Painel, Ponto, Selo, Vazio } from '@/components/erp/ui/superficies';
-import { FormCadastrarApp, FormIncluirFinanceiro } from './forms';
+import { FormCadastrarApp, FormIncluirModuloNoAppDeTeste } from './forms';
 import { diaBr, QUANDO, ROTULO_DA_CATEGORIA, ROTULO_DA_HOMOLOGACAO, ROTULO_DO_PASSO, TOM_DA_HOMOLOGACAO } from './rotulos';
 
 export const dynamic = 'force-dynamic';
@@ -85,7 +85,12 @@ export default async function CentralDeIntegracoesPage() {
                         <dt className="text-suave">Acesso guardado</dt>
                         <dd className="text-texto">{!t ? 'nenhum ainda' : valido ? `vale até ${QUANDO.format(t.expiraEm)}` : `venceu em ${QUANDO.format(t.expiraEm)}; a próxima leitura pede outro`}</dd>
                       </dl>
-                      {ehAppIfoodDeTeste(a) && <FormIncluirFinanceiro appId={a.id} nome={a.nome} cadastrado={a.modulos.includes('FINANCIAL')} />}
+                      {ehAppIfoodDeTeste(a) && (
+                        <>
+                          <FormIncluirModuloNoAppDeTeste appId={a.id} nome={a.nome} modulo="FINANCIAL" cadastrado={a.modulos.includes('FINANCIAL')} />
+                          <FormIncluirModuloNoAppDeTeste appId={a.id} nome={a.nome} modulo="REVIEW" cadastrado={a.modulos.includes('REVIEW')} />
+                        </>
+                      )}
                       {ehAppIfoodDeTeste(a) && a.modulos.includes('FINANCIAL') && <Link prefetch={false} href={`/rodolfo/integracoes/apps/${a.id}/financial`}
                         className="inline-flex min-h-11 items-center text-sm underline underline-offset-4">Conferir apuração Financial de homologação</Link>}
                       {appAceitaParecer(a) && <Link href={`/rodolfo/integracoes/apps/${a.id}`} className="inline-block text-sm underline underline-offset-4">Registrar parecer do iFood</Link>}
