@@ -17,6 +17,7 @@ const listagemSchema = z.strictObject({
 });
 
 const detalheSchema = z.strictObject({ merchantId: uuid, reviewId: uuid });
+const resumoSchema = z.strictObject({ merchantId: uuid });
 
 const avaliacaoSchema = z.object({
   id: uuid,
@@ -37,6 +38,11 @@ const paginaSchema = z.object({
 });
 
 const respostaDetalheSchema = avaliacaoSchema.extend({ merchant: z.object({ id: uuid.optional() }).nullish() });
+const respostaResumoSchema = z.object({
+  totalReviewsCount: contagem.nullish(),
+  validReviewsCount: contagem.nullish(),
+  score: z.number().min(1).max(5).or(z.literal(0)).nullish(),
+}).refine(dados => dados.totalReviewsCount !== undefined || dados.validReviewsCount !== undefined || dados.score !== undefined);
 
 type CodigoContratoReview = 'PARAMETROS' | 'ESQUEMA' | 'PAGINACAO' | 'PERIODO' | 'IDENTIDADE';
 
@@ -88,8 +94,18 @@ function lerParametrosDoDetalhe(entrada: unknown) {
   return resultado.data;
 }
 
+function lerParametrosDoResumo(entrada: unknown) {
+  const resultado = resumoSchema.safeParse(entrada);
+  exigir(resultado.success, 'PARAMETROS', 'Parâmetros do resumo Review inválidos.');
+  return resultado.data;
+}
+
+function caminhoDoMerchantReview(merchantId: string) {
+  return `/review/v2.0/merchants/${merchantId}`;
+}
+
 function caminhoDasAvaliacoes(merchantId: string) {
-  return `/review/v2.0/merchants/${merchantId}/reviews`;
+  return `${caminhoDoMerchantReview(merchantId)}/reviews`;
 }
 
 export function chamadaDaListagemReview(entrada: unknown): ChamadaIfood {
@@ -108,6 +124,11 @@ export function chamadaDaListagemReview(entrada: unknown): ChamadaIfood {
 export function chamadaDoDetalheReview(entrada: unknown): ChamadaIfood {
   const { merchantId, reviewId } = lerParametrosDoDetalhe(entrada);
   return { metodo: 'GET', familia: 'review', caminho: `${caminhoDasAvaliacoes(merchantId)}/${reviewId}` };
+}
+
+export function chamadaDoResumoReview(entrada: unknown): ChamadaIfood {
+  const { merchantId } = lerParametrosDoResumo(entrada);
+  return { metodo: 'GET', familia: 'review', caminho: `${caminhoDoMerchantReview(merchantId)}/summary` };
 }
 
 function projetarAvaliacao(avaliacao: z.infer<typeof avaliacaoSchema>) {
@@ -180,4 +201,18 @@ export function conferirDetalheReview(entrada: unknown, resposta: unknown) {
   if (!dados.merchant?.id) return { estado: 'loja-nao-confirmada' } as const;
   exigir(dados.merchant.id === merchantId, 'IDENTIDADE', 'O detalhe Review indica outra loja.');
   return { estado: 'conferido', merchantId, avaliacao: projetarAvaliacao(dados) } as const;
+}
+
+/** Projeta os agregados da resposta bem-sucedida para a loja solicitada. */
+export function conferirResumoReview(entrada: unknown, resposta: unknown) {
+  const { merchantId } = lerParametrosDoResumo(entrada);
+  const resultado = respostaResumoSchema.safeParse(resposta);
+  exigir(resultado.success, 'ESQUEMA', 'Resposta do resumo Review fora do formato esperado.');
+  const { totalReviewsCount, validReviewsCount, score } = resultado.data;
+  return {
+    merchantIdSolicitado: merchantId,
+    totalAvaliacoes: totalReviewsCount ?? null,
+    avaliacoesValidas: validReviewsCount ?? null,
+    nota: score === 0 ? null : score ?? null,
+  };
 }
