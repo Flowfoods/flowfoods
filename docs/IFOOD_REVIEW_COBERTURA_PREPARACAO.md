@@ -32,3 +32,13 @@ npx --no-install vitest run tests/ifood-review-cobertura-simulada.test.ts --no-f
 As fixtures demonstram consulta completa com duplicatas, falta de página e atraso. Os testes incluem consulta completa vazia, repetição/conflito de páginas e registros, encadeamento, escopo, intervalo, snapshots, relógios e preservação de desconhecidos.
 
 Esta preparação **não conclui a INT-3.2**, não prova acesso, cobertura oficial, consistência real entre páginas, persistência ou concorrência. Um adaptador futuro depende do contrato vigente e de evidência suficiente de completude/frescor; não deve inventar snapshot, traduzir um booleano em prova ou promover automaticamente o resultado para o preflight de envio. Antes disso permanecem revisão independente, portão do repositório e as liberações próprias de TEST/operação. A [documentação oficial Review](https://developer.ifood.com.br/en-US/docs/food/guides/modules/review/homologation) é referência para futura reconferência, não um payload reproduzido aqui.
+
+## Preparo da leitura Review v2
+
+`src/lib/integracoes/ifood/review-leitura.ts` define os pedidos GET de listagem e detalhe para o cliente iFood existente e confere a parte da resposta usada na preparação. Na listagem, solicita uma página por vez com `pageSize` de 1 a 50, contagem e ordenação por criação. A conversão dos limites para UTC e a conferência do período preservam a fração de segundo recebida.
+
+A validação mantém o offset retornado separado da página pedida, conforme a [referência de listagem](https://developer.ifood.com.br/pt-BR/docs/references#operations-Review-getReviews). Quando total ou contagem de páginas está ausente, a contagem fica incompleta. Uma página vazia além do total continua identificada como fora da contagem. Itens fora do intervalo consultado, IDs repetidos na mesma página e quantidades incompatíveis sinalizam divergência. Observar uma página ainda exige conciliar as demais para confirmar cobertura.
+
+O [detalhe](https://developer.ifood.com.br/pt-BR/docs/references#operations-Review-getReview) confere a identidade da avaliação e da loja. A projeção conserva status, versão, visibilidade, nota, data e presença de resposta da loja. Autor desconhecido deixa a presença indeterminada quando nenhuma resposta da loja está confirmada. A projeção exclui comentários, nomes e texto das respostas. Falhas HTTP, inclusive 404, continuam no resultado do cliente iFood.
+
+Os testes em `tests/ifood-review-leitura.test.ts` usam respostas sintéticas e transporte em memória. O contrato aguarda a primeira comparação de listagem e detalhe com o TEST oficial da loja autorizada, incluindo contagem e interpretação do offset. A fila editorial simulada e esse ensaio permanecem independentes da operação de Review.
