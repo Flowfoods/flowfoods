@@ -51,7 +51,10 @@ export default async function IntegracoesDoParceiroNoNivel1(
   const integracao = liberacoes.find((l) => l.modulo === 'integracao');
   const liberado = integracao?.liberado ?? false;
   const lojaDaConsulta = situacao.ok ? situacao.situacao?.loja.id : undefined;
-  const painelHref = `/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}/analytics${lojaDaConsulta ? `?loja=${encodeURIComponent(lojaDaConsulta)}` : ''}`;
+  const centralHref = `/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}`;
+  const consultaDaLoja = lojaDaConsulta && lojas.some(loja => loja.id === lojaDaConsulta)
+    ? `?loja=${encodeURIComponent(lojaDaConsulta)}` : '';
+  const painelHref = `${centralHref}/analytics${lojaDaConsulta ? `?loja=${encodeURIComponent(lojaDaConsulta)}` : ''}`;
   const ambiente = parceiro.homologacaoDeIntegracao ? 'TEST' : 'PRODUCAO';
   const appPorId = new Map(apps.map((a) => [a.id, a]));
   const ligadas = conexoes.filter((c) => c.estado === 'ATIVA');
@@ -70,8 +73,13 @@ export default async function IntegracoesDoParceiroNoNivel1(
       {liberado && <nav aria-label="Conferências iFood" className="flex flex-wrap gap-x-6">
         <Link href={painelHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver painel iFood por período</Link>
         <Link href={`/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}/financial${lojaDaConsulta ? `?loja=${encodeURIComponent(lojaDaConsulta)}` : ''}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Conferir financeiro do iFood</Link>
+        {parceiro.homologacaoDeIntegracao && (
+          <Link href={`${centralHref}/review${consultaDaLoja}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>
+            Consultar avaliações em demonstração
+          </Link>
+        )}
       </nav>}
-      <PainelSituacaoAnalytics resultado={situacao} teste={parceiro.homologacaoDeIntegracao} base={`/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}`} baseFaturamento={`/rodolfo/erp/${encodeURIComponent(parceiro.slug)}/faturamento`}
+      <PainelSituacaoAnalytics resultado={situacao} teste={parceiro.homologacaoDeIntegracao} base={centralHref} baseFaturamento={`/rodolfo/erp/${encodeURIComponent(parceiro.slug)}/faturamento`}
         formularioReleitura={podeEscrever ? pedido => <FormReleituraAnalytics slug={parceiro.slug} pedido={pedido} /> : undefined} />
       {!podeEscrever && (
         <Aviso tom="alerta" titulo="Só leitura">

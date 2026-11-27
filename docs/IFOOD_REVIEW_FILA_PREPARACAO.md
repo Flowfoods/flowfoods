@@ -1,6 +1,6 @@
 # Review — fila editorial persistente, preparação interna
 
-Esta fatia continua a política versionada e os modelos locais de INT-3.2–3.3. Cada sugestão tem origem **LOCAL_SIMULATION**, capacidade **INATIVA** e estado editorial **RASCUNHO** ou **APROVADA**. Os fatos são sintéticos/locais; não são dados coletados, contrato oficial, prova TEST ou homologação. Não há UI, action, rota HTTP, IA, worker, grant ou transporte. Não encerra INT-3.3 nem habilita a operação Review.
+Esta preparação continua a política versionada e os modelos locais de INT-3.2–3.3. Cada sugestão tem origem **LOCAL_SIMULATION**, capacidade **INATIVA** e estado editorial **RASCUNHO** ou **APROVADA**. A fila contém fatos sintéticos e locais. A homologação de Review exige evidências obtidas no ambiente TEST oficial.
 
 ## Identidade, revisão e aprovação
 
@@ -23,9 +23,11 @@ Consulta reconstrói os snapshots do banco, sem depender de cache. DTOs são có
 
 ## Autorização e isolamento
 
-`review-fila-servidor.ts` é fachada interna Nível 1, sem consumidor externo. `exigirParceiro` fornece cliente e sessão; o payload estrito não aceita tenant, autoria, relógio, origem/capacidade ou política arbitrários. `integracao.ver` não concede esta escrita. O repositório interno recebe somente contexto confiável; não é endpoint de autenticação.
+`review-fila-servidor.ts` é fachada interna Nível 1, sem consumidor externo. `exigirParceiro` fornece cliente e sessão; o payload estrito não aceita tenant, autoria, relógio, origem/capacidade ou política arbitrários. A escrita da fila exige o contexto interno do repositório.
 
 O portão revalida parceiro ATIVO na primeira escrita da transação e recusa cliente somente leitura. Não é necessário criar app, grant ou conexão para preparar dados locais. Com RLS instalada em Loja, as três tabelas usam FORCE RLS e o papel existente; sem RLS, preservam portão, FKs e gatilhos, sem alegar isolamento de SQL administrativo nesse perfil.
+
+A Central do Barney oferece uma consulta de demonstração para parceiros marcados como TEST com o módulo Integração liberado. A sessão Nível 1 e `integracao.ver` são verificadas no servidor. A tela usa um cliente somente leitura e apresenta as sugestões de uma loja ativa, filtradas por estado editorial. Ela mostra o texto da revisão corrente da sugestão selecionada na página. Aprovação registrada nessa fila continua sendo um estado editorial local.
 
 ## Verificação e continuidade
 
