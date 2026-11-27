@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { armazemEmMemoria, ServicoDeToken, type AppParaToken } from '@/lib/integracoes/ifood/auth';
 import { criarClienteIfood } from '@/lib/integracoes/ifood/http';
 import { Limitador } from '@/lib/integracoes/ifood/limitador';
-import { chamadaDaListagemReview, chamadaDoDetalheReview, conferirDetalheReview, conferirPaginaReview } from '@/lib/integracoes/ifood/review-leitura';
+import {
+  chamadaDaListagemReview, chamadaDoDetalheReview, chamadaDoResumoReview,
+  conferirDetalheReview, conferirPaginaReview, conferirResumoReview,
+} from '@/lib/integracoes/ifood/review-leitura';
 import type { PedidoHttp, Transporte } from '@/lib/integracoes/ifood/transporte';
 
 const loja = 'd05ecab0-7bb7-4a5e-badf-0c6111111111';
@@ -11,6 +14,7 @@ const avaliacaoId = (numero: number) => `8fcac37a-47dd-4dc4-a802-${String(numero
 const criadaEm = '2026-11-20T12:10:00.000Z';
 const periodo = { merchantId: loja, de: '2026-11-20T09:00:00-03:00', ate: '2026-11-20T18:00:00-03:00' };
 const escolha = { merchantId: loja, reviewId: avaliacaoId(1) };
+const consultaResumo = { merchantId: loja.toUpperCase() };
 
 const avaliacao = (i = 1, campos: Record<string, unknown> = {}) => ({
   id: avaliacaoId(i), createdAt: criadaEm, score: 2, status: 'NOT_REPLIED', version: 'V2', visibility: 'PRIVATE', replies: [], ...campos,
@@ -121,7 +125,43 @@ describe('Review v2 · conferência do detalhe', () => {
   });
 });
 
-it('envia apenas GET de Review pelo cliente existente com transporte simulado e conserva 404 como falha', async () => {
+describe('Review v2 · resumo por loja', () => {
+  it('solicita o resumo da loja sem filtros de listagem', () => {
+    expect(chamadaDoResumoReview(consultaResumo)).toEqual({
+      metodo: 'GET', familia: 'review', caminho: `/review/v2.0/merchants/${loja}/summary`,
+    });
+    expect(() => chamadaDoResumoReview({ merchantId: `${loja}/reviews?` })).toThrow(expect.objectContaining({ codigo: 'PARAMETROS' }));
+    expect(() => chamadaDoResumoReview({ ...consultaResumo, dateFrom: periodo.de })).toThrow(expect.objectContaining({ codigo: 'PARAMETROS' }));
+  });
+
+  it('preserva os agregados e a precisão da nota fornecida no resumo', () => {
+    const resposta = { totalReviewsCount: 12, validReviewsCount: 10, score: 4.375, comentario: 'Texto fictício' };
+    expect(conferirResumoReview(consultaResumo, resposta)).toEqual({
+      merchantIdSolicitado: loja, totalAvaliacoes: 12, avaliacoesValidas: 10, nota: 4.375,
+    });
+  });
+
+  it('preserva zero explícito nas contagens e só retorna nota dentro da escala', () => {
+    expect(conferirResumoReview(consultaResumo, { totalReviewsCount: 0, validReviewsCount: 0, score: 0 })).toMatchObject({
+      totalAvaliacoes: 0, avaliacoesValidas: 0, nota: null,
+    });
+    expect(conferirResumoReview(consultaResumo, { validReviewsCount: 0, score: null })).toMatchObject({
+      totalAvaliacoes: null, avaliacoesValidas: 0, nota: null,
+    });
+    expect(conferirResumoReview(consultaResumo, { totalReviewsCount: 3 })).toMatchObject({
+      totalAvaliacoes: 3, avaliacoesValidas: null, nota: null,
+    });
+  });
+
+  it.each([
+    {}, null, { errorType: 'NOT_FOUND' }, { totalReviewsCount: -1 }, { validReviewsCount: 1.5 },
+    { validReviewsCount: '0' }, { score: '4.5' }, { score: 0.5 }, { score: 5.1 },
+  ])('recusa formatos de resumo não reconhecidos (%j)', resposta => {
+    expect(() => conferirResumoReview(consultaResumo, resposta)).toThrow(expect.objectContaining({ codigo: 'ESQUEMA' }));
+  });
+});
+
+it('envia apenas GET de Review pelo cliente existente e preserva falhas HTTP no transporte simulado', async () => {
   const registros: PedidoHttp[] = [];
   const app: AppParaToken = { id: 'review-local', clientId: 'cliente-sintetico', ambiente: 'TEST',
     nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET', homologacao: 'NAO_SE_APLICA' };
@@ -129,6 +169,12 @@ it('envia apenas GET de Review pelo cliente existente com transporte simulado e 
   const transporte: Transporte = async pedido => {
     if (pedido.url.endsWith('/oauth/token')) return { status: 200, cabecalhos: {}, corpo: '{"accessToken":"token-sintetico","expiresIn":3600}' };
     registros.push(pedido);
+    if (pedido.url.endsWith(`/merchants/${loja}/summary`)) {
+      return { status: 200, cabecalhos: {}, corpo: '{"totalReviewsCount":0,"validReviewsCount":0}' };
+    }
+    if (pedido.url.endsWith(`/merchants/${outraLoja}/summary`)) {
+      return { status: 403, cabecalhos: {}, corpo: '{"errorType":"FORBIDDEN"}' };
+    }
     return pedido.url.includes('?')
       ? { status: 200, cabecalhos: {}, corpo: JSON.stringify(pagina([avaliacao()])) }
       : { status: 404, cabecalhos: {}, corpo: '{"errorType":"NOT_FOUND"}' };
@@ -139,6 +185,13 @@ it('envia apenas GET de Review pelo cliente existente com transporte simulado e 
   const lista = await cliente.chamar(chamadaDaListagemReview(periodo));
   expect(lista.ok && conferirPaginaReview(periodo, lista.dados)).toMatchObject({ estado: 'observada' });
   await expect(cliente.chamar(chamadaDoDetalheReview(escolha))).resolves.toMatchObject({ ok: false, status: 404 });
-  expect(registros.map(p => p.metodo)).toEqual(['GET', 'GET']);
+  const resumo = await cliente.chamar(chamadaDoResumoReview(consultaResumo));
+  expect(resumo.ok && conferirResumoReview(consultaResumo, resumo.dados)).toMatchObject({
+    totalAvaliacoes: 0, avaliacoesValidas: 0, nota: null,
+  });
+  await expect(cliente.chamar(chamadaDoResumoReview({ merchantId: outraLoja }))).resolves.toMatchObject({ ok: false, status: 403 });
+  await expect(cliente.chamar(chamadaDoResumoReview({ merchantId: avaliacaoId(3) }))).resolves.toMatchObject({ ok: false, status: 404 });
+  expect(registros.map(p => p.metodo)).toEqual(['GET', 'GET', 'GET', 'GET', 'GET']);
   expect([...new URL(registros[0].url).searchParams.keys()]).toEqual(['page', 'pageSize', 'addCount', 'dateFrom', 'dateTo', 'sort', 'sortBy']);
+  expect(registros.slice(2).map(p => new URL(p.url).search)).toEqual(['', '', '']);
 });
