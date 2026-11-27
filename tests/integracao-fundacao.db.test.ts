@@ -218,7 +218,10 @@ describe.skipIf(!URL_TESTE)('INT-1.1 · fundação da Central de Integrações (
     expect(await moduloLiberado(a, 'integracao')).toBe(false);
     const hist = await a.historicoAlteracao.findMany({ where: { entidade: 'LiberacaoDeModulo' }, orderBy: { ocorridoEm: 'asc' } });
     expect(hist.map((r) => r.acao)).toEqual(['LIBEROU', 'BLOQUEOU']);
-    expect((await liberacoesDoParceiro(a)).map((l) => [l.modulo, l.liberado, l.mudadoPorNome])).toEqual([['integracao', false, AUTOR.nome]]);
+    expect((await liberacoesDoParceiro(a)).map((l) => [l.modulo, l.liberado, l.mudadoPorNome])).toEqual([
+      ['integracao', false, AUTOR.nome],
+      ['consultoria-de-delivery', false, null],
+    ]);
     expect(await mudarLiberacao(a, 'compras', true, AUTOR.nome)).toEqual({ ok: false, erro: 'Módulo desconhecido.' });
     // Bloquear não apagou conexão nenhuma.
     expect((await conexoesDoParceiro(a)).length).toBeGreaterThan(0);

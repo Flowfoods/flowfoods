@@ -42,7 +42,7 @@ export default async function SeuAcessoPage() {
     listarRostos(pessoa.usuario.id),
     rostosRemovidosEm(pessoa.usuario.id),
     listarLojasDoAlcance(cliente, alcance),
-    modulosLiberados(cliente),
+    modulosLiberados(cliente, alcance),
   ]);
   const onde = rotuloDasLojas(alcance.lojas, new Map(lojas.map((l) => [l.id, l.nome])));
   const modulos = CATALOGO.map((m) => ({

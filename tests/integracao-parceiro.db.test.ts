@@ -268,7 +268,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
 
   it('a migration do catálogo v4: só o "copiado do Dono" da v3 ganha integracao.ver; o parcial e o de versão antiga parcial não; rodar de novo não muda', async () => {
     const sql = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261118000000_erp_catalogo_v4', 'migration.sql'), 'utf8');
-    const V3 = TODAS_AS_PERMISSOES.filter((p) => p !== 'integracao.ver');
+    const V3 = TODAS_AS_PERMISSOES.filter((p) => p !== 'integracao.ver' && p !== 'consultoria.ver');
     const desfazer = Symbol('desfazer');
     await db
       .$transaction(async (tx) => {
@@ -315,12 +315,30 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     expect(html2).toContain('https://wa.me/5521996416060');
   });
 
+  it('a migração v5 inclui consultoria no perfil próprio completo e é idempotente', async () => {
+    const sql = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261205000000_erp_catalogo_v5_consultoria', 'migration.sql'), 'utf8');
+    const v4 = TODAS_AS_PERMISSOES.filter(p => p !== 'consultoria.ver');
+    const desfazer = new Error('Desfazer a massa do teste de migração.');
+    await expect(db.$transaction(async tx => {
+      const completa = `pv5a-${sufixo}`, parcial = `pv5b-${sufixo}`;
+      await tx.perfilAcesso.createMany({ data: [
+        { id: completa, parceiroId: A.id, nome: 'Sócio v4', base: 'DONO', permissoes: v4, catalogoVersao: 4 },
+        { id: parcial, parceiroId: A.id, nome: 'Sócio v4 parcial', base: 'DONO', permissoes: v4.filter(p => p !== 'integracao.ver'), catalogoVersao: 4 },
+      ] });
+      await tx.$executeRawUnsafe(sql);
+      await tx.$executeRawUnsafe(sql);
+      const perfis = await tx.perfilAcesso.findMany({ where: { id: { in: [completa, parcial] } }, orderBy: { id: 'asc' } });
+      expect(perfis.map(p => [p.catalogoVersao, p.permissoes.filter(x => x === 'consultoria.ver').length])).toEqual([[5, 1], [4, 0]]);
+      throw desfazer;
+    })).rejects.toBe(desfazer);
+  });
+
   it('liberar e bloquear mudam o que o menu recebe; a loja de teste (no parceiro de testes) leva o selo; o "revise" só cita módulo liberado', async () => {
     expect([...(await modulosLiberados(a))]).toEqual(['integracao']);
     await mudarLiberacao(a, 'integracao', false, 'teste');
     expect([...(await modulosLiberados(a))]).toEqual([]);
     // Perfil próprio parcial da v3 (sem a permissão nova): sem o módulo liberado, nada a revisar sobre integrações.
-    const V3 = TODAS_AS_PERMISSOES.filter((p) => p !== 'integracao.ver' && p !== 'precos.editar');
+    const V3 = TODAS_AS_PERMISSOES.filter((p) => p !== 'integracao.ver' && p !== 'precos.editar' && p !== 'consultoria.ver');
     const parcial = await db.perfilAcesso.create({ data: { parceiroId: A.id, nome: `Parcial v3 ${sufixo}`, base: 'DONO', permissoes: V3, catalogoVersao: 3 } });
     const revisarSem = (await listarPerfis(A.id, undefined, await modulosLiberados(a))).find((p) => p.id === parcial.id)?.revisar;
     expect(revisarSem).toEqual([]);

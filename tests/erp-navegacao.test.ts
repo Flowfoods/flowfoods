@@ -30,7 +30,7 @@ import {
   type Navegacao,
 } from '@/lib/erp/modulos';
 import { comParceiroAtual, navegacaoDoNivel1 } from '@/lib/rodolfo/modulos';
-import { MODULOS_COM_LIBERACAO, NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO } from '@/lib/erp/liberacao';
+import { MODULOS_COM_LIBERACAO, NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO, type ModuloComLiberacao } from '@/lib/erp/liberacao';
 import { HubDoParceiro } from '@/components/erp/telas/hub-do-parceiro';
 import { Abas } from '@/components/erp/ui/abas';
 
@@ -53,10 +53,10 @@ const proprio = (permissoes: string[]) => alcance({ perfilBase: null, perfilProp
 // 3.1: Produção virou área. 3.4: Etiquetas também. Decisão 539 (25/11/2026): "Cadastros e Cardápio" virou Ficha Técnica, os
 // Insumos foram para Estoque e Integração virou área própria. A P-03 abre sua Central para quem tem a permissão de leitura.
 const AREAS = ['Ficha Técnica', 'Compras e Fornecedores', 'Estoque e Movimentações', 'Produção', 'Etiquetas', 'Faturamento e DRE', 'Integração', 'Rede e Equipe'];
-// 10/11/2026: o catálogo "Em breve" (18 módulos sem tela), sempre depois das áreas em uso. 11/11: só o público autorizado
+// O catálogo "Em breve" fica depois das áreas em uso. Só o público autorizado
 // o enxerga (hoje, o nível 1); para as pessoas do parceiro não há módulo futuro na navegação.
 const FUTUROS: string[] = [
-  'CRM Time', 'CRM Clube', 'Divulgação em TVs', 'Atendimento com IA', 'Consultoria de Delivery', 'Pedidos Próprios', 'Equipe e RH', 'Freelancers',
+  'CRM Time', 'CRM Clube', 'Divulgação em TVs', 'Atendimento com IA', 'Pedidos Próprios', 'Equipe e RH', 'Freelancers',
   'Pedidos na Cozinha (KDS)', 'Entregas', 'Monitoramento por Câmeras', 'Patrimônio e Dispositivos', 'Anúncios', 'Contratos e Royalties', 'Implantação',
   'Rotinas e Inspeções', 'Supervisão da Rede', 'Página da Unidade',
 ];
@@ -238,7 +238,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     for (const nome of FUTUROS) expect(texto(h), nome).not.toContain(nome);
   });
 
-  it('nível 1 no parceiro: "Em breve" vem depois de "Em uso", com os 18 do catálogo, sem link, botão nem promessa', () => {
+  it('nível 1 no parceiro: "Em breve" vem depois de "Em uso", sem link, botão nem promessa', () => {
     const h = html(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins');
     const uso = cartoes(secao(h, 'Em uso'));
     expect(uso).toHaveLength(8);
@@ -247,7 +247,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     expect(h.indexOf('<section aria-label="Em uso">')).toBeLessThan(h.indexOf('<section aria-label="Em breve">'));
     const emBreve = secao(h, 'Em breve');
     const futuros = cartoes(emBreve);
-    expect(futuros).toHaveLength(18);
+    expect(futuros).toHaveLength(FUTUROS.length);
     futuros.forEach((c, n) => {
       expect(texto(c)).toContain(FUTUROS[n]);
       // Nenhum controle: nem link, nem botão, nem formulário, nem algo que receba foco.
@@ -287,10 +287,10 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     }
   });
 
-  it('decisão 539: no hub real do nível 1 (todos os módulos de liberação), oito áreas, com Integração antes de Rede e Equipe', () => {
+  it('o hub do nível 1 inclui Integração e Consultoria antes de Rede e Equipe', () => {
     const base = '/rodolfo/erp/valentins';
     const areas = modulosDoParceiro(ALCANCE_FLOWFOODS, base, TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => m.href);
-    expect(areas.map((m) => m.nome)).toEqual(AREAS);
+    expect(areas.map((m) => m.nome)).toEqual([...AREAS.slice(0, -1), 'Consultoria de Delivery', 'Rede e Equipe']);
     // No nível 1, a área leva à rota do espelho, que redireciona para a Central de Integrações do parceiro.
     expect(areas.find((m) => m.chave === 'integracao')!.href).toBe(`${base}/integracoes`);
   });
@@ -775,7 +775,7 @@ describe('P-03 · acesso à Central de Integrações pelo menu', () => {
 
   it('decisão 539: Integração é área própria no menu principal, antes de Rede e Equipe, que não tem mais a entrada antiga', () => {
     const nav = navegacaoDoParceiro(DONO, liberado);
-    expect(nav.modulos.map((m) => m.nome)).toEqual(AREAS);
+    expect(nav.modulos.map((m) => m.nome)).toEqual([...AREAS.slice(0, -1), 'Consultoria de Delivery', 'Rede e Equipe']);
     expect(abasDe(nav, 'rede')).not.toContain('/erp/integracoes');
     const area = nav.modulos.find((m) => m.chave === 'integracao')!;
     // A área abre direto na Central (a mesma tela de antes) e não tem ação: nada se liga, autoriza ou ativa pelo menu.
@@ -789,25 +789,37 @@ describe('P-03 · acesso à Central de Integrações pelo menu', () => {
 
   it('o layout (menu, busca, trilha) e o hub do /erp passam os módulos liberados do parceiro; o nível 1 vê a aba em todo parceiro', () => {
     const layout = readFileSync(join('src', 'app', 'erp', 'layout.tsx'), 'utf8');
-    expect(layout).toMatch(/modulosLiberados\(ctx\.cliente\)/);
+    expect(layout).toMatch(/modulosLiberados\(ctx\.cliente, ctx\.alcance\)/);
     expect(layout).toMatch(/navegacaoDoParceiro\(alcance, liberados\)/);
     const hub = readFileSync(join('src', 'app', 'erp', 'page.tsx'), 'utf8');
-    expect(hub).toMatch(/modulosLiberados\(ctx\.cliente\)/);
+    expect(hub).toMatch(/modulosLiberados\(ctx\.cliente, ctx\.alcance\)/);
     expect(hub).toMatch(/modulosDoParceiro\(ctx\.alcance, '\/erp', liberados\)/);
     const nivel1 = comParceiroAtual(navegacaoDoNivel1(), '/rodolfo/erp/v/insumos', [{ slug: 'v', nome: 'V' }]);
     expect(nivel1.modulos.flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)))).toContain('/rodolfo/erp/v/integracoes');
   });
 });
 
-describe('INT-1.8 · o hub diz quem libera o módulo (decisão 491)', () => {
-  const hub = (semModulo: boolean) =>
+describe('O hub diz quem libera o módulo', () => {
+  const hub = (semModulo?: ModuloComLiberacao) =>
     renderToStaticMarkup(createElement(HubDoParceiro, { titulo: 'Áreas da Rede', subtitulo: 'Casa', modulos: [], semAcesso: false, semModulo }));
   it('com sem-modulo, o aviso diz que é a FlowFoods quem libera (não "quem cuida da equipe") e traz o WhatsApp; sem ele, nada', () => {
-    const com = hub(true);
+    const com = hub('integracao');
     expect(com).toContain('O módulo Integração não está liberado para a sua rede.');
     expect(com).toContain('fale com a FlowFoods');
     expect(com).toContain('https://wa.me/');
     expect(com).not.toContain('quem cuida da equipe');
-    expect(hub(false)).not.toContain('não está liberado');
+    expect(hub()).not.toContain('não está liberado');
+    expect(hub('consultoria-de-delivery')).toContain('O módulo Consultoria de Delivery não está liberado para a sua rede.');
   });
+});
+
+it('a Consultoria conserva sua chave e seu ícone e só aparece no ERP com liberação e permissão', () => {
+  const href = '/erp/consultoria-delivery';
+  expect(telasDaNavegacao(navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO)).some(tela => tela.href === href)).toBe(false);
+  expect(telasDaNavegacao(navegacaoDoParceiro(GERENTE, TODOS_OS_MODULOS_COM_LIBERACAO)).some(tela => tela.href === href)).toBe(false);
+  expect(navegacaoDoParceiro(DONO, TODOS_OS_MODULOS_COM_LIBERACAO).modulos).toContainEqual(expect.objectContaining({
+    chave: 'consultoria-de-delivery', href, icone: 'consultoria',
+  }));
+  const nivel1 = comParceiroAtual(navegacaoDoNivel1(), '/rodolfo/erp/v/consultoria-delivery', [{ slug: 'v', nome: 'V' }]);
+  expect(telasDaNavegacao(nivel1)).toContainEqual(expect.objectContaining({ href: '/rodolfo/erp/v/consultoria-delivery' }));
 });

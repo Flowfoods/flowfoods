@@ -186,9 +186,7 @@ describe('busca ⌘K · nomes curtos do plano', () => {
   it('módulo sem tela não vira resultado (CRM Clube, Checklists, Flow Ads, Patrimônio); Delivery e Pessoas só acham telas que existem', () => {
     for (const locais of [doParceiro('DONO'), doNivel1()]) {
       for (const q of ['crm clube', 'crm', 'checklists', 'flow ads', 'patrimônio']) expect(filtrarLocais(locais, q), q).toEqual([]);
-      // "Delivery" acha a Precificação (fala de delivery) e "Pessoas" acha a aba Equipe (pessoas e perfis), ambas pelo texto
-      // que já estava na tela; nunca um módulo futuro.
-      expect(rotulos(filtrarLocais(locais, 'delivery'))).toEqual(['Precificação']);
+      expect(rotulos(filtrarLocais(locais, 'delivery'))).toEqual(['Precificação', 'Visão geral']);
       expect(rotulos(filtrarLocais(locais, 'pessoas'))).toEqual(['Equipe']);
     }
   });

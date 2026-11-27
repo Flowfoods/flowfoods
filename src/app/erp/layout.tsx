@@ -43,7 +43,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const { parceiro, pessoa, bloqueio, alcance } = ctx;
   const status = STATUS_DO_PARCEIRO[parceiro.status];
   // INT-1.8 (decisão 491): aba de módulo com liberação só aparece com o módulo liberado para o parceiro.
-  const [{ opcoes, valor }, liberados, identidade] = await Promise.all([visaoDaRequisicao(ctx), modulosLiberados(ctx.cliente), identidadeDaSessao()]);
+  const [{ opcoes, valor }, liberados, identidade] = await Promise.all([visaoDaRequisicao(ctx), modulosLiberados(ctx.cliente, ctx.alcance), identidadeDaSessao()]);
   const c = await cookies();
 
   const links = [{ rotulo: 'Meu perfil', href: '/erp/perfil' }, { rotulo: 'Seu acesso', href: '/erp/acesso' }];

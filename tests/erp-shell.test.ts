@@ -62,13 +62,12 @@ const futuros = (a: Alcance) =>
     .map((m) => m.chave);
 // O catálogo "Em breve" é apresentação: sempre depois das áreas em uso, e só para quem `veCatalogoEmBreve` autoriza.
 const CATALOGO_EM_BREVE = MODULOS_FUTUROS.map((f) => f.chave);
-// Os 18 nomes do catálogo conferidos em 10/11/2026, na ordem dele. Integração não está aqui: já tem tela, sob liberação.
+// Nomes dos módulos ainda sem tela, na ordem do catálogo.
 const NOMES_EM_BREVE = [
   'CRM Time',
   'CRM Clube',
   'Divulgação em TVs',
   'Atendimento com IA',
-  'Consultoria de Delivery',
   'Pedidos Próprios',
   'Equipe e RH',
   'Freelancers',
@@ -233,12 +232,12 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       }
     }
     // A regra mora num lugar só e não olha permissão: liberar um módulo com liberação não muda quem vê o catálogo.
-    expect(modulosDoParceiro(ALCANCE_FLOWFOODS, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href)).toHaveLength(18);
+    expect(modulosDoParceiro(ALCANCE_FLOWFOODS, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href)).toHaveLength(NOMES_EM_BREVE.length);
   });
 
-  it('catálogo "Em breve" (10/11): os 18 módulos, na ordem do catálogo, só com nome, finalidade, ícone e cadeado', () => {
+  it('catálogo "Em breve": os módulos na ordem do catálogo, só com nome, finalidade, ícone e cadeado', () => {
     expect(MODULOS_FUTUROS.map((f) => f.nome)).toEqual(NOMES_EM_BREVE);
-    expect(new Set(CATALOGO_EM_BREVE).size).toBe(18);
+    expect(new Set(CATALOGO_EM_BREVE).size).toBe(NOMES_EM_BREVE.length);
     for (const f of MODULOS_FUTUROS) {
       // Nada de rota, permissão, cor de área, fase ou data: só o que a apresentação mostra.
       expect(Object.keys(f).filter((k) => k !== 'cadeado').sort(), f.nome).toEqual(['chave', 'icone', 'nome', 'subtitulo']);
@@ -260,7 +259,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
           const emBreve = mods.filter((x) => !x.href);
           expect(emBreve.map((m) => m.nome)).toEqual(NOMES_EM_BREVE);
           // Sempre depois das áreas em uso (não se misturam com elas).
-          expect(mods.slice(-18)).toEqual(emBreve);
+          expect(mods.slice(-NOMES_EM_BREVE.length)).toEqual(emBreve);
           for (const m of emBreve) {
             expect(m.href).toBeNull();
             expect(m.grupos).toEqual([]);
@@ -289,9 +288,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
   });
 
   it('"Em breve" fica fora da busca, da trilha, do item ativo e do disco: nenhuma rota, tela ou ação foi criada para eles', () => {
-    // Com o alcance de quem enxerga o catálogo (nível 1), para o teste valer com os 18 presentes na navegação.
+    // O nível 1 enxerga o catálogo.
     const nav = navegacaoDoParceiro(ALCANCE_FLOWFOODS, TODOS_OS_MODULOS_COM_LIBERACAO);
-    expect(nav.modulos.filter((m) => !m.href)).toHaveLength(18);
+    expect(nav.modulos.filter((m) => !m.href)).toHaveLength(NOMES_EM_BREVE.length);
     const naBusca = [...telasDaNavegacao(nav), ...acoesDaNavegacao(nav)];
     for (const nome of NOMES_EM_BREVE) {
       expect(naBusca.some((t) => t.rotulo === nome || t.modulo === nome), nome).toBe(false);
@@ -353,6 +352,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/dre/plano',
       '/rodolfo/erp/valentins/dre/metas-categorias',
       '/rodolfo/erp/valentins/integracoes',
+      '/rodolfo/erp/valentins/consultoria-delivery',
       '/rodolfo/erp/valentins/lojas',
       '/rodolfo/erp/valentins/equipe',
       '/rodolfo/erp/valentins/historico',
@@ -412,12 +412,14 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
       'Etiquetas',
       'Faturamento e DRE',
       'Integração',
+      'Consultoria de Delivery',
       'Rede e Equipe',
     ]);
     expect(grupos[1].itens.map((i) => i.rotulo)).toEqual(['Áreas da Rede']);
     // Decisão 539: no nível 1, a área Integração leva à Central do parceiro (a rota do espelho redireciona para ela).
     expect(grupos[8].itens.map((i) => i.href)).toEqual(['/rodolfo/erp/valentins/integracoes']);
-    expect(grupos[9].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
+    expect(grupos[9].itens.map((i) => i.href)).toEqual(['/rodolfo/erp/valentins/consultoria-delivery']);
+    expect(grupos[10].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
     // As ações das áreas vão junto (o ⌘K do nível 1 as acha), sob a base do parceiro.
     expect(acoesDaNavegacao(dentro).map((a) => a.href)).toContain('/rodolfo/erp/valentins/compras/nova');
     expect(comParceiroAtual(nav, '/rodolfo/erp/outro/insumos', parceiros)).toBe(nav);
@@ -439,7 +441,7 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
       // O mesmo catálogo do hub do parceiro, na mesma ordem, sempre depois dos módulos com tela.
       expect(emBreve).toEqual(modulosDoParceiro(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins', TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => !m.href));
       expect(emBreve.map((m) => m.nome)).toEqual(NOMES_EM_BREVE);
-      expect(dentro.modulos.slice(-18)).toEqual(emBreve);
+      expect(dentro.modulos.slice(-NOMES_EM_BREVE.length)).toEqual(emBreve);
       // Continuam fora da busca, das abas e do item ativo.
       const naBusca = [...telasDaNavegacao(dentro), ...acoesDaNavegacao(dentro)];
       for (const nome of NOMES_EM_BREVE) expect(naBusca.some((t) => t.rotulo === nome || t.modulo === nome), nome).toBe(false);
