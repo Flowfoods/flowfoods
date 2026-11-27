@@ -75,7 +75,11 @@ describe.skipIf(!URL_TESTE || !temPsql)('INT-1.6 · migration, catálogo e SQL d
           apps: await db.integracaoApp.findMany(),
           conexoes: await db.integracaoConexao.findMany({ orderBy: { id: 'asc' } }),
           modulos: await db.integracaoConexaoModulo.findMany({ orderBy: { id: 'asc' } }),
-          liberacoes: await db.liberacaoDeModulo.findMany({ orderBy: { id: 'asc' } }),
+          // Fotografa todas as colunas de LiberacaoDeModulo na época desta migração.
+          liberacoes: await db.liberacaoDeModulo.findMany({
+            orderBy: { id: 'asc' },
+            select: { id: true, parceiroId: true, modulo: true, liberado: true, mudadoEm: true, mudadoPorNome: true, criadoEm: true },
+          }),
         });
         const antes = await legado();
         const aplicada = psql(dono, ['-f', join(RAIZ, MIGRACAO, 'migration.sql')]);

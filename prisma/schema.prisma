@@ -3165,8 +3165,10 @@ model IntegracaoConexao {
   modulos IntegracaoConexaoModulo[]
   fontesFaturamento IntegracaoFaturamentoFonte[]
   recibosFinancial IntegracaoReciboFinancial[]
+  recortesConsultoria LiberacaoDeModulo[]
 
   @@unique([parceiroId, id])
+  @@unique([parceiroId, lojaId, id], map: "IntegracaoConexao_tenant_loja_id_key")
   @@index([parceiroId, lojaId])
 }
 
@@ -3481,8 +3483,7 @@ model IntegracaoSomasFinancial {
 }
 
 // Liberação de um módulo do ERP para um parceiro (decisão de Rodolfo de 25/10/2026: "cada módulo liberado individualmente").
-// Hoje só o módulo Integração depende dela (decisão 482); os demais seguem como estão até a rodada da liberação decidir o estado
-// inicial. Bloquear não apaga dado nem histórico. Quem grava é o nível 1.
+// Bloquear preserva o histórico. O recorte de Consultoria exige uma conexão na loja e no parceiro registrados.
 model LiberacaoDeModulo {
   id            String       @id @default(cuid())
   parceiroId    String
@@ -3492,6 +3493,9 @@ model LiberacaoDeModulo {
   mudadoEm      DateTime     @default(now())
   mudadoPorNome String
   criadoEm      DateTime     @default(now())
+  consultoriaLojaId    String?
+  consultoriaConexaoId String?
+  consultoriaConexao   IntegracaoConexao? @relation(fields: [parceiroId, consultoriaLojaId, consultoriaConexaoId], references: [parceiroId, lojaId, id], onDelete: Restrict, onUpdate: Restrict, map: "LiberacaoDeModulo_consultoria_conexao_fkey")
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, modulo])

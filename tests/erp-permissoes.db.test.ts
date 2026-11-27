@@ -593,7 +593,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
   });
 
   it('catálogo v2 (3.2, decisão 219): o sócio de perfil próprio salvo na v1 com tudo (o "copiado do Dono") continua cuidando do Gerente; o parcial não ganha nada e a Equipe pede para revisar', async () => {
-    const V1 = TODAS_AS_PERMISSOES.filter((p) => p !== 'producao.planejar' && p !== 'insumos.categorias' && p !== 'integracao.ver');
+    const V1 = TODAS_AS_PERMISSOES.filter((p) => p !== 'producao.planejar' && p !== 'insumos.categorias' && p !== 'integracao.ver' && p !== 'consultoria.ver');
     // Como estava no banco antes da 3.2 (se o app antigo salvar durante o deploy, a migration não pega: a regra pega).
     const socioV1 = await db.perfilAcesso.create({ data: { parceiroId: A, nome: `Sócio v1 ${sufixo}`, base: 'DONO', permissoes: V1, catalogoVersao: 1 } });
     const parcialV1 = await db.perfilAcesso.create({ data: { parceiroId: A, nome: `Sem preços v1 ${sufixo}`, base: 'DONO', permissoes: V1.filter((p) => p !== 'precos.editar'), catalogoVersao: 1 } });
@@ -609,7 +609,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     expect(parcial.s.alcance!.permissoes.has('producao.planejar')).toBe(false);
     const ps = await listarPerfis(A, o());
     expect(ps.find((p) => p.id === socioV1.id)).toMatchObject({ permissoes: TODAS_AS_PERMISSOES, revisar: [] });
-    expect(ps.find((p) => p.id === parcialV1.id)).toMatchObject({ revisar: ['insumos.categorias', 'producao.planejar', 'integracao.ver'] });
+    expect(ps.find((p) => p.id === parcialV1.id)).toMatchObject({ revisar: ['insumos.categorias', 'producao.planejar', 'integracao.ver', 'consultoria.ver'] });
     // Salvar o perfil leva para a versão de hoje (o que foi marcado vale, e nada mais a revisar).
     const salvo = await salvarPerfil(A, { id: parcialV1.id, nome: parcialV1.nome, base: 'DONO', permissoes: V1.filter((p) => p !== 'precos.editar') }, ator(dono.s), o());
     expect(salvo.ok).toBe(true);

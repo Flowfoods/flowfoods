@@ -7,7 +7,7 @@
  */
 
 // A chave da área no menu (`modulos.ts`): `cadastros` é a Ficha Técnica; `integracao`, área própria desde a decisão 539.
-export type AreaDaAjuda = 'inicio' | 'cadastros' | 'compras' | 'estoque' | 'producao' | 'etiquetas' | 'dre' | 'integracao' | 'rede';
+export type AreaDaAjuda = 'inicio' | 'cadastros' | 'compras' | 'estoque' | 'producao' | 'etiquetas' | 'dre' | 'integracao' | 'consultoria-de-delivery' | 'rede';
 
 /** A entrada como a tela a recebe: o servidor já tirou os blocos que a pessoa não pode ler. */
 export interface EntradaParaATela {

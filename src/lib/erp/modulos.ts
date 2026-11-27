@@ -163,6 +163,7 @@ export const COR = {
   rede: '#7E3A6B',
   // Decisão 539: Integração virou área própria e ganha cor própria (decisão de 29/10: uma cor por módulo), fora do vermelho.
   integracao: '#6E56CF',
+  consultoria: '#0E7490',
   comercial: '#2563A8',
   clientes: '#A16207',
   parceiros: '#57534E',
@@ -727,13 +728,11 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       ],
     },
     {
-      // Decisão 539: Integração é área própria no menu e abre direto a Central de Integrações (no nível 1, a rota leva à
-      // Central do parceiro). A aba é a mesma de antes, com a mesma permissão ("ver integrações") e a mesma liberação do
-      // módulo por parceiro (decisão 491): sem as duas, a área nem aparece. Estar no menu não liga nenhuma API; autorização,
-      // ativação e validação continuam por loja e por API.
+      // Decisão 539 e P-03: a permissão abre a Central informativa. As consultas de leituras e vínculos
+      // conferem a liberação por parceiro. A ativação continua por loja e capacidade no Barney.
       chave: 'integracao',
       nome: 'Integração',
-      subtitulo: 'A Central de Integrações: lojas do iFood ligadas e o que está ativo',
+      subtitulo: 'Capacidades do iFood e situação das lojas',
       resumo: 'iFood e conexões',
       icone: 'canais',
       cor: COR.integracao,
@@ -747,10 +746,34 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               href: `${base}/integracoes`,
               rotulo: 'Integrações',
               icone: 'canais',
-              subtitulo: 'Lojas do iFood ligadas e o que está ativo',
+              subtitulo: 'Capacidades do iFood e situação das lojas',
               termos: ['iFood', 'Integração', 'Configurações', 'Configuração'],
               permissao: 'integracao.ver',
-              modulo: 'integracao',
+            },
+          ],
+        },
+      ],
+      acoes: [],
+    },
+    {
+      chave: 'consultoria-de-delivery',
+      nome: 'Consultoria de Delivery',
+      subtitulo: 'Indicadores e diagnóstico do delivery por loja',
+      resumo: 'Consultoria',
+      icone: 'consultoria',
+      cor: COR.consultoria,
+      grupos: [
+        {
+          rotulo: 'Visão geral',
+          icone: 'consultoria',
+          telas: [
+            {
+              href: `${base}/consultoria-delivery`,
+              rotulo: 'Visão geral',
+              icone: 'consultoria',
+              subtitulo: 'Indicadores do iFood no último dia fechado',
+              permissao: 'consultoria.ver',
+              modulo: 'consultoria-de-delivery',
             },
           ],
         },
@@ -790,16 +813,14 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
 }
 
 /**
- * Catálogo "Em breve" conferido em 10/11/2026: os 18 módulos do plano ainda sem tela, na ordem do catálogo. Integração NÃO
- * entra aqui: já tem área própria (decisão 539), sujeita à liberação por parceiro (`liberacao.ts`). "Equipe e RH" é outro módulo,
- * não a aba Equipe que já existe; "CRM Time" não é a gestão de acessos.
+ * Módulos do plano ainda sem tela, na ordem do catálogo. Áreas construídas sujeitas à liberação por parceiro ficam
+ * em `areasConstruidas`. "Equipe e RH" é distinto da aba Equipe e "CRM Time" é distinto da gestão de acessos.
  */
 export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
   { chave: 'crm-time', nome: 'CRM Time', subtitulo: 'Relacionamento, cultura e treinamento da equipe', icone: 'crm-time', cadeado: true },
   { chave: 'crm-clube', nome: 'CRM Clube', subtitulo: 'Conhecer o cliente, ouvir e cuidar do relacionamento', icone: 'crm-clube', cadeado: true },
   { chave: 'divulgacao-em-tvs', nome: 'Divulgação em TVs', subtitulo: 'Produtos, campanhas e a marca nas TVs da loja', icone: 'tvs' },
   { chave: 'atendimento-com-ia', nome: 'Atendimento com IA', subtitulo: 'Atendimento com a identidade e os dados autorizados de cada loja', icone: 'atendimento' },
-  { chave: 'consultoria-de-delivery', nome: 'Consultoria de Delivery', subtitulo: 'Diagnóstico, desempenho e recomendações para o delivery', icone: 'consultoria' },
   { chave: 'pedidos-proprios', nome: 'Pedidos Próprios', subtitulo: 'Canal próprio de catálogo e pedidos', icone: 'pedidos' },
   { chave: 'equipe-e-rh', nome: 'Equipe e RH', subtitulo: 'Cadastro funcional, cargos, setores e organização da equipe', icone: 'rh' },
   { chave: 'freelancers', nome: 'Freelancers', subtitulo: 'Serviços, presença e acertos de quem trabalha como freelancer', icone: 'freelancers' },

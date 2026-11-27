@@ -107,7 +107,7 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP I.1a · migration das categorias co
         expect(plantado.ok, plantado.aviso).toBe(true);
         expect(psql(dono, ['-c', noContexto('p2', `INSERT INTO "Insumo"(id,"parceiroId",nome,unidade,"conteudoMilesimos","precoEmbalagemCentavos","atualizadoEm") VALUES ('j1','p2','Cebola','KG',1000,500,now())`)]).ok).toBe(true);
         // Perfis próprios salvos no catálogo v2 (fora do tenant: sem RLS): o "copiado do Dono" (todas as da v2), um parcial e um já na v3.
-        const V2 = TODAS_AS_PERMISSOES.filter((p) => p !== 'insumos.categorias');
+        const V2 = TODAS_AS_PERMISSOES.filter((p) => p !== 'insumos.categorias' && p !== 'integracao.ver' && p !== 'consultoria.ver');
         const arr = (l: readonly string[]) => `ARRAY[${l.map((x) => `'${x}'`).join(',')}]::text[]`;
         expect(
           psql(dono, [
@@ -198,7 +198,7 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP I.1a · migration das categorias co
         for (let vez = 0; vez < 2; vez++) {
           const c = psql(dono, ['-f', join(MIGRACOES, CATALOGO_V3, 'migration.sql')]);
           expect(c.ok, c.aviso).toBe(true);
-          expect(lerPerfis()).toEqual([`pa1:3:true:${TODAS_AS_PERMISSOES.length}`, `pa2:2:false:${V2.length - 1}`, `pa3:3:false:${V2.length}`]);
+          expect(lerPerfis()).toEqual([`pa1:3:true:${V2.length + 1}`, `pa2:2:false:${V2.length - 1}`, `pa3:3:false:${V2.length}`]);
         }
       });
     });

@@ -30,7 +30,7 @@ import {
   type Navegacao,
 } from '@/lib/erp/modulos';
 import { comParceiroAtual, navegacaoDoNivel1 } from '@/lib/rodolfo/modulos';
-import { MODULOS_COM_LIBERACAO, NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO } from '@/lib/erp/liberacao';
+import { MODULOS_COM_LIBERACAO, NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO, type ModuloComLiberacao } from '@/lib/erp/liberacao';
 import { HubDoParceiro } from '@/components/erp/telas/hub-do-parceiro';
 import { Abas } from '@/components/erp/ui/abas';
 
@@ -51,12 +51,12 @@ const OPERADOR = alcance({ perfilBase: 'OPERADOR' });
 const proprio = (permissoes: string[]) => alcance({ perfilBase: null, perfilProprio: permissoes as never });
 
 // 3.1: Produção virou área. 3.4: Etiquetas também. Decisão 539 (25/11/2026): "Cadastros e Cardápio" virou Ficha Técnica, os
-// Insumos foram para Estoque e Integração virou área própria (só aparece com o módulo liberado: ver o bloco INT-1.8).
-const AREAS = ['Ficha Técnica', 'Compras e Fornecedores', 'Estoque e Movimentações', 'Produção', 'Etiquetas', 'Faturamento e DRE', 'Rede e Equipe'];
-// 10/11/2026: o catálogo "Em breve" (18 módulos sem tela), sempre depois das áreas em uso. 11/11: só o público autorizado
+// Insumos foram para Estoque e Integração virou área própria. A P-03 abre sua Central para quem tem a permissão de leitura.
+const AREAS = ['Ficha Técnica', 'Compras e Fornecedores', 'Estoque e Movimentações', 'Produção', 'Etiquetas', 'Faturamento e DRE', 'Integração', 'Rede e Equipe'];
+// O catálogo "Em breve" fica depois das áreas em uso. Só o público autorizado
 // o enxerga (hoje, o nível 1); para as pessoas do parceiro não há módulo futuro na navegação.
 const FUTUROS: string[] = [
-  'CRM Time', 'CRM Clube', 'Divulgação em TVs', 'Atendimento com IA', 'Consultoria de Delivery', 'Pedidos Próprios', 'Equipe e RH', 'Freelancers',
+  'CRM Time', 'CRM Clube', 'Divulgação em TVs', 'Atendimento com IA', 'Pedidos Próprios', 'Equipe e RH', 'Freelancers',
   'Pedidos na Cozinha (KDS)', 'Entregas', 'Monitoramento por Câmeras', 'Patrimônio e Dispositivos', 'Anúncios', 'Contratos e Royalties', 'Implantação',
   'Rotinas e Inspeções', 'Supervisão da Rede', 'Página da Unidade',
 ];
@@ -70,7 +70,7 @@ const acoesPorArea = (a: Alcance) => Object.fromEntries(emUso(a).map((m) => [m.n
 
 // ---------------------------------------------------------------- papéis × áreas
 describe('UX.9 · papéis × áreas, abas e ações', () => {
-  it('Dono: 7 áreas, as abas de cada uma e as 10 ações; nenhum futuro (o catálogo "Em breve" é só do nível 1)', () => {
+  it('Dono vê oito áreas, as abas permitidas e as dez ações', () => {
     expect(emUso(DONO).map((m) => m.nome)).toEqual(AREAS);
     expect(abasPorArea(DONO)).toEqual({
       'Ficha Técnica': ['Fichas técnicas', 'Precificação'],
@@ -79,6 +79,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       Etiquetas: ['Imprimir', 'Abrir embalagem', 'Histórico', 'Impressora'],
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'CMV por categoria', 'Períodos', 'Plano e metas', 'Metas por categoria'],
+      Integração: ['Integrações'],
       'Rede e Equipe': ['Lojas e marcas', 'Equipe', 'Histórico', 'Seu acesso'],
     });
     expect(acoesPorArea(DONO)).toEqual({
@@ -88,10 +89,11 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       Produção: ['Nova produção'],
       Etiquetas: [],
       'Faturamento e DRE': ['Lançar o dia', 'Importar faturamento', 'Lançar despesa'],
+      Integração: [],
       'Rede e Equipe': [],
     });
     expect(modulosDoParceiro(DONO, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href).map((m) => m.nome)).toEqual([]);
-    // O nível 1 vê as mesmas 7 áreas e, depois delas, o catálogo inteiro.
+    // O nível 1 vê as mesmas áreas e, depois delas, o catálogo inteiro.
     expect(modulosDoParceiro(ALCANCE_FLOWFOODS, '/erp', NENHUM_MODULO_LIBERADO).map((m) => m.nome)).toEqual([...AREAS, ...FUTUROS]);
   });
 
@@ -201,7 +203,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Rede ↔ loja nunca muda quais áreas e abas aparecem (só o que as telas leem)', () => {
     // A navegação nasce SÓ do alcance e da base: `modulosDoParceiro(alcance, base)` não recebe a visão.
     expect(modulosDoParceiro.length).toBe(3); // (alcance, base, liberados): a visão não entra
-    expect(modulosDoParceiro(GERENTE_N3, '/erp', NENHUM_MODULO_LIBERADO).map((m) => m.nome)).toEqual(AREAS);
+    expect(modulosDoParceiro(GERENTE_N3, '/erp', NENHUM_MODULO_LIBERADO).map((m) => m.nome)).toEqual(AREAS.filter(nome => nome !== 'Integração'));
   });
 });
 
@@ -222,10 +224,10 @@ const abasDoCartao = (c: string) =>
 const texto = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 describe('UX.9 · hub: um card por área, nunca uma ação', () => {
-  it('Dono: "Em uso" tem exatamente 7 cards de área e nenhuma seção de futuros (o catálogo "Em breve" não é mostrado ao parceiro)', () => {
+  it('Dono vê oito cards em uso e o catálogo "Em breve" fica reservado ao nível 1', () => {
     const h = html(DONO);
     const uso = cartoes(secao(h, 'Em uso'));
-    expect(uso).toHaveLength(7);
+    expect(uso).toHaveLength(8);
     uso.forEach((c, n) => {
       expect(texto(c)).toContain(AREAS[n]);
       expect(c).toMatch(/<a [^>]*href="\/erp\//);
@@ -236,16 +238,16 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     for (const nome of FUTUROS) expect(texto(h), nome).not.toContain(nome);
   });
 
-  it('nível 1 no parceiro: "Em breve" vem depois de "Em uso", com os 18 do catálogo, sem link, botão nem promessa', () => {
+  it('nível 1 no parceiro: "Em breve" vem depois de "Em uso", sem link, botão nem promessa', () => {
     const h = html(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins');
     const uso = cartoes(secao(h, 'Em uso'));
-    expect(uso).toHaveLength(7);
+    expect(uso).toHaveLength(8);
     // O rótulo antigo prometia fase; a seção agora só diz "Em breve".
     expect(h).not.toContain('Chegam nas próximas fases');
     expect(h.indexOf('<section aria-label="Em uso">')).toBeLessThan(h.indexOf('<section aria-label="Em breve">'));
     const emBreve = secao(h, 'Em breve');
     const futuros = cartoes(emBreve);
-    expect(futuros).toHaveLength(18);
+    expect(futuros).toHaveLength(FUTUROS.length);
     futuros.forEach((c, n) => {
       expect(texto(c)).toContain(FUTUROS[n]);
       // Nenhum controle: nem link, nem botão, nem formulário, nem algo que receba foco.
@@ -266,7 +268,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
 
   it('o card é a entrada da área: leva à primeira aba permitida', () => {
     const uso = cartoes(secao(html(DONO), 'Em uso')).map((c) => /href="([^"]+)"/.exec(c)![1]);
-    expect(uso).toEqual(['/erp/fichas', '/erp/compras', '/erp/estoque', '/erp/producao/lista', '/erp/etiquetas', '/erp/faturamento', '/erp/lojas']);
+    expect(uso).toEqual(['/erp/fichas', '/erp/compras', '/erp/estoque', '/erp/producao/lista', '/erp/etiquetas', '/erp/faturamento', '/erp/integracoes', '/erp/lojas']);
     // Decisão 539: quem vê o Estoque continua entrando pela Visão geral; quem só vê insumos entra no Estoque pelos Insumos.
     const soInsumos = cartoes(secao(html(proprio(['insumos.ver'])), 'Em uso')).map((c) => /href="([^"]+)"/.exec(c)![1]);
     expect(soInsumos[0]).toBe('/erp/insumos');
@@ -285,10 +287,10 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     }
   });
 
-  it('decisão 539: no hub real do nível 1 (todos os módulos de liberação), oito áreas, com Integração antes de Rede e Equipe', () => {
+  it('o hub do nível 1 inclui Integração e Consultoria antes de Rede e Equipe', () => {
     const base = '/rodolfo/erp/valentins';
     const areas = modulosDoParceiro(ALCANCE_FLOWFOODS, base, TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => m.href);
-    expect(areas.map((m) => m.nome)).toEqual([...AREAS.slice(0, -1), 'Integração', 'Rede e Equipe']);
+    expect(areas.map((m) => m.nome)).toEqual([...AREAS.slice(0, -1), 'Consultoria de Delivery', 'Rede e Equipe']);
     // No nível 1, a área leva à rota do espelho, que redireciona para a Central de Integrações do parceiro.
     expect(areas.find((m) => m.chave === 'integracao')!.href).toBe(`${base}/integracoes`);
   });
@@ -359,10 +361,10 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     expect(texto(html(proprio(['lojas.ver'])))).not.toMatch(/Em breve|Compras e Fornecedores|Ficha Técnica|Faturamento e DRE|Integração/);
   });
 
-  it('nível 1 dentro do parceiro: mesmos 7 cards, sob a base dele, com Cadastro do parceiro em Rede e Equipe', () => {
+  it('nível 1 vê oito cards sob a base do parceiro com Cadastro em Rede e Equipe', () => {
     const h = html(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins');
     const uso = cartoes(secao(h, 'Em uso'));
-    expect(uso).toHaveLength(7);
+    expect(uso).toHaveLength(8);
     expect(uso.map((c) => /href="([^"]+)"/.exec(c)![1])).toEqual([
       '/rodolfo/erp/valentins/fichas',
       '/rodolfo/erp/valentins/compras',
@@ -370,10 +372,11 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
       '/rodolfo/erp/valentins/producao/lista',
       '/rodolfo/erp/valentins/etiquetas',
       '/rodolfo/erp/valentins/faturamento',
+      '/rodolfo/erp/valentins/integracoes',
       '/rodolfo/erp/valentins/lojas',
     ]);
-    expect(texto(uso[6])).toContain('Cadastro do parceiro');
-    expect(texto(uso[6])).not.toContain('Seu acesso');
+    expect(texto(uso[7])).toContain('Cadastro do parceiro');
+    expect(texto(uso[7])).not.toContain('Seu acesso');
   });
 });
 
@@ -562,12 +565,12 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     }
   });
 
-  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens, das categorias e da classificação (I.1a) e das das fases 2.1, 2.2a, 2.5, 3.1, 3.2, 3.3 e 3.4 (faturamento, DRE, despesas, orçamento, produção, a lista do dia, as tarefas, o histórico e os indicadores da produção, as etiquetas)', () => {
+  it('as abas e ações do Dono usam as rotas previstas no catálogo, incluindo a Central informativa', () => {
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
     // 2.5: o orçamento de compra é aba da área Compras.
     // F4: Categorias e Classificar saíram do menu (painel ao lado da lista); as páginas continuam (teste acima).
-    expect(novas).toEqual(['/compras/recebidas', '/compras/orcamento', '/compras/relatorios/insumo', '/compras/relatorios/periodo', '/compras/relatorios/comparar-fornecedores', '/compras/relatorios/comparar-periodos', '/compras/recebidas/importar', '/estoque/contagens', '/estoque/relatorios/consumo', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/etiquetas', '/etiquetas/abrir', '/etiquetas/historico', '/etiquetas/impressora', '/faturamento', '/dre/despesas', '/dre', '/dre/cmv-categorias', '/dre/periodos', '/dre/plano', '/dre/metas-categorias', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
+    expect(novas).toEqual(['/compras/recebidas', '/compras/orcamento', '/compras/relatorios/insumo', '/compras/relatorios/periodo', '/compras/relatorios/comparar-fornecedores', '/compras/relatorios/comparar-periodos', '/compras/recebidas/importar', '/estoque/contagens', '/estoque/relatorios/consumo', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/etiquetas', '/etiquetas/abrir', '/etiquetas/historico', '/etiquetas/impressora', '/faturamento', '/dre/despesas', '/dre', '/dre/cmv-categorias', '/dre/periodos', '/dre/plano', '/dre/metas-categorias', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova', '/integracoes']);
   });
 });
 
@@ -753,18 +756,18 @@ describe('UX.9 · guardas estáticas', () => {
   });
 });
 
-// ---------------------------------------------------------------- INT-1.8: aba que depende de módulo liberado
-describe('INT-1.8 · a área Integração só aparece com o módulo liberado (decisões 491 e 539)', () => {
+// ---------------------------------------------------------------- P-03: Central informativa e permissões
+describe('P-03 · acesso à Central de Integrações pelo menu', () => {
   const abasDe = (nav: ReturnType<typeof navegacaoDoParceiro>, chave: string) => nav.modulos.find((m) => m.chave === chave)?.grupos.flatMap((g) => g.itens.map((i) => i.href)) ?? [];
   const todas = (nav: ReturnType<typeof navegacaoDoParceiro>) => nav.modulos.flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)));
   const liberado = new Set(MODULOS_COM_LIBERACAO);
 
-  it('sem liberação, ninguém vê a área (nem o Dono); liberado, o Dono vê; o Gerente só com a permissão extra; o Operador não', () => {
-    expect(todas(navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO))).not.toContain('/erp/integracoes');
-    expect(navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO).modulos.map((m) => m.chave)).not.toContain('integracao');
+  it('Dono e Gerente com a permissão de Integração veem a Central antes da liberação', () => {
+    expect(abasDe(navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO), 'integracao')).toEqual(['/erp/integracoes']);
     expect(abasDe(navegacaoDoParceiro(DONO, liberado), 'integracao')).toEqual(['/erp/integracoes']);
     const gerente = (extras: string[]) => resolverAlcance({ perfilBase: 'GERENTE', perfilProprio: null, permissoesExtras: extras, permissoesRemovidas: [], redeInteira: false, lojaIds: ['l1'] });
     expect(todas(navegacaoDoParceiro(gerente([]), liberado))).not.toContain('/erp/integracoes');
+    expect(abasDe(navegacaoDoParceiro(gerente(['integracao.ver']), NENHUM_MODULO_LIBERADO), 'integracao')).toEqual(['/erp/integracoes']);
     expect(abasDe(navegacaoDoParceiro(gerente(['integracao.ver']), liberado), 'integracao')).toEqual(['/erp/integracoes']);
     const operador = resolverAlcance({ perfilBase: 'OPERADOR', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: false, lojaIds: ['l1'] });
     expect(todas(navegacaoDoParceiro(operador, liberado))).not.toContain('/erp/integracoes');
@@ -772,7 +775,7 @@ describe('INT-1.8 · a área Integração só aparece com o módulo liberado (de
 
   it('decisão 539: Integração é área própria no menu principal, antes de Rede e Equipe, que não tem mais a entrada antiga', () => {
     const nav = navegacaoDoParceiro(DONO, liberado);
-    expect(nav.modulos.map((m) => m.nome)).toEqual([...AREAS.slice(0, -1), 'Integração', 'Rede e Equipe']);
+    expect(nav.modulos.map((m) => m.nome)).toEqual([...AREAS.slice(0, -1), 'Consultoria de Delivery', 'Rede e Equipe']);
     expect(abasDe(nav, 'rede')).not.toContain('/erp/integracoes');
     const area = nav.modulos.find((m) => m.chave === 'integracao')!;
     // A área abre direto na Central (a mesma tela de antes) e não tem ação: nada se liga, autoriza ou ativa pelo menu.
@@ -786,25 +789,37 @@ describe('INT-1.8 · a área Integração só aparece com o módulo liberado (de
 
   it('o layout (menu, busca, trilha) e o hub do /erp passam os módulos liberados do parceiro; o nível 1 vê a aba em todo parceiro', () => {
     const layout = readFileSync(join('src', 'app', 'erp', 'layout.tsx'), 'utf8');
-    expect(layout).toMatch(/modulosLiberados\(ctx\.cliente\)/);
+    expect(layout).toMatch(/modulosLiberados\(ctx\.cliente, ctx\.alcance\)/);
     expect(layout).toMatch(/navegacaoDoParceiro\(alcance, liberados\)/);
     const hub = readFileSync(join('src', 'app', 'erp', 'page.tsx'), 'utf8');
-    expect(hub).toMatch(/modulosLiberados\(ctx\.cliente\)/);
+    expect(hub).toMatch(/modulosLiberados\(ctx\.cliente, ctx\.alcance\)/);
     expect(hub).toMatch(/modulosDoParceiro\(ctx\.alcance, '\/erp', liberados\)/);
     const nivel1 = comParceiroAtual(navegacaoDoNivel1(), '/rodolfo/erp/v/insumos', [{ slug: 'v', nome: 'V' }]);
     expect(nivel1.modulos.flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)))).toContain('/rodolfo/erp/v/integracoes');
   });
 });
 
-describe('INT-1.8 · o hub diz quem libera o módulo (decisão 491)', () => {
-  const hub = (semModulo: boolean) =>
+describe('O hub diz quem libera o módulo', () => {
+  const hub = (semModulo?: ModuloComLiberacao) =>
     renderToStaticMarkup(createElement(HubDoParceiro, { titulo: 'Áreas da Rede', subtitulo: 'Casa', modulos: [], semAcesso: false, semModulo }));
   it('com sem-modulo, o aviso diz que é a FlowFoods quem libera (não "quem cuida da equipe") e traz o WhatsApp; sem ele, nada', () => {
-    const com = hub(true);
+    const com = hub('integracao');
     expect(com).toContain('O módulo Integração não está liberado para a sua rede.');
     expect(com).toContain('fale com a FlowFoods');
     expect(com).toContain('https://wa.me/');
     expect(com).not.toContain('quem cuida da equipe');
-    expect(hub(false)).not.toContain('não está liberado');
+    expect(hub()).not.toContain('não está liberado');
+    expect(hub('consultoria-de-delivery')).toContain('O módulo Consultoria de Delivery não está liberado para a sua rede.');
   });
+});
+
+it('a Consultoria conserva sua chave e seu ícone e só aparece no ERP com liberação e permissão', () => {
+  const href = '/erp/consultoria-delivery';
+  expect(telasDaNavegacao(navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO)).some(tela => tela.href === href)).toBe(false);
+  expect(telasDaNavegacao(navegacaoDoParceiro(GERENTE, TODOS_OS_MODULOS_COM_LIBERACAO)).some(tela => tela.href === href)).toBe(false);
+  expect(navegacaoDoParceiro(DONO, TODOS_OS_MODULOS_COM_LIBERACAO).modulos).toContainEqual(expect.objectContaining({
+    chave: 'consultoria-de-delivery', href, icone: 'consultoria',
+  }));
+  const nivel1 = comParceiroAtual(navegacaoDoNivel1(), '/rodolfo/erp/v/consultoria-delivery', [{ slug: 'v', nome: 'V' }]);
+  expect(telasDaNavegacao(nivel1)).toContainEqual(expect.objectContaining({ href: '/rodolfo/erp/v/consultoria-delivery' }));
 });

@@ -120,9 +120,10 @@ describe('INT-1.1 · a ligação de uma loja do iFood', () => {
 });
 
 describe('INT-1.1 · a liberação de módulos (base)', () => {
-  it('hoje só o Integração depende dela; os módulos que já existem não', () => {
-    expect([...MODULOS_COM_LIBERACAO]).toEqual(['integracao']);
+  it('Integração e Consultoria dependem da liberação por parceiro', () => {
+    expect([...MODULOS_COM_LIBERACAO]).toEqual(['integracao', 'consultoria-de-delivery']);
     expect(ehModuloComLiberacao('integracao')).toBe(true);
+    expect(ehModuloComLiberacao('consultoria-de-delivery')).toBe(true);
     for (const m of ['insumos', 'fichas', 'compras', 'estoque', 'dre']) expect(ehModuloComLiberacao(m), m).toBe(false);
   });
 });

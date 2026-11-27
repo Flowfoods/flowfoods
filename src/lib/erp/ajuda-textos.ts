@@ -2036,6 +2036,19 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     }],
   },
   {
+    chave: 'consultoria-de-delivery',
+    area: 'consultoria-de-delivery',
+    rotas: ['consultoria-delivery'],
+    titulo: 'Consultoria de Delivery',
+    versao: 1,
+    aula: [
+      { texto: 'A prévia mostra o último dia fechado em São Paulo para a loja e a origem liberadas pela FlowFoods.' },
+      { texto: 'A cobertura mostra se há leitura do dia, com a publicação anterior indicada separadamente quando houver atraso.' },
+      { texto: 'O GMV e o ticket usam os pedidos concluídos.' },
+      { texto: 'Um dia confirmado sem movimento tem contagens iguais a zero.' },
+    ],
+  },
+  {
     chave: 'equipe',
     area: 'rede',
     rotas: ['equipe'],

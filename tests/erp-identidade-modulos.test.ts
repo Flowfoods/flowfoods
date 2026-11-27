@@ -34,7 +34,7 @@ const atributo = (attrs: string, nome: string) => new RegExp(`${nome}="([^"]*)"`
 describe('Identidade central das áreas no hub e no menu', () => {
   it('cada card e sua entrada no menu recebem a mesma cor central, com destinos preservados', () => {
     const entradas = links(menu(null));
-    expect(emUso).toHaveLength(7);
+    expect(emUso).toHaveLength(8);
     for (const m of emUso) {
       const h = cartao(m);
       expect(h).toContain(`style="--cor-modulo:${m.cor}"`);
@@ -71,7 +71,7 @@ describe('Identidade central das áreas no hub e no menu', () => {
   });
 
   it('catálogo "Em breve": card neutro, com selo e sem controle; o menu lateral não ganha entrada para ele', () => {
-    expect(emBreve).toHaveLength(18);
+    expect(emBreve).toHaveLength(17);
     expect(nav.modulos.filter((m) => !m.href)).toEqual([]);
     // O menu de quem enxerga o catálogo (nível 1), aberto e recolhido.
     const menuDoNivel1 = (recolhido = false) => renderToStaticMarkup(createElement(NavLateral, {
@@ -123,14 +123,14 @@ describe('Identidade central das áreas no hub e no menu', () => {
     // Em breve: lista ligada ao rótulo do grupo; cada item é texto (nome, finalidade, selo), nunca controle.
     expect(futuros).toMatch(/^<ul aria-labelledby="[^"]+" class="ff-grade-modulos">/);
     // Sem cor de área: o ícone do futuro é só o contorno tracejado, nunca o quadrado de cor cheia.
-    expect(futuros.match(/ff-icone-modulo ff-icone-futuro/g)).toHaveLength(18);
+    expect(futuros.match(/ff-icone-modulo ff-icone-futuro/g)).toHaveLength(emBreve.length);
     expect(futuros).not.toContain('ff-icone-cheio');
     // O bloco do futuro não carrega a identidade de área: não herda nem deriva cor de módulo.
-    expect(futuros.match(/<div class="ff-bloco-modulo">/g)).toHaveLength(18);
+    expect(futuros.match(/<div class="ff-bloco-modulo">/g)).toHaveLength(emBreve.length);
     expect(futuros).not.toContain('ff-identidade-modulo');
     expect(futuros).not.toMatch(/href=|<a[ >]|<button|tabindex/);
     const itens = futuros.split('<li>').slice(1);
-    expect(itens).toHaveLength(18);
+    expect(itens).toHaveLength(emBreve.length);
     itens.forEach((item, n) => {
       expect(item).toContain(emBreve[n].nome);
       expect(item).toContain(emBreve[n].subtitulo);

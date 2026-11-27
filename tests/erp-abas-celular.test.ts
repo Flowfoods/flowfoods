@@ -121,7 +121,7 @@ describe('barra de Módulos · quais atalhos', () => {
     }
   });
 
-  it('decisão 539: Integração vira atalho só com o módulo liberado; acende em qualquer tela da Central', () => {
+  it('P-03 mantém o atalho da Central antes da liberação para quem tem a permissão', () => {
     const liberado = navegacaoDoParceiro(DONO, new Set(['integracao']) as typeof NENHUM_MODULO_LIBERADO);
     const opcao = opcoesDaBarra(liberado).find((o) => o.chave === 'integracao');
     expect(opcao).toMatchObject({ href: '/erp/integracoes', rotulo: 'Integração', nome: 'Integração', icone: 'canais', cor: COR.integracao });
@@ -131,9 +131,8 @@ describe('barra de Módulos · quais atalhos', () => {
       const r = atalhosDaBarra(liberado, tela, ['integracao']);
       expect(r.atalhos.filter((a) => a.ativo).map((a) => a.chave), tela).toEqual(['integracao']);
     }
-    // Sem o módulo liberado, a escolha salva sai sozinha (nunca abre destino que o menu não tem).
-    expect(opcoesDaBarra(NAV_DONO).map((o) => o.chave)).not.toContain('integracao');
-    expect(chavesDaBarra(NAV_DONO, ['integracao'])).not.toContain('integracao');
+    expect(opcoesDaBarra(NAV_DONO).map((o) => o.chave)).toContain('integracao');
+    expect(chavesDaBarra(NAV_DONO, ['integracao'])).toContain('integracao');
   });
 
   it('pessoa com menos áreas: só as dela; o catálogo "Em breve" (sem tela) nunca vira atalho', () => {
@@ -148,10 +147,10 @@ describe('barra de Módulos · quais atalhos', () => {
 
   it('o nome no atalho é a primeira palavra da área, curto para 320 px; na grade, o nome inteiro quando cabe', () => {
     const nomes = NAV_DONO.modulos.map((m) => rotuloDaAba(m.nome));
-    expect(nomes).toEqual(['Ficha', 'Compras', 'Estoque', 'Produção', 'Etiquetas', 'Faturamento', 'Rede']);
+    expect(nomes).toEqual(['Ficha', 'Compras', 'Estoque', 'Produção', 'Etiquetas', 'Faturamento', 'Integração', 'Rede']);
     for (const n of nomes) expect(n.length, n).toBeLessThanOrEqual(11);
     // Os nomes da prévia aprovada: o inteiro até 14 letras ("Rede e Equipe"), senão o da aba.
-    expect(NAV_DONO.modulos.map((m) => nomeCurtoDoModulo(m.nome))).toEqual(['Ficha Técnica', 'Compras', 'Estoque', 'Produção', 'Etiquetas', 'Faturamento', 'Rede e Equipe']);
+    expect(NAV_DONO.modulos.map((m) => nomeCurtoDoModulo(m.nome))).toEqual(['Ficha Técnica', 'Compras', 'Estoque', 'Produção', 'Etiquetas', 'Faturamento', 'Integração', 'Rede e Equipe']);
   });
 
   it('a busca da janela: nome, resumo, função e os sinônimos das abas, sem acento e pelo começo da palavra', () => {

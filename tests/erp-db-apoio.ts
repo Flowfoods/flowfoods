@@ -24,7 +24,7 @@ const ORDEM_DE_LIMPEZA = [
   'ListaProducaoItem', 'ListaProducao', 'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'DocumentoFiscalItem', 'DocumentoFiscal', 'VinculoItemFornecedor', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
   'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'SubsecaoFicha', 'SecaoFicha', 'InsumoVariante', 'FaturamentoLancamento',
   'Despesa', 'DreMeta', 'FarolFaixa', 'MetaCmvCategoria', 'MetaCmvConjunto', 'CategoriaNaLoja', 'DreLinha', 'DreFotografiaLinha', 'DreFotografia', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'CategoriaInsumo', 'Fornecedor',
-  'Colaborador', 'KpiIfoodDia', 'IntegracaoSnapshot', 'IntegracaoPagamentoSnapshot', 'IntegracaoDistribuicaoSnapshot', 'IntegracaoPayload', 'IntegracaoExecucao', 'IntegracaoConexaoModulo', 'IntegracaoConexao', 'LiberacaoDeModulo', 'Marca', 'Loja',
+  'Colaborador', 'KpiIfoodDia', 'IntegracaoSnapshot', 'IntegracaoPagamentoSnapshot', 'IntegracaoDistribuicaoSnapshot', 'IntegracaoPayload', 'IntegracaoExecucao', 'IntegracaoConexaoModulo', 'LiberacaoDeModulo', 'IntegracaoConexao', 'Marca', 'Loja',
 ];
 
 /** Tabelas com gatilho que recusa o DELETE (a limpeza desliga só na transação dela). */

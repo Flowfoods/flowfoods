@@ -1,3 +1,5 @@
+import type { ModuloComLiberacao } from './liberacao';
+
 /**
  * Permissões do ERP (0.4) — regras puras, sem banco e sem Next.
  *
@@ -28,9 +30,9 @@
 
 /**
  * Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu). 2 = 3.2, `producao.planejar`.
- * 3 = I.1a, `insumos.categorias`. 4 = INT-1.8, `integracao.ver`.
+ * 3 = I.1a, `insumos.categorias`. 4 = INT-1.8, `integracao.ver`. 5 = `consultoria.ver`.
  */
-export const VERSAO_DO_CATALOGO = 4;
+export const VERSAO_DO_CATALOGO = 5;
 
 export interface DefinicaoDePermissao {
   rotulo: string;
@@ -45,8 +47,8 @@ export interface ModuloDoCatalogo {
   rotulo: string;
   /** Ainda sem tela: a permissão já existe para montar o perfil. */
   emBreve?: boolean;
-  /** INT-1.8 (decisão 491): só vale com este módulo liberado para o parceiro pela FlowFoods (decisão 482). */
-  liberacao?: 'integracao';
+  /** Só vale com este módulo liberado para o parceiro pela FlowFoods. */
+  liberacao?: ModuloComLiberacao;
   permissoes: Record<string, DefinicaoDePermissao>;
 }
 
@@ -162,6 +164,14 @@ export const CATALOGO = [
       'integracao.ver': { rotulo: 'Ver as integrações das lojas (iFood)', porLoja: true },
     },
   },
+  {
+    chave: 'consultoria-de-delivery',
+    rotulo: 'Consultoria de Delivery',
+    liberacao: 'consultoria-de-delivery',
+    permissoes: {
+      'consultoria.ver': { rotulo: 'Ver a Consultoria de Delivery da loja', porLoja: true },
+    },
+  },
 ] as const satisfies readonly ModuloDoCatalogo[];
 
 type ChavesDe<M> = M extends { permissoes: infer P } ? keyof P & string : never;
@@ -206,7 +216,9 @@ export type PerfilBase = 'DONO' | 'GERENTE' | 'OPERADOR';
 
 // INT-1.8 (decisão 491): `integracao.ver` fica só no Dono pelo perfil base. No Gerente base, quem cuida da equipe com um perfil
 // próprio parcial deixaria de cobrir os Gerentes; quem precisar ganha como extra.
-const SEM_GERENTE = new Set<Permissao>(['acessos.gerir', 'lojas.gerir', 'metas.editar', 'precos.editar', 'insumos.categorias', 'integracao.ver']);
+const SEM_GERENTE = new Set<Permissao>([
+  'acessos.gerir', 'lojas.gerir', 'metas.editar', 'precos.editar', 'insumos.categorias', 'integracao.ver', 'consultoria.ver',
+]);
 
 const DO_OPERADOR: Permissao[] = [
   'insumos.ver',
@@ -313,7 +325,9 @@ export interface VinculoDePermissao {
 }
 
 /** O que entrou no catálogo em cada versão (a 1 é a de nascença). */
-const NOVAS_NA_VERSAO: Readonly<Record<number, readonly Permissao[]>> = { 2: ['producao.planejar'], 3: ['insumos.categorias'], 4: ['integracao.ver'] };
+const NOVAS_NA_VERSAO: Readonly<Record<number, readonly Permissao[]>> = {
+  2: ['producao.planejar'], 3: ['insumos.categorias'], 4: ['integracao.ver'], 5: ['consultoria.ver'],
+};
 
 /** O catálogo como era na versão `versao`: o de hoje menos o que entrou depois. */
 function catalogoNaVersao(versao: number): Permissao[] {

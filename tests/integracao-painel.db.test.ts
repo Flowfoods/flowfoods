@@ -11,10 +11,12 @@ vi.mock('@/lib/db', async () => {
 import { prisma } from '@/lib/db';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { resolverAlcance, type Alcance, type Permissao } from '@/lib/erp/permissoes';
-import { mudarLiberacao } from '@/lib/erp/liberacao';
+import { modulosLiberados, mudarLiberacao } from '@/lib/erp/liberacao';
 import { desligarConexao } from '@/lib/integracoes/core/conexoes';
 import { pausarAnalytics } from '@/lib/integracoes/core/controle-analytics';
+import { lerConsultoriaDelivery } from '@/lib/integracoes/core/consultoria-delivery';
 import { lerPainelAnalytics } from '@/lib/integracoes/core/painel-analytics';
+import { deslocarDiaDoPainel } from '@/lib/integracoes/ifood/painel-campos';
 import { agendarJanela, criarRepositorioAnalytics } from '@/lib/integracoes/ifood/pipeline-repositorio';
 import { criarPeriodoFechadoDeTeste, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 import { assumirPosseFinanceira, bucketFinanceiro, DIA_FINANCEIRO, massaFinanceira, publicarFinanceiro, type MassaFinanceira } from './integracao-faturamento-apoio';
@@ -54,6 +56,106 @@ describe.skipIf(!URL_TESTE)('INT-1.8B · indicadores persistidos e fotografia re
   }, 360_000);
   const massa = () => massaFinanceira(db, inventario);
   const ler = (m: MassaFinanceira, c = m.cliente, a = al(m.lojaId), extra = {}) => lerPainelAnalytics(c, a, contexto(m), { lojaId: m.lojaId, inicio: DIA, fim: DIA, ...extra });
+
+  function consultoria(m: MassaFinanceira, origem?: string, acesso = al(m.lojaId, ['consultoria.ver', 'integracao.ver', 'faturamento.ver'])) {
+    return lerConsultoriaDelivery(m.cliente, acesso, contexto(m), { lojaId: m.lojaId, fonteId: origem });
+  }
+
+  const liberarRecorte = (m: MassaFinanceira) => mudarLiberacao(m.cliente, 'consultoria-de-delivery', true, inventario.autor,
+    { conexaoId: m.conexaoId, ambiente: m.ambiente });
+
+  it('Consultoria: liberação e alcance por loja, seleção de uma marca e pausa com histórico', async () => {
+    const m = await massa(), outraLoja = await massaFinanceira(db, inventario, { cliente: m.cliente });
+    const outraMarca = await massaFinanceira(db, inventario, { cliente: m.cliente, lojaId: m.lojaId });
+    await publicarFinanceiro(m, lider.posse, [bucketFinanceiro(10, 2)]);
+    await publicarFinanceiro(outraMarca, lider.posse, [bucketFinanceiro(90, 20)]);
+    vi.setSystemTime(new Date(`${deslocarDiaDoPainel(DIA, 1)}T13:00:00Z`));
+    try {
+      expect(await consultoria(m, m.conexaoId)).toMatchObject({ ok: false, motivo: 'bloqueada' });
+      expect(await mudarLiberacao(m.cliente, 'consultoria-de-delivery', true, inventario.autor)).toMatchObject({ ok: false });
+      expect(await liberarRecorte(m)).toMatchObject({ ok: true, mudou: true });
+      expect(await liberarRecorte(m)).toMatchObject({ ok: true, mudou: false });
+      expect(await modulosLiberados(m.cliente, al(m.lojaId))).toContain('consultoria-de-delivery');
+      expect(await modulosLiberados(m.cliente, al(outraLoja.lojaId))).not.toContain('consultoria-de-delivery');
+      expect(await consultoria(m, m.conexaoId, al(m.lojaId))).toMatchObject({ ok: false });
+      expect(await consultoria(m, m.conexaoId, al(outraLoja.lojaId, ['consultoria.ver', 'integracao.ver', 'faturamento.ver']))).toMatchObject({ ok: false });
+      expect(await consultoria(m, outraMarca.conexaoId, todas)).toMatchObject({ ok: false });
+      expect(await lerConsultoriaDelivery(m.cliente, todas, contexto(m), { lojaId: outraLoja.lojaId })).toMatchObject({ ok: false });
+      const r = await consultoria(m);
+      expect(r).toMatchObject({
+        ok: true, dia: DIA, fonte: { chave: m.conexaoId }, visaoGeral: {
+          estado: 'disponivel', cobertura: { fontesCobertas: 1, fontesEsperadas: 1 },
+          indicadores: { gmvConcluido: d('1500'), pedidos: d('2'), concluidos: d('2') },
+        },
+      });
+      expect(JSON.stringify(r)).not.toContain(m.merchantId);
+      expect(JSON.stringify(r)).not.toContain(outraLoja.lojaId);
+      expect(JSON.stringify(r)).not.toContain(outraMarca.conexaoId);
+      await expect(m.cliente.liberacaoDeModulo.update({
+        where: { parceiroId_modulo: { parceiroId: m.cliente.parceiroId, modulo: 'consultoria-de-delivery' } },
+        data: { consultoriaLojaId: outraLoja.lojaId },
+      })).rejects.toMatchObject({ code: 'P2003' });
+      await desligarConexao(m.cliente, m.conexaoId, inventario.autor);
+      expect(await consultoria(m, m.conexaoId)).toMatchObject({
+        visaoGeral: { estado: 'pausado', publicadaEm: expect.any(String), indicadores: null },
+      });
+      expect(await liberarRecorte(outraMarca)).toMatchObject({ ok: true, mudou: true });
+      expect(await consultoria(m, m.conexaoId)).toMatchObject({ ok: false });
+      const hist = await m.cliente.historicoAlteracao.findMany({ where: { entidade: 'LiberacaoDeModulo', acao: 'ALTEROU' } });
+      expect(hist).toContainEqual(expect.objectContaining({
+        antes: expect.objectContaining({ lojaId: m.lojaId, conexaoId: m.conexaoId }),
+        depois: expect.objectContaining({ lojaId: outraMarca.lojaId, conexaoId: outraMarca.conexaoId }),
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Consultoria: leitura anterior fica separada e zero confirmado de TEST é Demonstração', async () => {
+    const m = await massaFinanceira(db, inventario, { ambiente: 'TEST' });
+    expect(await liberarRecorte(m)).toMatchObject({ ok: true });
+    const anterior = deslocarDiaDoPainel(DIA, -1);
+    await publicarFinanceiro(m, lider.posse, [bucketFinanceiro(50, 2)], { dia: anterior });
+    vi.setSystemTime(new Date(`${deslocarDiaDoPainel(DIA, 1)}T13:00:00Z`));
+    try {
+      expect(await consultoria(m)).toMatchObject({
+        ok: true, dia: DIA, ambiente: 'TEST', visaoGeral: {
+          estado: 'atraso', publicadaEm: null, ultimaLeituraAnterior: { dia: anterior }, indicadores: null,
+        },
+      });
+      await publicarFinanceiro(m, lider.posse, []);
+      expect(await consultoria(m)).toMatchObject({
+        dia: DIA, ambiente: 'TEST', visaoGeral: {
+          estado: 'demonstracao', ultimaLeituraAnterior: null,
+          indicadores: { pedidos: d('0'), ticketConcluidos: { estado: 'sem-dado' } },
+        },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Consultoria: mostra a publicação confirmada do próprio dia com a revisão pendente', async () => {
+    const m = await massa();
+    expect(await liberarRecorte(m)).toMatchObject({ ok: true });
+    await publicarFinanceiro(m, lider.posse, [bucketFinanceiro(10, 2)]);
+    vi.setSystemTime(new Date(`${deslocarDiaDoPainel(DIA, 1)}T13:00:00Z`));
+    try {
+      const antes = await consultoria(m);
+      expect(antes).toMatchObject({ ok: true, visaoGeral: { estado: 'disponivel', revisaoPendente: false } });
+      if (!antes.ok) throw new Error(antes.mensagem);
+      await m.cliente.transacao(tx => criarPeriodoFechadoDeTeste(tx, { nome: 'QA revisão', inicio: '2026-10-01', fim: '2026-10-31' }));
+      await publicarFinanceiro(m, lider.posse, [bucketFinanceiro(90, 20)], { ciclo: '2026-10-23' });
+      expect(await consultoria(m)).toMatchObject({
+        ok: true, dia: DIA, visaoGeral: {
+          estado: 'parcial', revisaoPendente: true, publicadaEm: antes.visaoGeral.publicadaEm,
+          ultimaLeituraAnterior: null, indicadores: { gmvConcluido: d('1500'), pedidos: d('2') },
+        },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it('domínio exige duas permissões, loja, tenant e liberação antes das métricas', async () => {
     const m = await massa(), outra = await massa(); await publicarFinanceiro(m, lider.posse);

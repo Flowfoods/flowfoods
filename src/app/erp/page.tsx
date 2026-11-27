@@ -5,7 +5,7 @@
  */
 
 import { exigirParceiroDaSessao, visaoDaRequisicao } from '@/lib/erp/contexto';
-import { modulosLiberados } from '@/lib/erp/liberacao';
+import { ehModuloComLiberacao, modulosLiberados } from '@/lib/erp/liberacao';
 import { modulosDoParceiro } from '@/lib/erp/modulos';
 import { rotuloDaVisao } from '@/lib/erp/visao';
 import { HubDoParceiro } from '@/components/erp/telas/hub-do-parceiro';
@@ -17,8 +17,9 @@ export default async function HubDaRede(
   props: { searchParams: Promise<{ 'sem-acesso'?: string; 'sem-modulo'?: string }> }
 ) {
   const searchParams = await props.searchParams;
+  const modulo = searchParams['sem-modulo'];
   const ctx = await exigirParceiroDaSessao();
-  const [{ visao }, liberados] = await Promise.all([visaoDaRequisicao(ctx), modulosLiberados(ctx.cliente)]);
+  const [{ visao }, liberados] = await Promise.all([visaoDaRequisicao(ctx), modulosLiberados(ctx.cliente, ctx.alcance)]);
   const painel = await painelDoDia(ctx.cliente, ctx.alcance, '/erp', undefined, visao);
   return (
     <HubDoParceiro
@@ -26,7 +27,7 @@ export default async function HubDaRede(
       subtitulo={`${ctx.parceiro.nome} · ${rotuloDaVisao(visao)} · ${ctx.pessoa.perfilRotulo ?? 'acesso próprio'}`}
       modulos={modulosDoParceiro(ctx.alcance, '/erp', liberados)}
       semAcesso={Boolean(searchParams['sem-acesso'])}
-      semModulo={searchParams['sem-modulo'] === 'integracao'}
+      semModulo={ehModuloComLiberacao(modulo) ? modulo : undefined}
       painel={painel}
     />
   );

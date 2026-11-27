@@ -13,6 +13,7 @@
 
 import type { ModuloNav } from '@/lib/erp/modulos';
 import { COR } from '@/lib/erp/modulos';
+import { ROTULO_DO_MODULO, type ModuloComLiberacao } from '@/lib/erp/liberacao';
 import { PageHeader } from '../ui/cabecalho';
 import { HubDeModulos } from '../ui/hub';
 import { Aviso } from '../ui/superficies';
@@ -27,7 +28,7 @@ export function HubDoParceiro({
   subtitulo,
   modulos,
   semAcesso,
-  semModulo = false,
+  semModulo,
   painel,
 }: {
   /** 24/10: indicadores e pendências do dia (só o que a permissão libera). */
@@ -37,8 +38,8 @@ export function HubDoParceiro({
   modulos: ModuloNav[];
   /** Chegou aqui vindo de uma tela fora do acesso (`?sem-acesso=1`). */
   semAcesso: boolean;
-  /** INT-1.8: veio da tela de um módulo que não está liberado para o parceiro (`?sem-modulo=integracao`). */
-  semModulo?: boolean;
+  /** Veio da tela de um módulo que depende de liberação para o parceiro. */
+  semModulo?: ModuloComLiberacao;
 }) {
   const emUso = modulos.filter((m) => m.href);
   const futuros = modulos.filter((m) => !m.href);
@@ -57,7 +58,7 @@ export function HubDoParceiro({
         </Aviso>
       )}
       {semModulo && (
-        <Aviso tom="alerta" titulo="O módulo Integração não está liberado para a sua rede.">
+        <Aviso tom="alerta" titulo={`O módulo ${ROTULO_DO_MODULO[semModulo]} não está liberado para a sua rede.`}>
           Para usar,{' '}
           <a href={AJUDA_DE_USO_ERP.url} target="_blank" rel="noopener noreferrer" className={LINK_DE_TEXTO}>
             fale com a FlowFoods no WhatsApp

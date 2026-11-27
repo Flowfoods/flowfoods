@@ -171,7 +171,7 @@ export async function acaoAjudaFechar(form: FormData): Promise<void> {
  */
 export async function acaoSalvarAtalhosDaBarra(chaves: string[]): Promise<{ ok: boolean; mensagem?: string }> {
   const ctx = await exigirParceiroDaSessao();
-  const nav = navegacaoDoParceiro(ctx.alcance, await modulosLiberados(ctx.cliente));
+  const nav = navegacaoDoParceiro(ctx.alcance, await modulosLiberados(ctx.cliente, ctx.alcance));
   const permitidas = new Set(['inicio', ...nav.modulos.filter((m) => m.href).map((m) => m.chave)]);
   // O vínculo vai junto: a lista é gravada no MESMO parceiro cujo menu foi conferido.
   const r = await gravarAtalhosDaBarra(await tokenDoCookie(), chaves, permitidas, undefined, ctx.pessoa.acessoId);
