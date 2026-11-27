@@ -3,6 +3,7 @@ import type { ResultadoConferenciaFinancial } from '@/lib/integracoes/core/confe
 import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Contagem, Painel } from '@/components/erp/ui/superficies';
 import { diaAnalytics, instanteAnalytics } from './formato-analytics';
+import { formatarCompetenciaFinancial, MedidaFinancial } from './medidas-conferencia-financial';
 import { SaldosConferenciaFinancial } from './saldos-conferencia-financial';
 
 type Consulta = Extract<ResultadoConferenciaFinancial, { ok: true }>;
@@ -11,21 +12,37 @@ const taxa = (bp: number) => `${(bp / 100).toLocaleString('pt-BR', { maximumFrac
 export function RecibosFontesFinancial({ consulta, retorno, destaque }: { consulta: Consulta; retorno: string; destaque?: string }) {
   const { recibos, conexoes } = consulta;
   if (!recibos.total) return null;
-  return <Painel id="recibos" titulo="Recibos de fontes" subtitulo="Por ordem de recebimento, com as taxas declaradas em cada envio."
+  return <Painel id="recibos" titulo="Recibos de fontes" subtitulo="Fontes e cobertura declaradas em cada envio."
     acessorio={<Contagem>{recibos.total} {recibos.total === 1 ? 'recibo' : 'recibos'}</Contagem>} semRespiro>
     <ul className="divide-y divide-linha">
       {recibos.itens.map(r => <li key={r.id} id={`recibo-${r.id}`}>
         <details className="min-w-0" open={r.id === destaque || undefined}>
           <summary className="min-h-11 cursor-pointer break-words px-4 py-3 text-sm font-semibold sm:px-5">
-            {instanteAnalytics(r.recebidoEm.toISOString())} · {conexoes.find(c => c.id === r.conexaoId)?.nome ?? 'Conexão da loja'} · Produto {r.produto}
+            Recebido em <time dateTime={r.recebidoEm.toISOString()}>{instanteAnalytics(r.recebidoEm.toISOString())}</time>
+            {' · '}{conexoes.find(c => c.id === r.conexaoId)?.nome ?? 'Conexão da loja'} · Produto {r.produto}
             <span className="ml-2 inline-block font-mono text-xs font-normal text-suave">Pacote {r.pacoteSha256.slice(0, 10)}</span>
           </summary>
           <div className="space-y-4 px-4 pb-4 text-[13px] sm:px-5">
             <p>Envio manual · {r.ambiente === 'TEST' ? 'Teste' : 'Produção'} · Recebido para conferência</p>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-              {([['Linhas do arquivo', r.linhasArquivo], ['Pedidos distintos', r.pedidosDistintos], ['Páginas de eventos', r.paginasEventos], ['Eventos', r.quantidadeEventos]] as const)
-                .map(([nome, n]) => <div key={nome}><dt className="text-suave">{nome}</dt><dd className="font-semibold tabular-nums">{n.toLocaleString('pt-BR')}</dd></div>)}
-            </dl>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <section>
+                <h3 className="font-semibold">Arquivo mensal de conciliação</h3>
+                <p className="mt-1 text-suave">CSV.gz · competência declarada de {formatarCompetenciaFinancial(r.competencia)}</p>
+                <dl className="mt-2 grid grid-cols-2 gap-2">
+                  <MedidaFinancial rotulo="Linhas do arquivo" valor={r.linhasArquivo.toLocaleString('pt-BR')} />
+                  <MedidaFinancial rotulo="Pedidos distintos" valor={r.pedidosDistintos.toLocaleString('pt-BR')} />
+                </dl>
+              </section>
+              <section>
+                <h3 className="font-semibold">Eventos financeiros</h3>
+                <p className="mt-1 text-suave">Consulta declarada para o mês inteiro</p>
+                <dl className="mt-2 grid grid-cols-2 gap-2">
+                  <MedidaFinancial rotulo="Páginas de eventos" valor={r.paginasEventos.toLocaleString('pt-BR')} />
+                  <MedidaFinancial rotulo="Eventos" valor={r.quantidadeEventos.toLocaleString('pt-BR')} />
+                </dl>
+              </section>
+            </div>
+            <p className="text-suave">Liquidações e antecipações · Sem fonte neste recibo</p>
             <section aria-label="Comparação do arquivo mensal com os eventos">
               <h3 className="font-semibold">Lançamentos com impacto no repasse</h3>
               {r.somas ? <>
