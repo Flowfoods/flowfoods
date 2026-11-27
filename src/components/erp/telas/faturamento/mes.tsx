@@ -17,6 +17,7 @@ import { CANAIS } from '@/lib/erp/canal-campos';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { CANAIS_EM_ORDEM, diaDaSemana, mesVizinho, rotuloDoMes, textoDoTicket, type CanalVenda, type TotaisDoRecorte } from '@/lib/erp/faturamento-campos';
 import { coberturaDaLoja, coberturaDaRede, estadoDoCanal, fraseDeParcial, type CoberturaDoRecorte, type EstadoDoCanal } from '@/lib/erp/faturamento-cobertura';
+import type { OrigemDoTotal } from '@/lib/erp/faturamento-origem';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
@@ -24,6 +25,7 @@ import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Contagem, Metrica, Painel, Selo, Vazio } from '../../ui/superficies';
 import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { dataCurta } from './formato';
+import { ID_ORIGEM_DO_TOTAL, PainelOrigemDoTotal } from './origem-do-total';
 import { FRASE_DO_ESTADO, serieDoMes } from '@/lib/erp/grafico';
 import { GraficoDeColunas, type PontoDoGrafico } from '../../ui/grafico-colunas';
 import { rotuloDoEscopo } from '@/lib/erp/visao';
@@ -345,6 +347,7 @@ export function TelaDoMes({
   base,
   parceiro,
   lojaAberta,
+  origemDoTotal,
   podeLancar,
   bloqueio,
   veRede,
@@ -356,6 +359,7 @@ export function TelaDoMes({
   parceiro?: string;
   /** A loja do calendário (visão de uma loja ou `?loja=`); ausente = a rede. */
   lojaAberta?: LojaNoMes;
+  origemDoTotal?: OrigemDoTotal | 'indisponivel';
   podeLancar: boolean;
   bloqueio: string | null;
   /** Quem tem a rede inteira volta à soma das lojas. */
@@ -367,6 +371,7 @@ export function TelaDoMes({
   const seguinte = mesVizinho(m.mes, 1);
   const noMesAtual = m.mes === m.hoje.slice(0, 7);
   const lojaQuery = lojaAberta ? `&loja=${lojaAberta.loja.id}` : '';
+  const hrefOrigem = lojaAberta ? comVoltaParaAHome(`${base}?mes=${m.mes}${lojaQuery}&origem=1`, volta) : null;
   const faltas = lojaAberta ? lojaAberta.faltas : m.faltas;
   // Decisão 538: sem nenhum lançamento no recorte, os cartões dizem "Sem dados" (não R$ 0,00); com falta, o total diz que é parcial.
   const cobertura = lojaAberta ? coberturaDaLoja(lojaAberta) : coberturaDaRede(m);
@@ -464,7 +469,13 @@ export function TelaDoMes({
                       rotulo="Faturamento"
                       valor={semDados ? 'Sem dados' : formatarDinheiro(t.valorCentavos)}
                       detalhe={<span className="block whitespace-normal">{semDados ? 'nenhum lançamento neste mês' : detalheDoTotal}</span>}
-                    />
+                    >
+                      {hrefOrigem && (
+                        <Link href={`${hrefOrigem}#${ID_ORIGEM_DO_TOTAL}`} prefetch={false} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center self-start text-sm`}>
+                          De onde vem
+                        </Link>
+                      )}
+                    </Metrica>
                   </div>
                   <Metrica rotulo="Pedidos" valor={semDados ? 'Sem dados' : inteiro(t.pedidos)} detalhe={semDados ? 'sem lançamento' : frasePedidos(t.pedidos)} />
                   <Metrica
@@ -477,6 +488,10 @@ export function TelaDoMes({
               );
             })()}
           </div>
+          {lojaAberta && origemDoTotal && (
+            <PainelOrigemDoTotal origem={origemDoTotal} loja={lojaAberta} mes={m.mes} cobertura={cobertura}
+              base={base} hrefMes={comVoltaParaAHome(`${base}?mes=${m.mes}${lojaQuery}`, volta)} volta={volta} />
+          )}
           <GraficoDoMes m={m} lojaAberta={lojaAberta} contexto={rotuloDoEscopo(lojaAberta?.loja.nome)} />
           <Totais por={lojaAberta ? lojaAberta.porCanal : m.porCanal} total={lojaAberta ? lojaAberta.total : m.total} cobertura={cobertura} />
           {lojaAberta ? (

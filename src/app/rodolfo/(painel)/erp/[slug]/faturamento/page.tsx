@@ -20,13 +20,14 @@ export default async function ParceiroFaturamentoPage(
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'faturamento.ver');
   const { visao } = await visaoDaRequisicao(ctx);
-  const { m, lojaAberta } = await carregarDoMes(ctx.cliente, ctx.alcance, visao, searchParams);
+  const { m, lojaAberta, origemDoTotal } = await carregarDoMes(ctx.cliente, ctx.alcance, visao, searchParams);
   return (
     <TelaDoMes
       m={m}
       base={`/rodolfo/erp/${ctx.parceiro.slug}/faturamento`}
       parceiro={ctx.parceiro.nome}
       lojaAberta={lojaAberta}
+      origemDoTotal={origemDoTotal}
       podeLancar
       bloqueio={ctx.bloqueio}
       veRede
