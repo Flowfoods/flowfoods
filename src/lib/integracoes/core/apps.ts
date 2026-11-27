@@ -43,6 +43,7 @@ export async function appPorId(id: string): Promise<AppDeIntegracao | null> {
 
 const APP_IFOOD_DE_TESTE = { provedor: 'IFOOD', ambiente: 'TEST', categoria: 'TEST' } as const;
 export const EVENTO_FINANCEIRO_INCLUIDO = 'integracao.app-teste-financial-incluido';
+export const EVENTO_AVALIACOES_INCLUIDAS = 'integracao.app-teste-review-incluido';
 
 export function ehAppIfoodDeTeste(app: Pick<DadosDoApp, 'provedor' | 'ambiente' | 'categoria'>) {
   return app.provedor === APP_IFOOD_DE_TESTE.provedor && app.ambiente === APP_IFOOD_DE_TESTE.ambiente && app.categoria === APP_IFOOD_DE_TESTE.categoria;
@@ -57,24 +58,35 @@ export async function appDeReferenciaFinancial(id: string) {
   });
 }
 
-export async function incluirFinanceiroNoAppDeTeste(appId: string, autor: SessaoErp): Promise<{ ok: true; mudou: boolean } | { ok: false; erro: string }> {
+export function incluirFinanceiroNoAppDeTeste(appId: string, autor: SessaoErp) {
+  return incluirModuloNoAppDeTeste(appId, autor, 'FINANCIAL');
+}
+
+export function incluirAvaliacoesNoAppDeTeste(appId: string, autor: SessaoErp) {
+  return incluirModuloNoAppDeTeste(appId, autor, 'REVIEW');
+}
+
+async function incluirModuloNoAppDeTeste(
+  appId: string, autor: SessaoErp, modulo: 'FINANCIAL' | 'REVIEW',
+): Promise<{ ok: true; mudou: boolean } | { ok: false; erro: string }> {
   if (typeof appId !== 'string' || !appId || appId.length > 60 || !autor.userId || !autor.autorNome.trim()) {
     return { ok: false, erro: 'Não foi possível identificar o app ou o responsável.' };
   }
   const alvo = { id: appId, ...APP_IFOOD_DE_TESTE };
+  const evento = modulo === 'FINANCIAL' ? EVENTO_FINANCEIRO_INCLUIDO : EVENTO_AVALIACOES_INCLUIDAS;
   return prisma.$transaction(async (tx) => {
     // O mesmo UPDATE confere a ausência e acrescenta ao array atual, inclusive com dois envios simultâneos.
     const inclusao = await tx.integracaoApp.updateMany({
-      where: { ...alvo, NOT: { modulos: { has: 'FINANCIAL' } } },
-      data: { modulos: { push: 'FINANCIAL' } },
+      where: { ...alvo, NOT: { modulos: { has: modulo } } },
+      data: { modulos: { push: modulo } },
     });
     if (inclusao.count === 0) {
-      const jaIncluido = await tx.integracaoApp.findFirst({ where: { ...alvo, modulos: { has: 'FINANCIAL' } }, select: { id: true } });
+      const jaIncluido = await tx.integracaoApp.findFirst({ where: { ...alvo, modulos: { has: modulo } }, select: { id: true } });
       if (jaIncluido) return { ok: true, mudou: false };
       return { ok: false, erro: 'Escolha um app do iFood com ambiente e categoria de teste.' };
     }
     await tx.auditLog.create({
-      data: { userId: autor.userId, evento: EVENTO_FINANCEIRO_INCLUIDO, dados: { appId, modulo: 'FINANCIAL', autorNome: autor.autorNome.trim().slice(0, 120) } },
+      data: { userId: autor.userId, evento, dados: { appId, modulo, autorNome: autor.autorNome.trim().slice(0, 120) } },
     });
     return { ok: true, mudou: true };
   });

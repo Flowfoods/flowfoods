@@ -63,7 +63,7 @@ vi.mock('@/lib/erp/contexto', async () => {
 import { prisma } from '@/lib/db';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
-import { EVENTO_FINANCEIRO_INCLUIDO, incluirFinanceiroNoAppDeTeste, registrarApp } from '@/lib/integracoes/core/apps';
+import { EVENTO_AVALIACOES_INCLUIDAS, EVENTO_FINANCEIRO_INCLUIDO, incluirFinanceiroNoAppDeTeste, registrarApp } from '@/lib/integracoes/core/apps';
 import { registrarParecerApp, historicoDoParecer, EVENTO_PARECER } from '@/lib/integracoes/core/homologacao';
 import { ligarConexao, mudarModulo, prepararModulo } from '@/lib/integracoes/core/conexoes';
 import { lerRegistroDaLeitura, marcarParceiroDeHomologacao, MENSAGEM_TROCA_COM_LOJA_LIGADA } from '@/lib/integracoes/core/central';
@@ -527,6 +527,48 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     expect(pagina).toContain('Avaliações, Loja, Analytics, Financeiro');
     expect(pagina).not.toContain(formulario(antes.nome));
     expect(pagina).toContain(formulario(outroTeste.nome));
+  });
+
+  it('registra Avaliações somente no app TEST escolhido, com acesso de nível 1 e confirmação da conferência', async () => {
+    const app = await registrarApp({
+      provedor: 'IFOOD', ambiente: 'TEST', categoria: 'TEST', nome: `Teste avaliações ${sufixo}`,
+      clientId: `avaliacoes-teste-${sufixo}`, nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET', modulos: ['ANALYTICS', 'FINANCIAL', 'MERCHANT'],
+    }, 'teste');
+    if (!app.ok) throw new Error(JSON.stringify(app.erros));
+    const ler = (id: string) => db.integracaoApp.findUniqueOrThrow({ where: { id } });
+    const [antes, outroTeste, producao] = await Promise.all([ler(app.id), ler(appTeste), ler(appBi)]);
+    const formulario = (nome: string) => `aria-label="Incluir Avaliações no cadastro de ${nome}"`;
+    const pagina = await html(CentralPage());
+    expect(pagina).toContain(formulario(antes.nome));
+    expect(pagina).toContain('Conferi que este app TEST tem Avaliações no iFood Developer.');
+    expect(pagina).not.toContain(formulario(producao.nome));
+    const incluir = (id: string, confirmado = true) => acoes.acaoIncluirAvaliacoesNoAppDeTeste(id, null,
+      form(confirmado ? { conferido: 'sim' } : {}));
+    const auditar = () => db.auditLog.findMany({
+      where: { evento: EVENTO_AVALIACOES_INCLUIDAS, userId: atual.userId }, select: { userId: true, dados: true },
+    });
+
+    await expect(incluir(app.id, false)).resolves.toMatchObject({ ok: false, erros: { conferido: expect.stringContaining('iFood Developer') } });
+    for (const id of [producao.id, uuid()]) {
+      await expect(incluir(id)).resolves.toMatchObject({ ok: false, erros: { geral: expect.stringContaining('teste') } });
+    }
+    atual.semSessao = true;
+    try {
+      await expect(incluir(app.id)).rejects.toThrow('SEM_SESSAO_N1');
+    } finally { atual.semSessao = false; }
+    expect(await ler(app.id)).toEqual(antes);
+    expect(await auditar()).toEqual([]);
+
+    const respostas = await Promise.all([incluir(app.id), incluir(app.id)]);
+    expect(respostas).toEqual(expect.arrayContaining([
+      { ok: true, mensagem: 'Avaliações incluídas no cadastro deste app TEST.', vez: 1 },
+      { ok: true, mensagem: 'Avaliações já constam no cadastro deste app TEST.', vez: 1 },
+    ]));
+    expect(await ler(app.id)).toEqual({ ...antes, modulos: [...antes.modulos, 'REVIEW'], atualizadoEm: expect.any(Date) });
+    expect(await ler(appTeste)).toEqual(outroTeste);
+    expect(await ler(appBi)).toEqual(producao);
+    expect(await auditar()).toEqual([{ userId: atual.userId, dados: { appId: app.id, modulo: 'REVIEW', autorNome: 'Rodolfo (FlowFoods)' } }]);
+    expect(await html(CentralPage())).not.toContain(formulario(antes.nome));
   });
 
   it('o registro da leitura de teste é conferido campo a campo (JSON de outra versão não quebra a tela)', () => {

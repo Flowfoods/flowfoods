@@ -17,7 +17,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { exigirNivel1, exigirParceiro } from '@/lib/erp/contexto';
 import { mudarLiberacao } from '@/lib/erp/liberacao';
-import { incluirFinanceiroNoAppDeTeste, registrarApp } from '@/lib/integracoes/core/apps';
+import { incluirAvaliacoesNoAppDeTeste, incluirFinanceiroNoAppDeTeste, registrarApp } from '@/lib/integracoes/core/apps';
 import { registrarParecerApp } from '@/lib/integracoes/core/homologacao';
 import { solicitarReleituraAnalytics } from '@/lib/integracoes/core/releitura-analytics';
 import type { PedidoReleituraAnalytics } from '@/lib/integracoes/core/situacao-analytics-campos';
@@ -94,6 +94,18 @@ export async function acaoIncluirFinanceiroNoAppDeTeste(appId: string, anterior:
   if (!r.ok) return recusa(vez, r.erro);
   revalidar();
   return { ok: true, mensagem: r.mudou ? 'Financeiro incluído no cadastro deste app.' : 'Financeiro já consta no cadastro deste app.', vez };
+}
+
+export async function acaoIncluirAvaliacoesNoAppDeTeste(appId: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
+  const sessao = await exigirNivel1();
+  const vez = proxima(anterior);
+  if (form.get('conferido') !== 'sim') {
+    return { ok: false, erros: { conferido: 'Confirme que o iFood Developer mostra Avaliações para este app TEST.' }, vez };
+  }
+  const r = await incluirAvaliacoesNoAppDeTeste(appId, sessao);
+  if (!r.ok) return recusa(vez, r.erro);
+  revalidar();
+  return { ok: true, mensagem: r.mudou ? 'Avaliações incluídas no cadastro deste app TEST.' : 'Avaliações já constam no cadastro deste app TEST.', vez };
 }
 
 export async function acaoMudarLiberacao(slug: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
