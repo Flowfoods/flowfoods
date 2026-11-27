@@ -5,10 +5,11 @@
  * dobro.) Fila por família: duas chamadas ao mesmo tempo não ocupam a mesma vaga.
  *
  * Limites oficiais (por minuto): autenticação 100, Analytics 500, Merchant 100 (GET /merchants), Review 2.000, Financial
- * 1.000 (plano de execução, seções 1 e 13). Seguimos o menor número quando a documentação diverge.
+ * 1.000 (plano de execução, seções 1 e 13). Catalog v2 lista 3.000 para GET /catalogs na referência oficial.
+ * Seguimos o menor número quando a documentação diverge.
  */
 
-export type Familia = 'autenticacao' | 'analytics' | 'merchant' | 'review' | 'financial';
+export type Familia = 'autenticacao' | 'analytics' | 'merchant' | 'review' | 'financial' | 'catalog';
 
 export const LIMITES_POR_MINUTO: Record<Familia, number> = {
   autenticacao: 100,
@@ -16,6 +17,7 @@ export const LIMITES_POR_MINUTO: Record<Familia, number> = {
   merchant: 100,
   review: 2000,
   financial: 1000,
+  catalog: 3000,
 };
 
 const FOLGA = 0.9;
