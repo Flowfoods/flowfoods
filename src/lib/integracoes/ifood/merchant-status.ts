@@ -46,7 +46,11 @@ export function conferirStatusMerchant(entrada: unknown, resposta: unknown) {
     throw new ErroContratoMerchantStatus('ESQUEMA', 'Os canais da resposta de status Merchant estão fora do formato esperado.');
   }
 
-  const selecionados = canais.data.filter(item => item.operation === operation && item.salesChannel === salesChannel);
+  const selecionados = canais.data.filter(item => {
+    // O /status em TEST devolve "delivery" e "ifood-app" para a entrega pelo app do iFood.
+    const canalRecebido = item.salesChannel === 'ifood-app' ? 'MARKETPLACE' : item.salesChannel;
+    return item.operation.toUpperCase() === operation && canalRecebido === salesChannel;
+  });
   if (selecionados.length !== 1) {
     return { ...consulta, situacao: 'inconclusiva', motivo: selecionados.length === 0 ? 'canal-ausente' : 'canal-duplicado' } as const;
   }

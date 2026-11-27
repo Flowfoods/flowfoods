@@ -45,9 +45,16 @@ describe('Catalog v2 · listagem por loja', () => {
       .toThrow(expect.objectContaining({ codigo: 'ESQUEMA' }));
   });
 
+  it.each(['2026-11-27T14:00:00.000Z', '2026-11-27T11:00:00-03:00'])('preserva a data ISO do catálogo (%s)', modifiedAt => {
+    const recebido = { ...catalogo, modifiedAt };
+    expect(conferirCatalogos(consulta, [recebido])).toEqual({
+      merchantIdSolicitado: loja, situacao: 'observada', catalogos: [recebido],
+    });
+  });
+
   it.each([
     { catalogId: '' }, { catalogId: 123 }, { context: 'DEFAULT' }, { context: [null] },
-    { status: null }, { modifiedAt: '2026-11-27T14:00:00Z' }, { modifiedAt: undefined },
+    { status: null }, { modifiedAt: '2026-11-27T14:00:00' }, { modifiedAt: '1741900000.37425' }, { modifiedAt: undefined },
   ])('recusa campos com tipo incompatível (%j)', campos => {
     expect(() => conferirCatalogos(consulta, [{ ...catalogo, ...campos }]))
       .toThrow(expect.objectContaining({ codigo: 'ESQUEMA' }));
