@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { armazemEmMemoria, ServicoDeToken, type AppParaToken } from '@/lib/integracoes/ifood/auth';
-import { chamadaDaListagemCatalog, conferirCatalogos } from '@/lib/integracoes/ifood/catalog-listagem';
+import { chamadaDaListagemCatalog, chamadaDaListagemCategoriasCatalog, conferirCatalogos, conferirCategoriasCatalog } from '@/lib/integracoes/ifood/catalog-listagem';
 import { criarClienteIfood } from '@/lib/integracoes/ifood/http';
 import { Limitador, LIMITES_POR_MINUTO } from '@/lib/integracoes/ifood/limitador';
 import type { PedidoHttp, Transporte } from '@/lib/integracoes/ifood/transporte';
@@ -14,6 +14,10 @@ const catalogo = {
   context: ['DEFAULT', 'WHITELABEL'],
   status: 'AVAILABLE',
   modifiedAt: 1741900000.37425,
+};
+const entradaCategorias = { ...consulta, catalogId: 'Menu:TEST-001' };
+const categoria = {
+  id: 'cat-sintetica-001', index: 0, name: 'Sanduíches', externalCode: 'CAT-SAND', status: 'AVAILABLE', template: 'DEFAULT',
 };
 
 describe('Catalog v2 · listagem por loja', () => {
@@ -50,6 +54,40 @@ describe('Catalog v2 · listagem por loja', () => {
   });
 });
 
+describe('Catalog v2 · categorias de um catálogo', () => {
+  it('preserva o identificador do catálogo no caminho e usa a opção atual de leitura', () => {
+    expect(chamadaDaListagemCategoriasCatalog(entradaCategorias)).toEqual({
+      metodo: 'GET', familia: 'catalog', caminho: `/catalog/v2.0/merchants/${loja}/catalogs/Menu:TEST-001/categories`,
+      consulta: { includeItems: 'false' },
+    });
+    expect(() => chamadaDaListagemCategoriasCatalog({ catalogId: 'Menu:TEST-001' })).toThrow(expect.objectContaining({ codigo: 'PARAMETROS' }));
+    expect(() => chamadaDaListagemCategoriasCatalog({ ...entradaCategorias, includeItems: true }))
+      .toThrow(expect.objectContaining({ codigo: 'PARAMETROS' }));
+  });
+
+  it.each(['', '.', '..', 'menu/loja', 'menu%2Foutro', 'menu?includeItems=true', 'menu#outro'])('recusa catálogo fora de um segmento (%s)', catalogId => {
+    expect(() => chamadaDaListagemCategoriasCatalog({ ...entradaCategorias, catalogId }))
+      .toThrow(expect.objectContaining({ codigo: 'PARAMETROS' }));
+  });
+
+  it('mantém ordem, código e status explícitos, e registra os campos opcionais ausentes', () => {
+    const semCodigo = { ...categoria, id: 'outra', index: 3, externalCode: null, status: 'UNAVAILABLE', template: null };
+    expect(conferirCategoriasCatalog(entradaCategorias, [
+      { ...semCodigo, items: [{ id: 'item-nao-consultado' }] }, { ...categoria, pizza: {} },
+    ])).toEqual({
+      merchantIdSolicitado: loja, catalogIdSolicitado: entradaCategorias.catalogId,
+      situacao: 'observada', categorias: [semCodigo, categoria],
+    });
+  });
+
+  it('distingue lista vazia, resposta incompleta e identidade repetida', () => {
+    expect(conferirCategoriasCatalog(entradaCategorias, [])).toMatchObject({ situacao: 'vazia', categorias: [] });
+    for (const resposta of [null, {}, [{ ...categoria, index: '0' }], [categoria, { ...categoria, name: 'ID repetido' }]]) {
+      expect(() => conferirCategoriasCatalog(entradaCategorias, resposta)).toThrow(expect.objectContaining({ codigo: 'ESQUEMA' }));
+    }
+  });
+});
+
 it('Catalog tem fila própria, com o limite da listagem e a folga padrão do cliente', async () => {
   expect(LIMITES_POR_MINUTO.catalog).toBe(3000);
   expect(new Limitador().capacidade('catalog')).toBe(2700);
@@ -76,9 +114,11 @@ it('usa o cliente com transporte em memória e mantém HTTP 403 como falha de ac
   const transporte: Transporte = async pedido => {
     if (pedido.url.endsWith('/oauth/token')) return { status: 200, cabecalhos: {}, corpo: '{"accessToken":"token-sintetico","expiresIn":3600}' };
     registros.push(pedido);
-    if (pedido.url.endsWith(`/merchants/${lojaSemAcesso}/catalogs`)) {
+    const caminho = new URL(pedido.url).pathname;
+    if (caminho.includes(`/merchants/${lojaSemAcesso}/`)) {
       return { status: 403, cabecalhos: {}, corpo: '{"errorType":"FORBIDDEN"}' };
     }
+    if (caminho.endsWith('/categories')) return { status: 200, cabecalhos: {}, corpo: JSON.stringify([categoria]) };
     return { status: 200, cabecalhos: {}, corpo: JSON.stringify(pedido.url.endsWith(`/merchants/${loja}/catalogs`) ? [catalogo] : []) };
   };
   const limitador = new Limitador();
@@ -96,8 +136,16 @@ it('usa o cliente com transporte em memória e mantém HTTP 403 como falha de ac
   await expect(cliente.chamar(chamadaDaListagemCatalog({ merchantId: lojaSemAcesso }))).resolves.toMatchObject({
     ok: false, status: 403, classificacao: { tipo: 'sem-permissao' },
   });
+  const categorias = await cliente.chamar(chamadaDaListagemCategoriasCatalog(entradaCategorias));
+  expect(categorias.ok && conferirCategoriasCatalog(entradaCategorias, categorias.dados)).toMatchObject({ situacao: 'observada', categorias: [categoria] });
+  await expect(cliente.chamar(chamadaDaListagemCategoriasCatalog({ ...entradaCategorias, merchantId: lojaSemAcesso }))).resolves.toMatchObject({
+    ok: false, status: 403, classificacao: { tipo: 'sem-permissao' },
+  });
   expect(registros.map(pedido => ({ metodo: pedido.metodo, caminho: new URL(pedido.url).pathname, consulta: new URL(pedido.url).search })))
-    .toEqual([loja, lojaVazia, lojaSemAcesso].map(id => ({
-      metodo: 'GET', caminho: `/catalog/v2.0/merchants/${id}/catalogs`, consulta: '',
-    })));
+    .toEqual([
+      ...[loja, lojaVazia, lojaSemAcesso].map(id => ({ metodo: 'GET', caminho: `/catalog/v2.0/merchants/${id}/catalogs`, consulta: '' })),
+      ...[loja, lojaSemAcesso].map(id => ({
+        metodo: 'GET', caminho: `/catalog/v2.0/merchants/${id}/catalogs/${entradaCategorias.catalogId}/categories`, consulta: '?includeItems=false',
+      })),
+    ]);
 });
