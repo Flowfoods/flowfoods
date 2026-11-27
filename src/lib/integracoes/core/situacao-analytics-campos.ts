@@ -38,6 +38,7 @@ export interface FonteDaSituacaoAnalytics {
   acesso: MensagemDaSituacaoAnalytics;
   tentativa: TentativaDaSituacaoAnalytics | null;
   versaoDisponivel: { publicadaEm: string } | null;
+  ultimaLeituraAnterior: { dia: string; publicadaEm: string } | null;
   revisaoPendente: boolean;
 }
 export interface AplicacaoDaSituacaoAnalytics {

@@ -12,9 +12,11 @@ function clienteFalso() {
   const ler = <T>(modelo: string, valor: T) => vi.fn(async (argumento?: unknown) => { calls.push({ modelo, argumento }); return valor; });
   const mock = {
     parceiroId: 'p1', somenteLeitura: true,
-    sql: vi.fn(async (argumento: TemplateStringsArray) => {
+    sql: vi.fn(async (argumento: TemplateStringsArray, ..._parametros: unknown[]): Promise<object[]> => {
       calls.push({ modelo: 'sql', argumento });
-      return argumento.join(' ').includes('AS ambigua') ? [{ ambigua: false }] : [{ repetivel: true, leitura: true }];
+      const sql = argumento.join(' ');
+      if (sql.includes('CROSS JOIN LATERAL')) return [];
+      return sql.includes('AS ambigua') ? [{ ambigua: false }] : [{ repetivel: true, leitura: true }];
     }),
     loja: { findMany: ler('loja', [{ id: 'l1', nome: 'Loja própria', ativa: true }]), findFirst: ler('loja-id', { id: 'l1' }) },
     liberacaoDeModulo: { findUnique: ler('liberacao', { liberado: true }) },
@@ -109,6 +111,19 @@ describe('INT-1.8A · domínio operacional e projeção', () => {
     const serializado = JSON.stringify({ r, consultas: f.calls });
     for (const proibido of ['gmv', 'pedidos', 'numeroGrupos', 'vazioOficial', 'hashAplicado', 'appId', 'ultimoRequestId', 'corpoOriginal', 'leaseAte', 'dono']) expect(serializado).not.toContain(proibido);
     expect(f.mock.kpiIfoodDia.findMany).not.toHaveBeenCalled(); expect(f.mock.integracaoPayload.findMany).not.toHaveBeenCalled();
+    expect(f.mock.sql.mock.calls.some(([q]) => q.join(' ').includes('CROSS JOIN LATERAL'))).toBe(false);
+  });
+  it('busca uma referência anterior somente para módulos do recorte sem publicação no dia', async () => {
+    const f = clienteFalso();
+    f.mock.integracaoSnapshot.findMany.mockResolvedValue([]);
+    f.mock.sql.mockResolvedValueOnce([{ repetivel: true, leitura: true }])
+      .mockResolvedValueOnce([{ ambigua: false }])
+      .mockResolvedValueOnce([{ moduloId: 'm1', dia: '2026-11-04', publicadaEm: new Date('2026-11-05T14:30:00Z') }]);
+    const r = await lerSituacaoAnalyticsDaLoja(f.cliente, alcance(), contexto);
+    expect(f.mock.sql.mock.calls[2].slice(1)).toEqual([['m1'], 'p1', dia]);
+    expect(r).toMatchObject({ dia, situacao: { cobertura: 'sem-leitura', fontes: [
+      { ultimaLeituraAnterior: { dia: '2026-11-04', publicadaEm: '2026-11-05T14:30:00.000Z' }, versaoDisponivel: null },
+    ] } });
   });
   it('loja válida mas inexistente no tenant não faz fallback', async () => {
     const f = clienteFalso();

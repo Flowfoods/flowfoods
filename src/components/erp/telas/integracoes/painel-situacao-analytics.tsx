@@ -37,6 +37,7 @@ function Fonte({ fonte, releitura }: { fonte: FonteDaSituacaoAnalytics; releitur
   const tentativa = fonte.tentativa;
   const detalhe = tentativa?.nivel1;
   const planejada = tentativa?.estado === 'PLANEJADA';
+  const anterior = fonte.ultimaLeituraAnterior;
   return (
     <li className="min-w-0 space-y-4 px-4 py-4 sm:px-5">
       <div className="space-y-1.5">
@@ -76,7 +77,14 @@ function Fonte({ fonte, releitura }: { fonte: FonteDaSituacaoAnalytics; releitur
         <div className="min-w-0 space-y-2">
           <dt className="text-[12px] font-medium text-suave">Versão disponível</dt>
           <dd className="space-y-2 text-[13px] text-suave">
-            {fonte.versaoDisponivel ? <p className="text-texto">Publicada em <InstanteDaIntegracao valor={fonte.versaoDisponivel.publicadaEm} />.</p> : <p>Ainda sem leitura disponível para este dia.</p>}
+            {fonte.versaoDisponivel ? <p className="text-texto">Publicada em <InstanteDaIntegracao valor={fonte.versaoDisponivel.publicadaEm} />.</p> : <>
+              <p>Ainda sem leitura disponível para este dia.</p>
+              {anterior && <p className="leading-relaxed">
+                Último dia anterior com leitura publicada{' '}
+                <time className="font-medium text-texto" dateTime={anterior.dia}>{diaDaIntegracao(anterior.dia)}</time>
+                {' · '}publicada em <InstanteDaIntegracao valor={anterior.publicadaEm} />.
+              </p>}
+            </>}
             {fonte.revisaoPendente && <p>Há uma revisão pendente; ela ainda não substitui a versão disponível.</p>}
           </dd>
         </div>

@@ -17,7 +17,7 @@ const fonte = (alteracoes: Partial<FonteDaSituacaoAnalytics> = {}): FonteDaSitua
   chave: 'CHAVE_TECNICA_NAO_EXIBIR', nome: 'Fonte Centro', marca: 'Marca da casa', vinculada: true, aplicada: true,
   acesso: mensagemDoAcessoAnalytics('ATIVO', true),
   tentativa: { estado: 'FALHA', mensagem: mensagemDaTentativaAnalytics('FALHA', 'servidor'), iniciadaEm: '2026-11-07T13:00:00Z', concluidaEm: '2026-11-07T13:01:00Z', naoAntesDe: null },
-  versaoDisponivel: { publicadaEm: '2026-11-06T12:00:00Z' }, revisaoPendente: false, ...alteracoes,
+  versaoDisponivel: { publicadaEm: '2026-11-06T12:00:00Z' }, ultimaLeituraAnterior: null, revisaoPendente: false, ...alteracoes,
 });
 const situacao = (alteracoes: Partial<SituacaoAnalyticsDaLoja> = {}): SituacaoAnalyticsDaLoja => ({
   loja: LOJA, dia: '2026-11-05', fuso: 'America/Sao_Paulo', ambiente: 'PRODUCAO', fontes: [fonte()], cobertura: 'disponivel',
@@ -51,6 +51,19 @@ describe('INT-1.8A · situação operacional apresentada sem dinheiro ou ação 
     expect(h).toContain('Acesso ativo'); expect(h).toContain('Isso não confirma que o dia já foi lido ou aplicado.');
     expect(h).toContain('Nenhuma tentativa registrada'); expect(h).toContain('Ausência de leitura não confirma ausência de movimento.');
     expect(h).not.toContain('Aplicado ao faturamento em'); expect(h).not.toMatch(/zero vendas|0 pedidos|R\$/);
+  });
+  it('mostra a publicação anterior sem trocar a data nem a condição de falha do dia consultado', () => {
+    const ultimaLeituraAnterior = { dia: '2026-11-04', publicadaEm: '2026-11-05T14:30:00Z' };
+    const semVersao = html(resultado(situacao({ cobertura: 'sem-leitura', fontes: [
+      fonte({ ultimaLeituraAnterior, versaoDisponivel: null, aplicada: false }),
+    ] })));
+    expect(semVersao).toContain('value="2026-11-05"');
+    expect(semVersao).toContain('Não foi possível atualizar');
+    expect(semVersao).toContain('Ainda sem leitura disponível para este dia.');
+    expect(semVersao).toContain('Último dia anterior com leitura publicada');
+    expect(semVersao).toContain('04/11/2026');
+    expect(semVersao).toContain('11:30');
+    expect(html(resultado(situacao({ fontes: [fonte({ ultimaLeituraAnterior })] })))).not.toContain('Último dia anterior');
   });
   it('espera usa o prazo mínimo apenas no estado durável AGUARDANDO', () => {
     const t = { estado: 'AGUARDANDO' as const, mensagem: mensagemDaTentativaAnalytics('AGUARDANDO', 'limite'), iniciadaEm: null, concluidaEm: null, naoAntesDe: '2026-11-08T15:00:00Z' };
