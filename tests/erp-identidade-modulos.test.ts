@@ -34,7 +34,7 @@ const atributo = (attrs: string, nome: string) => new RegExp(`${nome}="([^"]*)"`
 describe('Identidade central das áreas no hub e no menu', () => {
   it('cada card e sua entrada no menu recebem a mesma cor central, com destinos preservados', () => {
     const entradas = links(menu(null));
-    expect(emUso).toHaveLength(7);
+    expect(emUso).toHaveLength(8);
     for (const m of emUso) {
       const h = cartao(m);
       expect(h).toContain(`style="--cor-modulo:${m.cor}"`);

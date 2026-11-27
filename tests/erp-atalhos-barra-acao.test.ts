@@ -49,7 +49,7 @@ describe('Decisão 536 · ação "Salvar barra"', () => {
     expect(permitidas.has('cadastros')).toBe(false);
   });
 
-  it('decisão 539: a área Integração só entra na barra com "ver integrações" E o módulo liberado', async () => {
+  it('P-03 permite guardar o atalho da Central com "ver integrações" antes da liberação', async () => {
     const permitidasCom = async (permissoes: string[], liberados: Set<string>) => {
       m.gravar.mockClear();
       m.liberados = liberados;
@@ -59,8 +59,7 @@ describe('Decisão 536 · ação "Salvar barra"', () => {
     };
     const liberado = new Set(['integracao']);
     expect((await permitidasCom(['integracao.ver', 'lojas.ver'], liberado)).has('integracao')).toBe(true);
-    // Sem o módulo liberado para o parceiro, ou sem a permissão, a chave não é aceita (a escolha salva não abre destino).
-    expect((await permitidasCom(['integracao.ver', 'lojas.ver'], NENHUM_MODULO_LIBERADO as Set<string>)).has('integracao')).toBe(false);
+    expect((await permitidasCom(['integracao.ver', 'lojas.ver'], NENHUM_MODULO_LIBERADO as Set<string>)).has('integracao')).toBe(true);
     expect((await permitidasCom(['lojas.ver'], liberado)).has('integracao')).toBe(false);
     // A Ficha Técnica continua com a chave antiga: quem a tinha na barra não perde o atalho.
     expect((await permitidasCom(['fichas.ver'], NENHUM_MODULO_LIBERADO as Set<string>)).has('cadastros')).toBe(true);

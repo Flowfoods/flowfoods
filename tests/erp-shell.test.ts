@@ -87,7 +87,7 @@ const NOMES_EM_BREVE = [
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
   it('Dono: as abas de cada área (UX.9), as ações fora do menu; nenhum módulo futuro para o parceiro (Etiquetas é área desde a 3.4)', () => {
     const a = alcance({ perfilBase: 'DONO' });
-    // Decisão 539: Ficha Técnica (ex-Cadastros e Cardápio), Insumos no Estoque; Integração só com o módulo liberado.
+    // A P-03 inclui a Central informativa de Integrações no menu do Dono.
     expect(modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => m.href).map((m) => m.nome)).toEqual([
       'Ficha Técnica',
       'Compras e Fornecedores',
@@ -95,6 +95,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       'Produção',
       'Etiquetas',
       'Faturamento e DRE',
+      'Integração',
       'Rede e Equipe',
     ]);
     expect(hrefs(a)).toEqual([
@@ -131,6 +132,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/dre/periodos',
       '/erp/dre/plano',
       '/erp/dre/metas-categorias',
+      '/erp/integracoes',
       '/erp/lojas',
       '/erp/equipe',
       '/erp/historico',
@@ -271,7 +273,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     }
   });
 
-  it('"Em breve" não duplica nem rebatiza área em uso; Integração é área própria (decisão 539), sob liberação', () => {
+  it('Integração é área própria no menu e o catálogo "Em breve" preserva as áreas em uso', () => {
     const dono = alcance({ perfilBase: 'DONO' });
     const emUso = modulosDoParceiro(dono, '/erp', TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => m.href);
     const nomesEmUso = [...emUso.map((m) => m.nome), ...emUso.flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.rotulo)))];
@@ -280,9 +282,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     // "Equipe e RH" (futuro) não substitui a aba Equipe; "CRM Time" não é a gestão de acessos.
     expect(hrefs(dono)).toContain('/erp/equipe');
     expect(hrefs(dono)).toContain('/erp/acesso');
-    // Integração: nem no catálogo "Em breve", nem liberada por ele. É área própria e só aparece com o módulo liberado.
+    // O Dono acessa a Central informativa pela área de Integração.
     expect(NOMES_EM_BREVE.some((n) => /integra/i.test(n))).toBe(false);
-    expect(hrefs(dono)).not.toContain('/erp/integracoes');
+    expect(hrefs(dono)).toContain('/erp/integracoes');
     expect(hrefs(dono, '/erp', TODOS_OS_MODULOS_COM_LIBERACAO)).toContain('/erp/integracoes');
   });
 

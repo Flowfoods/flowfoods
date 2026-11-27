@@ -173,14 +173,14 @@ describe('busca ⌘K · nomes curtos do plano', () => {
     expect(filtrarLocais(locais, '   ')).toEqual(locais.filter((l) => l.tipo === 'tela'));
     const integracoes = locais.find((l) => l.rotulo === 'Integrações')!;
     // Decisão 539: Integrações é a aba da área Integração; "Gestão" (o nome curto de Rede e Equipe) não vem mais junto.
-    expect(integracoes.detalhe).toBe('Integração · Lojas do iFood ligadas e o que está ativo');
+    expect(integracoes.detalhe).toBe('Integração · Capacidades do iFood e situação das lojas');
     expect(integracoes.termos).toBe('iFood · Integração · Configurações · Configuração');
   });
 
-  it('quem não vê a tela não a acha: o Operador e o parceiro sem Integração liberada', () => {
+  it('a busca encontra a Central informativa para o Dono antes da liberação e respeita a permissão do Operador', () => {
     expect(filtrarLocais(doParceiro('OPERADOR'), 'ifood')).toEqual([]);
-    expect(rotulos(filtrarLocais(doParceiro('DONO', NENHUM_MODULO_LIBERADO), 'ifood'))).not.toContain('Integrações');
-    expect(rotulos(filtrarLocais(doParceiro('DONO', NENHUM_MODULO_LIBERADO), 'integração'))).not.toContain('Integrações');
+    expect(rotulos(filtrarLocais(doParceiro('DONO', NENHUM_MODULO_LIBERADO), 'ifood'))).toContain('Integrações');
+    expect(rotulos(filtrarLocais(doParceiro('DONO', NENHUM_MODULO_LIBERADO), 'integração'))).toContain('Integrações');
   });
 
   it('módulo sem tela não vira resultado (CRM Clube, Checklists, Flow Ads, Patrimônio); Delivery e Pessoas só acham telas que existem', () => {

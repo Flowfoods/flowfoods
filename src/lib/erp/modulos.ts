@@ -727,13 +727,11 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       ],
     },
     {
-      // Decisão 539: Integração é área própria no menu e abre direto a Central de Integrações (no nível 1, a rota leva à
-      // Central do parceiro). A aba é a mesma de antes, com a mesma permissão ("ver integrações") e a mesma liberação do
-      // módulo por parceiro (decisão 491): sem as duas, a área nem aparece. Estar no menu não liga nenhuma API; autorização,
-      // ativação e validação continuam por loja e por API.
+      // Decisão 539 e P-03: a permissão abre a Central informativa. As consultas de leituras e vínculos
+      // conferem a liberação por parceiro. A ativação continua por loja e capacidade no Barney.
       chave: 'integracao',
       nome: 'Integração',
-      subtitulo: 'A Central de Integrações: lojas do iFood ligadas e o que está ativo',
+      subtitulo: 'Capacidades do iFood e situação das lojas',
       resumo: 'iFood e conexões',
       icone: 'canais',
       cor: COR.integracao,
@@ -747,10 +745,9 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               href: `${base}/integracoes`,
               rotulo: 'Integrações',
               icone: 'canais',
-              subtitulo: 'Lojas do iFood ligadas e o que está ativo',
+              subtitulo: 'Capacidades do iFood e situação das lojas',
               termos: ['iFood', 'Integração', 'Configurações', 'Configuração'],
               permissao: 'integracao.ver',
-              modulo: 'integracao',
             },
           ],
         },

@@ -1,6 +1,6 @@
 /**
- * INT-1.8, segunda parte (decisão 491) — a tela das integrações do parceiro, pela porta de verdade (a página), com banco:
- *  - sem o módulo Integração liberado, nem o Dono entra (volta com aviso); sem `integracao.ver` (Operador), também não;
+ * INT-1.8 e P-03 — a Central de Integrações pela página do parceiro, com banco:
+ *  - `integracao.ver` dá acesso à Central informativa antes da liberação do módulo; as subrotas de leitura exigem liberação;
  *  - liberado: o Dono vê as lojas do iFood ligadas e o estado de cada módulo em linguagem simples; nada técnico (estado cru,
  *    app, Client ID); ligação desligada não aparece; o parceiro B nunca aparece;
  *  - o Gerente de uma loja só vê a ligação da loja dele;
@@ -57,10 +57,12 @@ import { resolverAlcance, TODAS_AS_PERMISSOES, type Alcance } from '@/lib/erp/pe
 import { registrarApp } from '@/lib/integracoes/core/apps';
 import { desligarConexao, ligarConexao, mudarModulo, prepararModulo } from '@/lib/integracoes/core/conexoes';
 import ErpIntegracoesPage from '@/app/erp/integracoes/page';
+import ErpPainelAnalyticsPage from '@/app/erp/integracoes/analytics/page';
+import ConferenciaFinancialDoParceiro from '@/app/erp/integracoes/financial/page';
 import { createElement } from 'react';
 import { TelaIntegracoes } from '@/components/erp/telas/integracoes/tela-integracoes';
 import { Selo } from '@/components/erp/ui/superficies';
-import { SITUACAO_PARA_O_PARCEIRO } from '@/lib/integracoes/core/do-parceiro';
+import { capacidadesIfoodPorLoja, SITUACAO_PARA_O_PARCEIRO } from '@/lib/integracoes/core/do-parceiro';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const uuid = () => globalThis.crypto.randomUUID();
@@ -76,8 +78,10 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
   let appBi = '';
   let A: { id: string };
   let a: ClienteDoParceiro;
+  let b: ClienteDoParceiro;
   let lojaA1 = '';
   let lojaA2 = '';
+  let lojaB = '';
 
   const como = (alcance: Alcance, cliente: ClienteDoParceiro = a, homologacaoDeIntegracao = false) => {
     atual.ctx = () => ({ alcance, cliente, bloqueio: null, podeEscrever: true, parceiro: { id: cliente.parceiroId, homologacaoDeIntegracao } });
@@ -92,7 +96,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     const B = await db.parceiroFlow.create({ data: { nome: `Parceiro Int B ${sufixo}`, slug: `pint-b-${sufixo}`, status: 'ATIVO' } });
     ids.push(A.id, B.id);
     a = doParceiro(A.id, db);
-    const b = doParceiro(B.id, db);
+    b = doParceiro(B.id, db);
     const loja = async (c: ClienteDoParceiro, nome: string) => {
       const r = await cadastrarLoja(c, { nome }, 'teste');
       if (!r.ok) throw new Error(JSON.stringify(r));
@@ -100,7 +104,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     };
     lojaA1 = await loja(a, 'Vila da Penha');
     lojaA2 = await loja(a, 'Méier');
-    const lojaB = await loja(b, 'Tijuca');
+    lojaB = await loja(b, 'Tijuca');
     const bi = await registrarApp({ provedor: 'IFOOD', ambiente: 'PRODUCAO', nome: 'FlowFoods ERP · BI', categoria: 'BI', clientId: `bi-par-${sufixo}`, nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET', modulos: ['ANALYTICS'] }, 'teste');
     if (!bi.ok) throw new Error('app não entrou');
     appBi = bi.id;
@@ -132,15 +136,55 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     await prisma.$disconnect();
   });
 
-  it('sem o módulo liberado, nem o Dono entra (volta com aviso); sem a permissão (Operador), também não', async () => {
+  it('sem liberação oferece só a Central informativa e mantém a permissão da pessoa, o escopo da loja e os portões de leitura', async () => {
     como(alcanceDe('DONO', 'rede'));
-    await expect(ErpIntegracoesPage({})).rejects.toThrow(/REDIRECT \/erp\?sem-modulo=integracao/);
-    await mudarLiberacao(a, 'integracao', true, 'teste');
+    const informativa = await html(ErpIntegracoesPage({}));
+    for (const texto of ['Integrações aguardando liberação', 'Números de venda', 'Financeiro', 'Status da loja', 'Avaliações',
+      'primeira leitura de vendas', 'fontes de repasse', 'horários e pausas', 'homologação do app de Avaliações',
+      'fale com a FlowFoods no WhatsApp', 'gerencia a ativação no Barney']) expect(informativa).toContain(texto);
+    expect(informativa.match(/>Previsto</g)).toHaveLength(4);
+    expect(informativa).not.toMatch(/>Disponível<|\/erp\/integracoes\/(analytics|financial)|<form\b/);
+    for (const nome of ['Vila da Penha', 'Valentin Burger Penha', 'Valentin Gourmet Meier', 'Loja do parceiro B']) {
+      expect(informativa).not.toContain(nome);
+    }
+    const filtro = (id: string) => ({ searchParams: Promise.resolve({ loja: id }) });
+    for (const id of [lojaB, uuid()]) {
+      const recusada = await html(ErpIntegracoesPage(filtro(id)));
+      expect(recusada).toContain('Esta loja não está disponível no seu acesso.');
+      expect(recusada).not.toContain('Capacidades do iFood');
+    }
+    await expect(ErpPainelAnalyticsPage({})).rejects.toThrow(/REDIRECT \/erp\?sem-modulo=integracao/);
+    await expect(ConferenciaFinancialDoParceiro({ searchParams: Promise.resolve({}) })).rejects.toThrow(/REDIRECT \/erp\?sem-modulo=integracao/);
+    como(alcanceDe('GERENTE', [lojaA1], ['integracao.ver']));
+    expect(await html(ErpIntegracoesPage(filtro(lojaA1)))).toContain('Capacidades do iFood');
+    expect(await html(ErpIntegracoesPage(filtro(lojaA2)))).toContain('Esta loja não está disponível no seu acesso.');
     como(alcanceDe('OPERADOR', [lojaA1]));
+    await expect(ErpIntegracoesPage({})).rejects.toThrow('SEM_ACESSO');
+
+    await mudarLiberacao(a, 'integracao', true, 'teste');
     await expect(ErpIntegracoesPage({})).rejects.toThrow('SEM_ACESSO');
     // O Gerente base não tem: só com a permissão extra (decisão 491).
     como(alcanceDe('GERENTE', [lojaA1]));
     await expect(ErpIntegracoesPage({})).rejects.toThrow('SEM_ACESSO');
+  });
+
+  it('um cadastro Analytics conserva as outras três capacidades previstas na loja e as quatro na outra loja', async () => {
+    como(alcanceDe('DONO', 'rede'));
+    const painel = (pagina: string) => pagina.split('Capacidades do iFood por loja')[1]?.split('Lojas do iFood ligadas')[0] ?? '';
+    const rede = painel(await html(ErpIntegracoesPage({})));
+    expect(rede.match(/>Previsto</g)).toHaveLength(7);
+    expect(rede).not.toMatch(/>Disponível<|Tijuca/);
+
+    const penha = painel(await html(ErpIntegracoesPage({ searchParams: Promise.resolve({ loja: lojaA1 }) })));
+    expect(penha.match(/>Previsto</g)).toHaveLength(3);
+    for (const texto of ['Vila da Penha', 'Financeiro', 'Avaliações', 'Status da loja']) expect(penha).toContain(texto);
+    expect(penha).not.toMatch(/Números de venda|Méier|Tijuca/);
+
+    const meier = painel(await html(ErpIntegracoesPage({ searchParams: Promise.resolve({ loja: lojaA2 }) })));
+    expect(meier.match(/>Previsto</g)).toHaveLength(4);
+    expect(meier).toContain('Números de venda');
+    expect(meier).toContain('Méier');
+    expect(meier).not.toMatch(/Vila da Penha|Tijuca/);
   });
 
   it('liberado: o Dono vê as lojas ligadas e o estado em linguagem simples; nada técnico, nada desligado, nada do parceiro B', async () => {
@@ -176,6 +220,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     como(alcanceDe('GERENTE', [lojaA1], ['integracao.ver']));
     const recusada = await html(ErpIntegracoesPage({ searchParams: Promise.resolve({ loja: lojaA2, dia: '2026-10-20' }) }));
     expect(recusada).toContain('Esta loja não está disponível no seu acesso.');
+    expect(recusada).not.toContain('Capacidades do iFood por loja');
     expect(recusada).not.toContain(`Loja antiga desligada ${sufixo}`);
     expect(recusada).not.toContain(`Valentin Gourmet Meier ${sufixo}`);
   });
@@ -186,6 +231,39 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     expect(pagina).toContain('Situação dos números de venda');
     expect(pagina).not.toContain('/erp/integracoes/analytics');
     expect(pagina).not.toContain('Ver painel iFood por período');
+  });
+
+  it('vínculo somente histórico conserva a evidência de desligamento e pausa e as demais capacidades previstas', async () => {
+    await mudarLiberacao(b, 'integracao', true, 'teste');
+    const dono = alcanceDe('DONO', 'rede');
+    como(dono, b);
+    const inicial = await html(ErpIntegracoesPage({}));
+    expect(inicial.match(/>Previsto</g)).toHaveLength(4);
+    expect(inicial).toContain('1 loja do iFood ligada');
+
+    const antiga = await b.integracaoConexao.findFirstOrThrow({ where: { lojaId: lojaB } });
+    const modulo = await prepararModulo(b, antiga.id, appBi, 'ANALYTICS', 'teste');
+    if (!modulo.ok) throw new Error(modulo.erro);
+    expect(await mudarModulo(b, modulo.id, 'solicitar', 'teste')).toMatchObject({ ok: true });
+    expect(await mudarModulo(b, modulo.id, 'autorizar', 'teste')).toMatchObject({ ok: true });
+    const erroEm = new Date('2026-11-24T12:00:00.000Z');
+    expect(await mudarModulo(b, modulo.id, 'erro-permissao', 'teste', {
+      erro: 'Recusa sintética do provedor', agora: erroEm,
+    })).toMatchObject({ ok: true, estado: 'ERRO_PERMISSAO' });
+    expect(await desligarConexao(b, antiga.id, 'teste')).toMatchObject({ ok: true });
+    const desligada = await b.integracaoConexao.findUniqueOrThrow({ where: { id: antiga.id } });
+    const historico = await html(ErpIntegracoesPage({}));
+    expect(historico.match(/>Previsto</g)).toHaveLength(3);
+    expect(historico).toContain('Nenhuma loja do iFood está ligada agora.');
+    expect(historico).toContain('Vínculo desligado');
+    expect(historico).toContain('>Pausado<');
+    expect(historico).toContain('Acesso recusado pelo iFood');
+    expect(historico).toContain(`dateTime="${erroEm.toISOString()}"`);
+    expect(historico).toContain(`dateTime="${desligada.desligadaEm?.toISOString()}"`);
+    expect(historico).not.toMatch(/ligada ainda|>Disponível<|Recusa sintética do provedor/);
+    expect(await capacidadesIfoodPorLoja(b, dono, 'TEST', lojaB)).toMatchObject([
+      { id: lojaB, modulosCadastrados: [], pausas: [], desligadas: [] },
+    ]);
   });
 
   it('a migration do catálogo v4: só o "copiado do Dono" da v3 ganha integracao.ver; o parcial e o de versão antiga parcial não; rodar de novo não muda', async () => {
