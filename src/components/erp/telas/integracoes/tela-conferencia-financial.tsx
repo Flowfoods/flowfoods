@@ -45,6 +45,7 @@ function conexoesParaEnvio(consulta: Consulta, parceiroId: string): ConexaoParaE
 function ConsultaDaLoja({ consulta, base }: { consulta: Consulta; base: string }) {
   const { lojas, loja, competencia, ambiente, conexoes } = consulta;
   if (!loja) return <Painel semRespiro><Vazio titulo="Nenhuma loja disponível">A consulta precisa de uma loja no seu acesso.</Vazio></Painel>;
+  const rotuloAmbiente = ambiente === 'TEST' ? 'Teste' : 'Produção';
   return <>
     <Painel titulo="Selecionar loja e competência">
       <form key={`${loja.id}/${competencia}`} action={base} method="get" aria-label="Consultar financeiro por loja e competência"
@@ -60,19 +61,13 @@ function ConsultaDaLoja({ consulta, base }: { consulta: Consulta; base: string }
         <button type="submit" className={classeDeBotao('primario')}>Consultar</button>
       </form>
     </Painel>
-    <Painel titulo="Fontes da competência" subtitulo={`${loja.nome} · ${formatarCompetenciaFinancial(competencia)}`}
+    <Painel titulo="Fontes da competência" subtitulo={`${loja.nome} · ${formatarCompetenciaFinancial(competencia)} · ${rotuloAmbiente}`}
       acessorio={<Selo>{consulta.fonteMensal === 'SEM_DADOS' ? 'Sem dados' : 'Recebido para conferência'}</Selo>}>
       <p className="text-sm text-texto">{consulta.fonteMensal === 'SEM_DADOS'
-        ? 'Ainda não há uma fonte Financial conciliada para esta loja neste mês.'
-        : 'O ERP recebeu fontes declaradas para esta loja e mês. A conciliação dos valores está pendente.'}</p>
-      <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] text-suave">
-        <li>Arquivo mensal e eventos financeiros para conferir o saldo com impacto no repasse.</li>
-        <li>Liquidações para confrontar o saldo de repasse com os eventos.</li>
-        <li>Cobranças e configuração vigente da loja para conferir comissão e taxa de pagamento.</li>
-        <li>Títulos de antecipação para conferir o desconto em reais e o percentual efetivo.</li>
-      </ul>
+        ? 'Nenhum pacote Financial recebido para esta loja e competência.'
+        : 'Abra cada recibo para consultar as fontes apresentadas. A conciliação da competência segue pendente.'}</p>
     </Painel>
-    <Painel titulo="Cadastro atual das conexões" subtitulo={`Ambiente do parceiro · ${ambiente === 'TEST' ? 'Teste' : 'Produção'}`}>
+    <Painel titulo="Cadastro atual das conexões" subtitulo={`Ambiente do parceiro · ${rotuloAmbiente}`}>
       {conexoes.length === 0 ? <p className="text-sm text-suave">Nenhuma conexão iFood cadastrada nesta loja e ambiente.</p>
         : <ul className="divide-y divide-linha">
           {conexoes.map(c => <li key={c.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2 first:pt-0 last:pb-0">

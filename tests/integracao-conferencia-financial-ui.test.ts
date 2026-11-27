@@ -25,8 +25,10 @@ describe('tela de conferência Financial · fontes e navegação', () => {
   it('mantém cadastro, mês e origem distintos, mesmo com Financial ativo no ambiente de teste', async () => {
     const tela = await html({ loja: loja.id, competencia: '2026-06', origem: 'SIMULACAO' });
     expect(ler).toHaveBeenCalledWith(ctx.cliente, ctx.alcance, { parceiroId: ctx.parceiro.id, homologacaoDeIntegracao: true }, { lojaId: loja.id, competencia: '2026-06' });
-    for (const texto of ['Unidade selecionada', 'junho de 2026', 'Sem dados', 'Vínculo cadastrado', 'Teste', 'Financial ativo']) expect(tela).toContain(texto);
+    for (const texto of ['Unidade selecionada · junho de 2026 · Teste', 'Sem dados', 'Vínculo cadastrado', 'Financial ativo',
+      'Nenhum pacote Financial recebido para esta loja e competência']) expect(tela).toContain(texto);
     expect(tela).not.toMatch(/R\$|data:application\/gzip|Baixar CSV/);
+    expect(tela).not.toContain('Recibos de fontes');
   });
 
   it.each(['/erp/integracoes', '/rodolfo/integracoes/rede'])('preserva o recorte no retorno e restringe os valores à loja fictícia em %s', async central => {
@@ -59,6 +61,9 @@ describe('tela de conferência Financial · fontes e navegação', () => {
     ler.mockResolvedValue({ ...consulta, fonteMensal: 'RECEBIDA_PARA_CONFERENCIA', recibos: { total: 13, paginas: 2, pagina: 1, itens: [recibo] } });
     const tela = await html({ loja: loja.id, competencia: '2026-06', pagina: '1' });
     for (const texto of ['Recibos de fontes', 'Recebido para conferência', '13 recibos', 'Produto DELIVERY', '8,5%', '3,15%', recibo.arquivoSha256, 'pagina=2#recibos']) expect(tela).toContain(texto);
+    for (const texto of ['A conciliação da competência segue pendente', 'Recebido em', '03/07/2026, 12:00',
+      'Arquivo mensal de conciliação', 'CSV.gz · competência declarada de junho de 2026', 'Eventos financeiros',
+      'Consulta declarada para o mês inteiro', 'Liquidações e antecipações · Sem fonte neste recibo']) expect(tela).toContain(texto);
     expect(tela).not.toMatch(/Registrar recebimento|Baixar modelo do manifesto|R\$/);
     expect(tela).toContain('Somas indisponíveis neste recibo');
     const comSomas = { ...recibo, somas: { arquivoCentavos: '-1250', eventosCentavos: '-1251' } };
