@@ -82,6 +82,7 @@ export async function lerSituacaoAnalyticsDaLoja(
           AND c."idExterno" = ANY(${merchants}::text[])
       ) AS ambigua` : [{ ambigua: false }];
       if (conflito.length !== 1 || typeof conflito[0].ambigua !== 'boolean') return indisponivel();
+      const vinculoAmbiguo = conflito[0].ambigua || new Set(merchants).size !== merchants.length;
       const modulos = conexoes.flatMap(c => c.modulos.map(m => m.id));
       const data = new Date(`${dia}T00:00:00.000Z`);
       const nivel1 = alcance.nivel === 'FLOWFOODS' && ambiente === 'PRODUCAO';
@@ -104,6 +105,26 @@ export async function lerSituacaoAnalyticsDaLoja(
         orderBy: { geracao: 'desc' }, distinct: ['execucaoId', 'situacao'],
         select: { execucaoId: true, situacao: true, geracao: true, criadoEm: true },
       }) : [];
+      const publicadas = new Map(snapshots.filter(s => s.situacao === 'PUBLICADO').map(s => [s.execucaoId, s]));
+      const modulosComVersao = new Set(execucoes.filter(e => publicadas.has(e.id)).map(e => e.moduloId));
+      const modulosSemVersao = modulos.filter(id => !modulosComVersao.has(id));
+      // A referência anterior é só metadado. O recorte do dia continua dependendo da sua própria versão publicada.
+      const anteriores = !vinculoAmbiguo && modulosSemVersao.length ? await tx.sql<{ moduloId: string; dia: string; publicadaEm: Date }>`
+        SELECT fonte."moduloId", leitura.dia, leitura."publicadaEm"
+        FROM unnest(${modulosSemVersao}::text[]) AS fonte("moduloId")
+        CROSS JOIN LATERAL (
+          SELECT to_char(e.dia, 'YYYY-MM-DD') AS dia, s."criadoEm" AS "publicadaEm"
+          FROM "IntegracaoExecucao" e
+          JOIN "IntegracaoSnapshot" s ON s."parceiroId" = e."parceiroId" AND s."execucaoId" = e.id
+          WHERE e."parceiroId" = ${tx.parceiroId} AND e."moduloId" = fonte."moduloId"
+            AND e.perfil = 'diario' AND e.fuso = 'America/Sao_Paulo'
+            AND e.dia < ${dia}::date AND s.situacao = 'PUBLICADO'
+          ORDER BY e.dia DESC, s.geracao DESC
+          LIMIT 1
+        ) leitura` : [];
+      const anteriorPorModulo = new Map(anteriores.map(r => [r.moduloId, {
+        dia: r.dia, publicadaEm: r.publicadaEm.toISOString(),
+      }]));
       const recibo = ambiente === 'TEST' ? null : await tx.integracaoFaturamentoDia.findFirst({
         where: { lojaId: loja.id, dia: data, canal: 'IFOOD', fonte: 'ifood-analytics' },
         select: { estado: true, motivo: true, revisaoSolicitada: true, revisaoConferida: true, aplicadoEm: true, conferidaEm: true,
@@ -114,7 +135,7 @@ export async function lerSituacaoAnalyticsDaLoja(
       const fontes = conexoes.map(c => {
         const modulo = c.modulos[0] ?? null;
         const e = execucoes.find(x => x.moduloId === modulo?.id);
-        const publicada = snapshots.find(s => s.execucaoId === e?.id && s.situacao === 'PUBLICADO');
+        const publicada = e ? publicadas.get(e.id) : undefined;
         const pendente = snapshots.find(s => s.execucaoId === e?.id && s.situacao === 'PENDENTE_PERIODO');
         const estado: EstadoDaTentativaAnalytics = e && ESTADOS.has(e.estado) ? e.estado as EstadoDaTentativaAnalytics : 'DESCONHECIDO';
         const detalhe = nivel1 && e ? { nivel1: {
@@ -127,11 +148,12 @@ export async function lerSituacaoAnalyticsDaLoja(
           // O planejador conserva o início antigo ao reagendar. Ele não é o início da nova tentativa prevista.
           tentativa: e ? { estado, mensagem: mensagemDaTentativaAnalytics(estado, e.ultimoErro, nivel1), iniciadaEm: estado === 'PLANEJADA' ? null : iso(e.iniciadaEm), concluidaEm: estado === 'PLANEJADA' ? null : iso(e.concluidaEm), naoAntesDe: estado === 'AGUARDANDO' ? iso(e.naoAntesDe) : null, ...detalhe } : null,
           versaoDisponivel: publicada ? { publicadaEm: publicada.criadoEm.toISOString() } : null,
+          ultimaLeituraAnterior: modulo ? anteriorPorModulo.get(modulo.id) ?? null : null,
           revisaoPendente: !!pendente && (!publicada || pendente.geracao > publicada.geracao),
         };
       });
       const disponiveis = fontes.filter(f => f.versaoDisponivel !== null).length;
-      const cobertura: SituacaoAnalyticsDaLoja['cobertura'] = conflito[0].ambigua || new Set(merchants).size !== merchants.length ? 'vinculo-ambiguo'
+      const cobertura: SituacaoAnalyticsDaLoja['cobertura'] = vinculoAmbiguo ? 'vinculo-ambiguo'
         : fontes.length === 0 ? 'sem-fontes' : disponiveis === 0 ? 'sem-leitura' : disponiveis === fontes.length ? 'disponivel' : 'parcial';
       return { ok: true, lojas, dia, ambiente, situacao: { loja, dia, fuso: 'America/Sao_Paulo', ambiente, fontes, cobertura,
         aplicacao: aplicacaoDoDia(recibo, ambiente === 'TEST'), podeVerFaturamento: pode(alcance, 'faturamento.ver', { lojaId: loja.id }) } };

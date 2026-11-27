@@ -328,6 +328,29 @@ describe.skipIf(!URL_TESTE)('INT-1.8A · fotografia e isolamento reais', { timeo
     expect(r).toMatchObject({ situacao: { cobertura: 'disponivel', fontes: [{ tentativa: { estado: 'SUCESSO' }, versaoDisponivel: { publicadaEm: expect.any(String) } }] } });
     expect(JSON.stringify(r)).not.toMatch(/vazioOficial|zero vendas|"pedidos"/);
   });
+  it('indica o último dia anterior publicado de cada fonte sem usar outra loja ou uma data posterior', async () => {
+    const m = await massa(), outraFonte = await massaFinanceira(db, inventario, { cliente: m.cliente, lojaId: m.lojaId });
+    const outraLoja = await massaFinanceira(db, inventario, { cliente: m.cliente });
+    const recente = await publicarFinanceiro(m, lider.posse, undefined, { dia: '2026-10-18' });
+    const publicada = await m.cliente.integracaoSnapshot.findFirstOrThrow({ where: { execucaoId: recente.tarefa.id } });
+    await publicarFinanceiro(m, lider.posse, undefined, { dia: '2026-10-17' });
+    await publicarFinanceiro(m, lider.posse, undefined, { dia: '2026-10-20', ciclo: '2026-10-21' });
+    await publicarFinanceiro(outraFonte, lider.posse, [], { dia: '2026-10-15' });
+    await publicarFinanceiro(outraLoja, lider.posse, undefined, { dia: '2026-10-18' });
+
+    const r = await ler(m);
+    expect(r).toMatchObject({ dia: DIA, situacao: { cobertura: 'sem-leitura', aplicacao: { estado: 'sem-aplicacao' } } });
+    if (!r.ok || !r.situacao) throw new Error('Fixture sem situação de loja.');
+    expect(r.situacao.fontes).toHaveLength(2);
+    expect(r.situacao.fontes.find(f => f.chave === m.conexaoId)).toMatchObject({
+      versaoDisponivel: null, ultimaLeituraAnterior: { dia: '2026-10-18', publicadaEm: publicada.criadoEm.toISOString() },
+    });
+    expect(r.situacao.fontes.find(f => f.chave === outraFonte.conexaoId)).toMatchObject({
+      versaoDisponivel: null, ultimaLeituraAnterior: { dia: '2026-10-15', publicadaEm: expect.any(String) },
+    });
+    expect(JSON.stringify(r)).not.toContain(outraLoja.conexaoId);
+    expect(await m.cliente.faturamentoLancamento.count()).toBe(0);
+  });
   it('no-op seguido de falha mantém data da versão e distingue tentativa posterior', async () => {
     const m = await massa(); await publicarFinanceiro(m, lider.posse); const a = await ler(m);
     await publicarFinanceiro(m, lider.posse, undefined, { ciclo: '2026-10-21' });
@@ -380,9 +403,13 @@ describe.skipIf(!URL_TESTE)('INT-1.8A · fotografia e isolamento reais', { timeo
     expect(await lerSituacaoAnalyticsDaLoja(m.cliente, todas, { ...contexto(m), homologacaoDeIntegracao: false }, { lojaId: m.lojaId, dia: DIA })).toMatchObject({ ok: false, motivo: 'ambiente-incompativel' });
   });
   it('relação comercial em outra loja produz só pendência, sem divulgar a loja fora do alcance', async () => {
-    const m = await massa(); await publicarFinanceiro(m, lider.posse); await desligarConexao(m.cliente, m.conexaoId, inventario.autor);
+    const m = await massa();
+    await publicarFinanceiro(m, lider.posse, undefined, { dia: '2026-10-18' });
+    expect(await ler(m)).toMatchObject({ situacao: { fontes: [{ ultimaLeituraAnterior: { dia: '2026-10-18' } }] } });
+    await desligarConexao(m.cliente, m.conexaoId, inventario.autor);
     const outra = await massaFinanceira(db, inventario, { cliente: m.cliente, merchantId: m.merchantId });
-    const r = await ler(m); expect(r).toMatchObject({ situacao: { cobertura: 'vinculo-ambiguo' } });
+    const r = await ler(m);
+    expect(r).toMatchObject({ situacao: { cobertura: 'vinculo-ambiguo', fontes: [{ ultimaLeituraAnterior: null }] } });
     expect(JSON.stringify(r)).not.toContain(outra.lojaId); expect(JSON.stringify(r)).not.toContain(outra.conexaoId);
   });
   it('origem mínima segue disponível sem integracao.ver ou liberação, mas respeita faturamento.ver/loja', async () => {
