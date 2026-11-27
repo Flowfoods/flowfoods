@@ -30,7 +30,14 @@ describe('Horário e primeiro pedido: resumo de ocorrências na origem', () => {
     const r = resumirComplementaresDoPainel(cobertura(), ['23', '9', '0', '14'].map(v => linha(v)), [], presentes);
     expect(r.horarios.distribuicao).toEqual({ estado: 'disponivel', valor: ['0', '9', '14', '23'].map(v => linha(v)) });
   });
-  it.each(['00', '01', '24', '-1', '1e1', '1.0', ' 1', '__proto__', 'null', 'Novo 🕘'])('preserva hora desconhecida %s sem coerção', termo => {
+  it('agrupa índices e horas cheias equivalentes sem alterar a soma nem o indicador de primeiro pedido', () => {
+    const horarios = [linha('23:00'), linha('09:00', '4'), linha('0'), linha('9', '2'), linha('00:00')];
+    const r = resumirComplementaresDoPainel(cobertura(), horarios, [linha('09:00')], presentes);
+    expect(r.horarios.distribuicao).toEqual({ estado: 'disponivel', valor: [linha('0', '2'), linha('9', '6'), linha('23')] });
+    expect(r.horarios.total).toEqual({ estado: 'disponivel', valor: '9' });
+    expect(r.primeirosPedidos.distribuicao).toEqual({ estado: 'disponivel', valor: [linha('09:00')] });
+  });
+  it.each(['00', '01', '24', '24:00', '9:00', '09:15', '09:00:00', '-1', '1e1', '1.0', ' 1', '__proto__', 'null', 'Novo 🕘'])('preserva hora desconhecida %s sem coerção', termo => {
     expect(horaComplementarConhecida(termo)).toBeNull();
     const r = resumirComplementaresDoPainel(cobertura(), [linha(termo, '0'), linha('2')], [], presentes);
     expect(r.horarios.distribuicao).toEqual({ estado: 'disponivel', valor: [linha('2'), linha(termo, '0')] });

@@ -14,9 +14,11 @@ export interface ComplementaresDoPainelAnalytics {
   primeirosPedidos: DistribuicaoComplementarDoPainel;
 }
 
-/** Só reconhece a representação canônica; "01", "24" e enums novos não viram outra hora. */
+/** Reconhece o índice documentado e as horas cheias HH:00 observadas no iFood. */
 export function horaComplementarConhecida(termo: string): number | null {
-  return /^(?:[0-9]|1[0-9]|2[0-3])$/.test(termo) ? Number(termo) : null;
+  if (/^(?:[0-9]|1[0-9]|2[0-3])$/.test(termo)) return Number(termo);
+  if (/^(?:[01][0-9]|2[0-3]):00$/.test(termo)) return Number(termo.slice(0, 2));
+  return null;
 }
 function compararTermos(a: string, b: string, horario: boolean): number {
   if (horario) {
@@ -39,7 +41,9 @@ function resumir(
   const termos = new Map<string, bigint>();
   for (const linha of linhas) {
     if (typeof linha.termo !== 'string' || !linha.termo.length) throw new Error('Termo complementar inválido no painel.');
-    termos.set(linha.termo, (termos.get(linha.termo) ?? 0n) + inteiroExatoDoPainel(linha.ocorrencias, true));
+    const hora = horario ? horaComplementarConhecida(linha.termo) : null;
+    const termo = hora === null ? linha.termo : String(hora);
+    termos.set(termo, (termos.get(termo) ?? 0n) + inteiroExatoDoPainel(linha.ocorrencias, true));
     if (termos.size > MAX_PARCELAS_DO_PAINEL) throw new RecorteGrandeDoPainel();
   }
   const parcelas = [...termos].sort(([a], [b]) => compararTermos(a, b, horario));
