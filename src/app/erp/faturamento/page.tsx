@@ -21,12 +21,13 @@ export default async function ErpFaturamentoPage(
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'faturamento.ver');
   const { visao } = await visaoDaRequisicao(ctx);
-  const { m, lojaAberta } = await carregarDoMes(ctx.cliente, ctx.alcance, visao, searchParams);
+  const { m, lojaAberta, origemDoTotal } = await carregarDoMes(ctx.cliente, ctx.alcance, visao, searchParams);
   return (
     <TelaDoMes
       m={m}
       base="/erp/faturamento"
       lojaAberta={lojaAberta}
+      origemDoTotal={origemDoTotal}
       podeLancar={pode(ctx.alcance, 'faturamento.lancar')}
       bloqueio={ctx.bloqueio}
       veRede={ctx.alcance.lojas === 'todas'}

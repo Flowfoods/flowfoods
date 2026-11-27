@@ -47,6 +47,7 @@ import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { somarDias } from '@/lib/erp/contagem-campos';
+import { chaveHumana } from '@/lib/erp/faturamento-campos';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import * as faturamentoDaSessao from '@/app/erp/faturamento/actions';
 import * as faturamentoDoNivel1 from '@/app/rodolfo/(painel)/erp/[slug]/faturamento/actions';
@@ -288,5 +289,63 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · telas e actions de faturamento (Postgres
     como(alcanceDe('DONO', 'rede'), 'Marina');
     const dona = await ErpHistoricoPage({ searchParams: Promise.resolve({}) });
     expect(renderToStaticMarkup(createElement(() => dona as never)).replace(/\u00a0/g, ' ')).toContain('R$ 4.350,00');
+  });
+
+  it('P-02 · abre a origem do total da loja, conserva o zero e só leva aos lançamentos permitidos', async () => {
+    const dia = '2026-09-16';
+    const atualizadoEm = new Date('2026-09-17T15:20:00.000Z');
+    const data = new Date(`${dia}T00:00:00.000Z`);
+    await a.faturamentoLancamento.createMany({ data: [
+      { parceiroId: A.id, lojaId: ids.vp, data, canal: 'LOJA', origem: 'MANUAL', valorCentavos: 0, pedidos: 0, clientes: 0,
+        chaveIdempotencia: chaveHumana(ids.vp, 'LOJA', dia), atualizadoEm },
+      { parceiroId: A.id, lojaId: ids.vp, data, canal: 'DELIVERY_PROPRIO', origem: 'IMPORTACAO', valorCentavos: 5000, pedidos: 1, clientes: 1,
+        chaveIdempotencia: chaveHumana(ids.vp, 'DELIVERY_PROPRIO', dia), atualizadoEm, origemRef: 'planilha-privada.xlsx#5' },
+      { parceiroId: A.id, lojaId: ids.vp, data, canal: 'IFOOD', origem: 'INTEGRACAO', valorCentavos: 2300, pedidos: 1, clientes: null,
+        chaveIdempotencia: 'outro-connector:pedido:prova-p02', origemRef: 'outro-connector:prova-sem-recibo', atualizadoEm },
+      { parceiroId: A.id, lojaId: ids.meier, data, canal: 'LOJA', origem: 'MANUAL', valorCentavos: 978654, pedidos: 8, clientes: 8,
+        chaveIdempotencia: chaveHumana(ids.meier, 'LOJA', dia), atualizadoEm },
+    ] });
+    await b.faturamentoLancamento.create({ data: {
+      parceiroId: B.id, lojaId: ids.lojaB, data, canal: 'LOJA', origem: 'MANUAL', valorCentavos: 897654, pedidos: 7, clientes: 7,
+      chaveIdempotencia: chaveHumana(ids.lojaB, 'LOJA', dia), atualizadoEm,
+    } });
+    atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
+    como(alcanceDe('OPERADOR', [ids.vp], ['faturamento.ver']), 'Leitura');
+    const abrir = (query: Record<string, string>) => ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-09', ...query }) });
+    const html = (e: unknown) => renderToStaticMarkup(e as never).replace(/\u00a0/g, ' ');
+    const antes = await abrir({});
+    expect(html(antes)).toContain(`/erp/faturamento?mes=2026-09&amp;loja=${ids.vp}&amp;origem=1#origem-do-total`);
+    expect(antes.props.origemDoTotal).toBeUndefined();
+    const detalhe = await abrir({ loja: ids.vp, origem: '1' });
+    expect(detalhe.props.lojaAberta?.total).toEqual(antes.props.lojaAberta?.total);
+    expect(detalhe.props.lojaAberta?.total.valorCentavos).toBe(7300);
+    expect(detalhe.props.origemDoTotal).toEqual({
+      dias: [{ data: dia, parcelas: [
+        { canal: 'LOJA', valorCentavos: 0, fontes: ['MANUAL'] },
+        { canal: 'DELIVERY_PROPRIO', valorCentavos: 5000, fontes: ['IMPORTACAO'] },
+        { canal: 'IFOOD', valorCentavos: 2300, fontes: ['SEM_FONTE'] },
+      ] }],
+      ultimaAtualizacao: atualizadoEm.toISOString(),
+    });
+    const pagina = html(detalhe);
+    expect(pagina).toContain('Vila da Penha · setembro de 2026');
+    expect(pagina).toContain('Digitado, Planilha, Sem fonte');
+    expect(pagina).toContain('R$ 0,00');
+    expect(pagina).toContain('R$ 73,00');
+    expect(pagina).toContain(`href="/erp/faturamento/${ids.vp}/${dia}"`);
+    expect(pagina).not.toContain('planilha-privada.xlsx');
+    expect(pagina).not.toContain('outro-connector:prova-sem-recibo');
+    const irAoDia = (lojaId: string) => ErpDiaPage({ params: Promise.resolve({ lojaId, data: dia }), searchParams: Promise.resolve({}) });
+    expect((await irAoDia(ids.vp)).props.podeLancar).toBe(false);
+    for (const fora of [ids.meier, ids.lojaB]) {
+      const forjada = await abrir({ loja: fora, origem: '1' });
+      expect(forjada.props.lojaAberta?.loja.id).toBe(ids.vp);
+      expect(html(forjada)).not.toContain(`/erp/faturamento/${fora}/${dia}`);
+      expect(await rodar(() => irAoDia(fora))).toEqual({ erro: 'NOT_FOUND' });
+    }
+    const vazio = html(await abrir({ origem: '1', mes: '2026-08' }));
+    expect(vazio).toContain('Sem fonte');
+    expect(vazio).toContain('Sem dados');
+    expect(vazio).not.toContain('R$ 0,00');
   });
 });

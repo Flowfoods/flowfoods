@@ -17,6 +17,7 @@ import { desligarConexao, mudarModulo } from '@/lib/integracoes/core/conexoes';
 import { mudarLiberacao } from '@/lib/erp/liberacao';
 import { lancarDia, obterDia, removerLancamento } from '@/lib/erp/faturamento';
 import { resolverAlcance } from '@/lib/erp/permissoes';
+import { carregarDoMes } from '@/components/erp/telas/faturamento/carregar';
 import { criarPeriodoFechadoDeTeste, reabrirPeriodoDeTeste, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 import { assumirPosseFinanceira, bucketFinanceiro, DIA_FINANCEIRO, massaFinanceira, publicarFinanceiro, type MassaFinanceira } from './integracao-faturamento-apoio';
 
@@ -147,6 +148,12 @@ describe.skipIf(!URL_TESTE)('INT-1.7B · aplicação financeira atômica e repla
     expect(await aplicar(a)).toMatchObject({ estado: 'aplicado', fontes: 2 });
     const d = await obterDia(a.cliente, al, a.lojaId, DIA_FINANCEIRO);
     expect(d?.canais.find(c => c.canal === 'IFOOD')?.valendo).toMatchObject({ valorCentavos: 4999, pedidos: 5, clientes: 19, fonteClientes: 'HUMANO' });
+    const mensal = await carregarDoMes(a.cliente, al, { tipo: 'loja', lojaId: a.lojaId, nome: d!.loja.nome }, { mes: DIA_FINANCEIRO.slice(0, 7), origem: '1' });
+    expect(mensal.lojaAberta?.total.valorCentavos).toBe(4999);
+    expect(mensal.origemDoTotal).toEqual({
+      dias: [{ data: DIA_FINANCEIRO, parcelas: [{ canal: 'IFOOD', valorCentavos: 4999, fontes: ['IFOOD_ANALYTICS'] }] }],
+      ultimaAtualizacao: (await recibo(a)).aplicadoEm?.toISOString(),
+    });
     expect(await a.cliente.faturamentoLancamento.findFirst({ where: { id: humana.id } })).toEqual(humana);
     expect(await removerLancamento(a.cliente, al, { lojaId: a.lojaId, canal: 'IFOOD', data: DIA_FINANCEIRO, motivo: 'Teste de ausência', versao: humana.atualizadoEm.toISOString() }, inventario.autor)).toMatchObject({ ok: true });
     const d2 = await obterDia(a.cliente, al, a.lojaId, DIA_FINANCEIRO);
