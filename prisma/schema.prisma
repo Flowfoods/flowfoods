@@ -631,6 +631,8 @@ model ParceiroFlow {
   erpIntegracaoFaturamentoFontes IntegracaoFaturamentoFonte[]
   erpIntegracaoRecibosFinancial IntegracaoReciboFinancial[]
   erpIntegracaoSomasFinancial IntegracaoSomasFinancial[]
+  erpIntegracaoEventosIfood    IntegracaoEventoIfood[]
+  erpIntegracaoEventosIfoodAck IntegracaoEventoIfoodAck[]
   erpLiberacoesDeModulo       LiberacaoDeModulo[]
 
   // Acesso das pessoas (0.3): FORA do tenant, só por `src/lib/erp/credenciais.ts`
@@ -3166,6 +3168,7 @@ model IntegracaoConexao {
   fontesFaturamento IntegracaoFaturamentoFonte[]
   recibosFinancial IntegracaoReciboFinancial[]
   recortesConsultoria LiberacaoDeModulo[]
+  eventosIfood IntegracaoEventoIfood[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, lojaId, id], map: "IntegracaoConexao_tenant_loja_id_key")
@@ -3480,6 +3483,48 @@ model IntegracaoSomasFinancial {
   recibo         IntegracaoReciboFinancial @relation(fields: [parceiroId, reciboId], references: [parceiroId, id], onDelete: Restrict, map: "IFSomas_recibo_fkey")
 
   @@id([parceiroId, reciboId], map: "IFSomas_pkey")
+}
+
+// Evento observado no iFood. A data de origem preserva a representação integral do provedor.
+model IntegracaoEventoIfood {
+  id              String                 @id @default(cuid())
+  parceiroId      String
+  lojaId          String
+  conexaoId       String
+  ambiente        AmbienteDeIntegracao
+  merchantId      String
+  eventoId        String
+  pedidoId        String
+  codigo          String
+  codigoCompleto  String
+  criadoNoIfoodEm String
+  categoria       String?
+  canal           String?
+  recebidoEm      DateTime               @default(now()) @db.Timestamptz(3)
+  parceiro        ParceiroFlow           @relation(fields: [parceiroId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "IfoodEvento_parceiro_fkey")
+  conexao         IntegracaoConexao      @relation(fields: [parceiroId, lojaId, conexaoId], references: [parceiroId, lojaId, id], onDelete: Restrict, onUpdate: Restrict, map: "IfoodEvento_conexao_fkey")
+  acks            IntegracaoEventoIfoodAck[]
+
+  @@unique([parceiroId, id], map: "IfoodEvento_tenant_key")
+  @@unique([parceiroId, ambiente, merchantId, eventoId], map: "IfoodEvento_evento_key")
+}
+
+// Cada app registra seu próprio recebimento e a confirmação de ACK. O app global é conferido no banco.
+model IntegracaoEventoIfoodAck {
+  id              String                @id @default(cuid())
+  parceiroId      String
+  eventoInternoId String
+  appId           String
+  geracao         Int                   @default(0)
+  recebidoEm      DateTime              @default(now()) @db.Timestamptz(3)
+  ackAceitoEm     DateTime?             @db.Timestamptz(3)
+  posse           String?
+  posseAte        DateTime?             @db.Timestamptz(3)
+  parceiro        ParceiroFlow          @relation(fields: [parceiroId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "IfoodEventoAck_parceiro_fkey")
+  evento          IntegracaoEventoIfood @relation(fields: [parceiroId, eventoInternoId], references: [parceiroId, id], onDelete: Restrict, onUpdate: Restrict, map: "IfoodEventoAck_evento_fkey")
+
+  @@unique([parceiroId, eventoInternoId, appId], map: "IfoodEventoAck_evento_app_key")
+  @@index([parceiroId, appId, ackAceitoEm, recebidoEm], map: "IfoodEventoAck_pendencias_idx")
 }
 
 // Liberação de um módulo do ERP para um parceiro (decisão de Rodolfo de 25/10/2026: "cada módulo liberado individualmente").

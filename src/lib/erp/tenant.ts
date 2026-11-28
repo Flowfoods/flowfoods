@@ -320,6 +320,8 @@ export type ClienteDoParceiro = ModelosDoParceiro & {
   readonly parceiroId: string;
   /** true: toda escrita é recusada (portão e transação read-only no banco). */
   readonly somenteLeitura: boolean;
+  /** true: transacao reutiliza a transação externa e o commit ainda depende do chamador. */
+  readonly emTransacao: boolean;
   /**
    * Transação interativa ainda amarrada ao parceiro: o `tx` recebido é outro
    * `ClienteDoParceiro`. Chamada de dentro de uma transação, só reaproveita a
@@ -373,6 +375,7 @@ function montar(
     ...modelos,
     parceiroId,
     somenteLeitura,
+    emTransacao: abrir === null,
     transacao: abrir ?? ((fn) => fn(cliente)),
     sql: async <T>(consulta: TemplateStringsArray, ...valores: unknown[]) => {
       conferirSqlDoParceiro(consulta);
