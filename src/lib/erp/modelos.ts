@@ -80,6 +80,8 @@ export const MODELOS_DE_TENANT = [
   'integracaoFaturamentoFonte',
   'integracaoReciboFinancial',
   'integracaoSomasFinancial',
+  'integracaoEventoIfood',
+  'integracaoEventoIfoodAck',
   'liberacaoDeModulo',
 ] as const;
 
@@ -157,6 +159,8 @@ export const RELACOES_DE_TENANT = [
   'erpIntegracaoFaturamentoFontes',
   'erpIntegracaoRecibosFinancial',
   'erpIntegracaoSomasFinancial',
+  'erpIntegracaoEventosIfood',
+  'erpIntegracaoEventosIfoodAck',
   'erpLiberacoesDeModulo',
 ] as const;
 

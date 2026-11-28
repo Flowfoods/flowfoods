@@ -20,7 +20,7 @@ const eventoSchema = z.object({
   salesChannel: codigo.nullish(),
 });
 const loteSchema = z.array(eventoSchema);
-type EventoIfood = z.infer<typeof eventoSchema>;
+export type EventoIfood = z.infer<typeof eventoSchema>;
 
 export class ErroContratoEvents extends Error {
   constructor(public readonly codigo: 'PARAMETROS' | 'HTTP' | 'ESQUEMA' | 'ESCOPO' | 'CONFLITO', mensagem: string) {
@@ -29,8 +29,10 @@ export class ErroContratoEvents extends Error {
   }
 }
 
-function mesmoEvento(anterior: EventoIfood, recebido: EventoIfood): boolean {
-  return anterior.orderId === recebido.orderId
+export function mesmoEventoIfood(anterior: EventoIfood, recebido: EventoIfood): boolean {
+  return anterior.id === recebido.id
+    && anterior.merchantId === recebido.merchantId
+    && anterior.orderId === recebido.orderId
     && anterior.code === recebido.code
     && anterior.fullCode === recebido.fullCode
     && compararInstantes(lerInstante(anterior.createdAt), lerInstante(recebido.createdAt)) === 0
@@ -70,7 +72,7 @@ export function conferirRecepcaoEventsIfood(entrada: unknown, resposta: { status
     const anterior = porId.get(evento.id);
     if (anterior === undefined) {
       porId.set(evento.id, evento);
-    } else if (mesmoEvento(anterior, evento)) {
+    } else if (mesmoEventoIfood(anterior, evento)) {
       reentregues.add(evento.id);
     } else {
       throw new ErroContratoEvents('CONFLITO', 'O lote contém versões divergentes do mesmo evento.');

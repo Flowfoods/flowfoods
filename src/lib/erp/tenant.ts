@@ -339,6 +339,13 @@ export type ClienteDoParceiro = ModelosDoParceiro & {
   sql<T = Record<string, unknown>>(consulta: TemplateStringsArray, ...valores: unknown[]): Promise<T[]>;
 };
 
+const clientesComTransacaoPropria = new WeakSet<ClienteDoParceiro>();
+
+/** Indica que a chamada a transacao só retorna depois do próprio commit. */
+export function clienteComTransacaoPropria(cliente: ClienteDoParceiro): boolean {
+  return clientesComTransacaoPropria.has(cliente);
+}
+
 /** Roda a consulta no contexto do parceiro. `escreve`: passa pela conferência de status. */
 type Executor = <T>(consulta: Promise<T>, escreve: boolean) => Promise<T>;
 
@@ -379,6 +386,7 @@ function montar(
       return executar(cru.$queryRaw(consulta, ...valores), ESCRITA_NO_SQL.test(consulta.join(' '))) as Promise<T[]>;
     },
   };
+  if (abrir !== null) clientesComTransacaoPropria.add(cliente);
   return Object.freeze(cliente);
 }
 
