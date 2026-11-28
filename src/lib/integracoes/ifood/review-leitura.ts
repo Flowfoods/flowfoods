@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ChamadaIfood } from './http';
+import { compararInstantes, lerInstante } from './instante-iso';
 
 const TAMANHO_MAXIMO = 50;
 const uuid = z.guid().transform(valor => valor.toLowerCase());
@@ -57,23 +58,7 @@ function exigir(condicao: unknown, codigo: CodigoContratoReview, mensagem: strin
   if (!condicao) throw new ErroContratoReview(codigo, mensagem);
 }
 
-function lerInstante(valor: string) {
-  const fracao = valor.match(/\.(\d+)/)?.[1] ?? '';
-  return { milissegundos: Date.parse(valor), fracaoDoMilissegundo: fracao.slice(3).replace(/0+$/, '') };
-}
-
-type InstanteReview = ReturnType<typeof lerInstante>;
-
-function compararInstantes(a: InstanteReview, b: InstanteReview) {
-  if (a.milissegundos !== b.milissegundos) return a.milissegundos - b.milissegundos;
-  const digitos = Math.max(a.fracaoDoMilissegundo.length, b.fracaoDoMilissegundo.length);
-  const esquerda = a.fracaoDoMilissegundo.padEnd(digitos, '0');
-  const direita = b.fracaoDoMilissegundo.padEnd(digitos, '0');
-  if (esquerda === direita) return 0;
-  return esquerda < direita ? -1 : 1;
-}
-
-function dataEmUtc(valor: InstanteReview) {
+function dataEmUtc(valor: ReturnType<typeof lerInstante>) {
   const utc = new Date(valor.milissegundos).toISOString();
   return `${utc.slice(0, -1)}${valor.fracaoDoMilissegundo}Z`;
 }
