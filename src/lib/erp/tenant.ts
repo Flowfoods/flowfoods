@@ -320,8 +320,6 @@ export type ClienteDoParceiro = ModelosDoParceiro & {
   readonly parceiroId: string;
   /** true: toda escrita é recusada (portão e transação read-only no banco). */
   readonly somenteLeitura: boolean;
-  /** true: transacao reutiliza a transação externa e o commit ainda depende do chamador. */
-  readonly emTransacao: boolean;
   /**
    * Transação interativa ainda amarrada ao parceiro: o `tx` recebido é outro
    * `ClienteDoParceiro`. Chamada de dentro de uma transação, só reaproveita a
@@ -340,6 +338,13 @@ export type ClienteDoParceiro = ModelosDoParceiro & {
    */
   sql<T = Record<string, unknown>>(consulta: TemplateStringsArray, ...valores: unknown[]): Promise<T[]>;
 };
+
+const clientesComTransacaoPropria = new WeakSet<ClienteDoParceiro>();
+
+/** Indica que a chamada a transacao só retorna depois do próprio commit. */
+export function clienteComTransacaoPropria(cliente: ClienteDoParceiro): boolean {
+  return clientesComTransacaoPropria.has(cliente);
+}
 
 /** Roda a consulta no contexto do parceiro. `escreve`: passa pela conferência de status. */
 type Executor = <T>(consulta: Promise<T>, escreve: boolean) => Promise<T>;
@@ -375,13 +380,13 @@ function montar(
     ...modelos,
     parceiroId,
     somenteLeitura,
-    emTransacao: abrir === null,
     transacao: abrir ?? ((fn) => fn(cliente)),
     sql: async <T>(consulta: TemplateStringsArray, ...valores: unknown[]) => {
       conferirSqlDoParceiro(consulta);
       return executar(cru.$queryRaw(consulta, ...valores), ESCRITA_NO_SQL.test(consulta.join(' '))) as Promise<T[]>;
     },
   };
+  if (abrir !== null) clientesComTransacaoPropria.add(cliente);
   return Object.freeze(cliente);
 }
 

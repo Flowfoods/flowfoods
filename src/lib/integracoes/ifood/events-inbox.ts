@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { ClienteDoParceiro } from '@/lib/erp/tenant';
+import { clienteComTransacaoPropria, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { conferirRecepcaoEventsIfood, mesmoEventoIfood } from './events-recepcao';
 
 const idInterno = z.string().min(1).max(128).refine(valor => valor.trim() === valor);
@@ -50,7 +50,7 @@ async function conferirConexao(tx: ClienteDoParceiro, alvo: Alvo): Promise<void>
 
 /** Registra uma recepção e a intenção de ACK do app receptor na mesma transação. */
 export async function gravarLoteEventsIfood(cliente: ClienteDoParceiro, entrada: unknown, resposta: Recebimento) {
-  if (cliente.emTransacao) throw new ErroEventsInbox('ALVO', 'A gravação de Events precisa controlar a transação do lote.');
+  if (!clienteComTransacaoPropria(cliente)) throw new ErroEventsInbox('ALVO', 'A gravação de Events precisa controlar a transação do lote.');
   const alvo = lerAlvo(entrada);
   const lote = conferirRecepcaoEventsIfood({ merchantId: alvo.merchantId, ambiente: alvo.ambiente }, resposta);
   const { lojaId, conexaoId, ambiente, merchantId } = alvo;
@@ -105,7 +105,7 @@ export async function gravarLoteEventsIfood(cliente: ClienteDoParceiro, entrada:
 export async function enviarAckPendenteIfood(
   cliente: ClienteDoParceiro, entrada: unknown, enviar: (chamada: ChamadaAck) => Promise<{ status: number | null }>,
 ): Promise<{ situacao: SituacaoAck; quantidade: number }> {
-  if (cliente.emTransacao) throw new ErroEventsInbox('ALVO', 'O envio de ACK deve iniciar fora de uma transação aberta.');
+  if (!clienteComTransacaoPropria(cliente)) throw new ErroEventsInbox('ALVO', 'O envio de ACK deve iniciar fora de uma transação aberta.');
   const alvo = lerAlvo(entrada);
   const posse = randomUUID();
   const selecionados = await cliente.transacao(async tx => {
